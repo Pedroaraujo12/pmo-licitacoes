@@ -1,17 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { use } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 
 export default function EditProcessoClient({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+
+  function getSupabase() {
+    if (!supabaseRef.current) supabaseRef.current = createClient()
+    return supabaseRef.current
+  }
 
   const [coordenacoes, setCoordenacoes] = useState<Coordenacao[]>([])
   const [modalidades, setModalidades] = useState<Modalidade[]>([])
@@ -24,12 +28,12 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
   useEffect(() => {
     async function load() {
       const [proc, c, m, d, r, s] = await Promise.all([
-        supabase.from('processos').select('*').eq('id', id).single(),
-        supabase.from('coordenacoes').select('*'),
-        supabase.from('modalidades').select('*'),
-        supabase.from('demandantes').select('*'),
-        supabase.from('responsaveis').select('*'),
-        supabase.from('status_processo').select('*'),
+        getSupabase().from('processos').select('*').eq('id', id).single(),
+        getSupabase().from('coordenacoes').select('*'),
+        getSupabase().from('modalidades').select('*'),
+        getSupabase().from('demandantes').select('*'),
+        getSupabase().from('responsaveis').select('*'),
+        getSupabase().from('status_processo').select('*'),
       ])
 
       if (c.data) setCoordenacoes(c.data)
@@ -70,7 +74,7 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
       }
     }
 
-    const { error: err } = await supabase.from('processos').update(payload).eq('id', id)
+    const { error: err } = await getSupabase().from('processos').update(payload).eq('id', id)
     if (err) {
       setError(err.message)
       setLoading(false)

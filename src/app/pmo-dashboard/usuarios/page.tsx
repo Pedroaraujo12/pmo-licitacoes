@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types/database'
 import { Shield, ShieldAlert, Eye, UserCheck } from 'lucide-react'
@@ -20,7 +20,13 @@ const roleColors: Record<string, string> = {
 }
 
 export default function UsuariosPage() {
-  const supabase = createClient()
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+
+  function getSupabase() {
+    if (!supabaseRef.current) supabaseRef.current = createClient()
+    return supabaseRef.current
+  }
+
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newRole, setNewRole] = useState<string>('')
@@ -28,20 +34,20 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getSupabase().auth.getUser()
       if (user) {
-        const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        const { data: prof } = await getSupabase().from('profiles').select('*').eq('id', user.id).single()
         if (prof) setCurrentUserRole(prof.role)
       }
 
-      const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      const { data } = await getSupabase().from('profiles').select('*').order('created_at', { ascending: false })
       if (data) setProfiles(data)
     }
     load()
   }, [])
 
   async function updateRole(userId: string, role: string) {
-    const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
+    const { error } = await getSupabase().from('profiles').update({ role }).eq('id', userId)
     if (!error) {
       setProfiles(prev => prev.map(p => p.id === userId ? { ...p, role: role as Profile['role'] } : p))
       setEditingId(null)

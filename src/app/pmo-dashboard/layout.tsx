@@ -26,13 +26,13 @@ export default function DashboardLayout({
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
       if (!user) {
         router.push('/login')
         return
       }
       supabase.from('profiles').select('*').eq('id', user.id).single()
-        .then(({ data }) => setProfile(data))
+        .then(({ data }: { data: Profile | null }) => setProfile(data))
     })
   }, [])
 

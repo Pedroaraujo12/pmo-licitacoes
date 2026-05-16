@@ -1,15 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 
 export default function NovoProcessoPage() {
   const router = useRouter()
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+
+  function getSupabase() {
+    if (!supabaseRef.current) supabaseRef.current = createClient()
+    return supabaseRef.current
+  }
 
   const [coordenacoes, setCoordenacoes] = useState<Coordenacao[]>([])
   const [modalidades, setModalidades] = useState<Modalidade[]>([])
@@ -42,11 +47,11 @@ export default function NovoProcessoPage() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('coordenacoes').select('*'),
-      supabase.from('modalidades').select('*'),
-      supabase.from('demandantes').select('*'),
-      supabase.from('responsaveis').select('*'),
-      supabase.from('status_processo').select('*'),
+      getSupabase().from('coordenacoes').select('*'),
+      getSupabase().from('modalidades').select('*'),
+      getSupabase().from('demandantes').select('*'),
+      getSupabase().from('responsaveis').select('*'),
+      getSupabase().from('status_processo').select('*'),
     ]).then(([c, m, d, r, s]) => {
       if (c.data) setCoordenacoes(c.data)
       if (m.data) setModalidades(m.data)
@@ -73,10 +78,10 @@ export default function NovoProcessoPage() {
       }
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getSupabase().auth.getUser()
     if (user) payload.created_by = user.id
 
-    const { error: err } = await supabase.from('processos').insert(payload)
+    const { error: err } = await getSupabase().from('processos').insert(payload)
     if (err) {
       setError(err.message)
       setLoading(false)

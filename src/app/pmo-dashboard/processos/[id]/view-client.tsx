@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { use } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Processo, Atividade } from '@/types/database'
 import { ArrowLeft, Edit, Trash2 } from 'lucide-react'
@@ -10,13 +9,19 @@ import { ArrowLeft, Edit, Trash2 } from 'lucide-react'
 export default function ProcessoViewClient({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const supabase = createClient()
   const [processo, setProcesso] = useState<Processo | null>(null)
   const [atividades, setAtividades] = useState<Atividade[]>([])
   const [profile, setProfile] = useState<{ role: string } | null>(null)
   const [loading, setLoading] = useState(true)
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+
+  function getSupabase() {
+    if (!supabaseRef.current) supabaseRef.current = createClient()
+    return supabaseRef.current
+  }
 
   useEffect(() => {
+    const supabase = getSupabase()
     async function load() {
       const { data: proc } = await supabase
         .from('processos')
@@ -44,7 +49,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
 
   async function handleDelete() {
     if (!confirm('Tem certeza que deseja excluir este processo?')) return
-    const { error } = await supabase.from('processos').delete().eq('id', id)
+    const { error } = await getSupabase().from('processos').delete().eq('id', id)
     if (!error) router.push('/pmo-dashboard')
   }
 

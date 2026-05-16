@@ -9,7 +9,7 @@ export default function Home() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: unknown } }) => {
       if (user) {
         router.replace('/pmo-dashboard')
       } else {
