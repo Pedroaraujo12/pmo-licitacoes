@@ -1,12 +1,22 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
 
-export default async function Home() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
-  if (user) {
-    redirect('/pmo-dashboard')
-  }
-  redirect('/login')
+export default function Home() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        router.replace('/pmo-dashboard')
+      } else {
+        router.replace('/login')
+      }
+    })
+  }, [router])
+
+  return null
 }
