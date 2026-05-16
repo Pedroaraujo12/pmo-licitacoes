@@ -103,7 +103,7 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: 0 }}>Editar Processo</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Editar Processo</h1>
         <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>{form.id_processo}</p>
       </div>
 

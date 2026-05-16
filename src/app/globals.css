@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #020617;
+  --foreground: #f8fafc;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
   --sidebar: #1e293b;
   --sidebar-foreground: #f1f5f9;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --border: #e2e8f0;
-  --muted: #f1f5f9;
+  --card: rgba(30, 41, 59, 0.7);
+  --card-foreground: #f8fafc;
+  --border: rgba(255, 255, 255, 0.1);
+  --muted: rgba(30, 41, 59, 0.5);
   --muted-foreground: #64748b;
   --destructive: #ef4444;
   --success: #22c55e;
@@ -24,5 +24,29 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

@@ -53,7 +53,7 @@ export default function UsuariosPage() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: 0 }}>Gerenciar Usuários</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Gerenciar Usuários</h1>
         <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>Controle de níveis de acesso</p>
       </div>
 

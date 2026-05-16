@@ -20,7 +20,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
     async function load() {
       const { data: proc } = await supabase
         .from('processos')
-        .select('*, coordenacao:nome, status:nome, responsavel:nome, demandante:nome, modalidade:nome')
+        .select('*, coordenacao(nome), status(nome), responsavel(nome), demandante(nome), modalidade(nome)')
         .eq('id', id)
         .single()
       setProcesso(proc)
@@ -62,7 +62,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: 0 }}>{processo.id_processo}</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>{processo.id_processo}</h1>
             <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>{processo.objeto_resumido}</p>
           </div>
         </div>

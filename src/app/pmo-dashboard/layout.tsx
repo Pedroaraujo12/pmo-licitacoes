@@ -138,7 +138,7 @@ export default function DashboardLayout({
         flex: 1,
         padding: 24,
         transition: 'margin-left 0.2s',
-        background: '#f8fafc',
+        background: '#020617',
         minHeight: '100vh',
       }}>
         {children}
