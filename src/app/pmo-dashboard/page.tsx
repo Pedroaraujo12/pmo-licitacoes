@@ -41,10 +41,8 @@ export default function DashboardPage() {
       supabase.from('licitacoes').select('*').order('data_entrada', { ascending: false }),
       supabase.from('modalidades').select('*'),
       supabase.from('responsaveis').select('*'),
-      supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) =>
-        user ? supabase.from('profiles').select('*').eq('id', user.id).single() : null
-      ),
-    ]).then(([l, m, r, profResult]) => {
+      supabase.auth.getUser(),
+    ]).then(([l, m, r, userResult]) => {
       const errors = [l.error, m.error, r.error].filter(Boolean)
       if (errors.length > 0) {
         console.error('Erros Supabase:', errors)
@@ -55,9 +53,9 @@ export default function DashboardPage() {
       if (l.data) setLicitacoes(l.data as Licitacao[])
       if (m.data) setModalidades(m.data)
       if (r.data) setResponsaveis(r.data)
-      if (profResult && 'data' in profResult) {
-        const prof = (profResult as { data: Profile | null }).data
-        if (prof) setProfile(prof)
+      const user = (userResult as { data: { user: { user_metadata?: { role?: string } } | null } }).data?.user
+      if (user?.user_metadata?.role) {
+        setProfile({ role: user.user_metadata.role } as Profile)
       }
       setLoading(false)
     }).catch(err => {
