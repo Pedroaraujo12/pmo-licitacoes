@@ -26,10 +26,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 457bf28700334ba70dc9093818245bd0
-          projectName: pmo-licitacoes
-          directory: out
-          branch: main
+          command: pages deploy out --project-name=pmo-licitacoes --branch=main
