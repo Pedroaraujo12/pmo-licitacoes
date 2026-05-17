@@ -221,8 +221,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
             </svg>
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight uppercase">Gestão de Projetos</h1>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-[0.2em]">AgSUS CCS-RD • Licitações 2026</p>
+            <h1 className="text-2xl font-extrabold tracking-tight uppercase">Gestão de Processo</h1>
           </div>
         </div>
         <div className="flex gap-3">
