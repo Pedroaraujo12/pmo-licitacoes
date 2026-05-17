@@ -32,16 +32,20 @@ function formatDate(d: string | null | undefined) {
   return date.toLocaleDateString('pt-BR')
 }
 
-function getAging(dateStr: string | null | undefined) {
-  if (!dateStr || dateStr === 'None') return { label: 'N/A', class: '' }
-  const target = new Date(dateStr)
-  if (isNaN(target.getTime())) return { label: 'Data Inv.', class: '' }
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const diff = Math.ceil((target.getTime() - today.getTime()) / 86400000)
-  if (diff < 0) return { label: `Atrasado ${Math.abs(diff)}d`, class: 'aging-red' }
-  if (diff <= 2) return { label: `Vence em ${diff}d`, class: 'aging-yellow' }
-  return { label: `No Prazo (${diff}d)`, class: 'aging-green' }
+function getAging(dateStr: string | null | undefined, processo_atrasado?: boolean) {
+  if (dateStr && dateStr !== 'None') {
+    const target = new Date(dateStr)
+    if (!isNaN(target.getTime())) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const diff = Math.ceil((target.getTime() - today.getTime()) / 86400000)
+      if (diff < 0) return { label: `Atrasado ${Math.abs(diff)}d`, class: 'aging-red' }
+      if (diff <= 2) return { label: `Vence em ${diff}d`, class: 'aging-yellow' }
+      return { label: `No Prazo (${diff}d)`, class: 'aging-green' }
+    }
+  }
+  if (processo_atrasado === true) return { label: 'Atrasado', class: 'aging-red' }
+  return { label: 'N/A', class: '' }
 }
 
 const chartColors = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899']
@@ -51,6 +55,7 @@ interface Props {
   modalidades: Modalidade[]
   responsaveis: Responsavel[]
   userRole?: string | null
+  statusCronograma?: Record<string, unknown>
 }
 
 export default function DashboardContent({ processos, modalidades, responsaveis, userRole }: Props) {
@@ -122,7 +127,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
         }
       }
       if (statusFilter) {
-        const ag = getAging(p.data_entrega)
+        const ag = getAging(p.data_entrega, p.processo_atrasado)
         if (statusFilter === 'Atrasados' && ag.class !== 'aging-red') return false
         if (statusFilter === 'No Prazo' && ag.class === 'aging-red') return false
       }
@@ -149,7 +154,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
       if (hom > 0) return s + cleanNum(p.valor_estimado) - hom
       return s
     }, 0)
-    const atrasados = filtered.filter(p => getAging(p.data_entrega).class === 'aging-red').length
+    const atrasados = filtered.filter(p => getAging(p.data_entrega, p.processo_atrasado).class === 'aging-red').length
     return { total, estimado, economia, atrasados }
   }, [filtered])
 
@@ -172,7 +177,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
 
     const health = filtered.reduce(
       (a, p) => {
-        const c = getAging(p.data_entrega).class
+        const c = getAging(p.data_entrega, p.processo_atrasado).class
         if (c === 'aging-green') a.g++
         else if (c === 'aging-yellow') a.y++
         else if (c === 'aging-red') a.r++
@@ -325,7 +330,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
               </thead>
               <tbody className="text-[10px] divide-y divide-white/5">
                   {filtered.map(p => {
-                  const ag = getAging(p.data_entrega)
+                  const ag = getAging(p.data_entrega, p.processo_atrasado)
                   return (
                     <tr
                       key={p.id}
@@ -543,7 +548,9 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
               </div>
               <div className="p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-slate-500 mb-1">Progresso</p>
-                <p className="text-sm font-bold text-slate-100">{modalProcesso.progresso != null ? `${modalProcesso.progresso}%` : '-'}</p>
+                <p className="text-sm font-bold text-slate-100">
+                  {modalProcesso.total_etapas ? `${modalProcesso.etapas_concluidas}/${modalProcesso.total_etapas} etapas` : modalProcesso.progresso != null ? `${modalProcesso.progresso}%` : '-'}
+                </p>
               </div>
               {modalProcesso.observacoes && (
                 <div className="col-span-2 p-4 glass-card-inner">

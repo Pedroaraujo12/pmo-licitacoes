@@ -3,13 +3,35 @@
 import { useEffect, useState, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { Processo, Atividade } from '@/types/database'
-import { ArrowLeft, Edit, Trash2 } from 'lucide-react'
+import type { Processo, Atividade, CronogramaAtividade } from '@/types/database'
+import { ArrowLeft, Edit, Trash2, CheckCircle2, Circle, Clock, AlertTriangle } from 'lucide-react'
+
+function formatDate(d: string | null | undefined) {
+  if (!d) return '-'
+  const date = new Date(d)
+  if (isNaN(date.getTime())) return d
+  return date.toLocaleDateString('pt-BR')
+}
+
+function statusIcon(status: string) {
+  switch (status) {
+    case 'concluido': return <CheckCircle2 size={16} className="text-emerald-400" />
+    case 'em_andamento': return <Clock size={16} className="text-blue-400" />
+    default: return <Circle size={16} className="text-slate-600" />
+  }
+}
+
+function isOverdue(etapa: CronogramaAtividade) {
+  if (etapa.status === 'concluido') return false
+  if (!etapa.data_fim) return false
+  return new Date(etapa.data_fim) < new Date(new Date().toDateString())
+}
 
 export default function ProcessoViewClient({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const [processo, setProcesso] = useState<Processo | null>(null)
+  const [cronograma, setCronograma] = useState<CronogramaAtividade[]>([])
   const [atividades, setAtividades] = useState<Atividade[]>([])
   const [profile, setProfile] = useState<{ role: string } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -30,6 +52,13 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         .single()
       setProcesso(proc)
 
+      const { data: crono } = await supabase
+        .from('cronograma_atividades')
+        .select('*')
+        .eq('processo_id', id)
+        .order('ordem', { ascending: true })
+      setCronograma(crono || [])
+
       const { data: atv } = await supabase
         .from('atividades')
         .select('*')
@@ -47,6 +76,20 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
     load()
   }, [id])
 
+  async function updateEtapaStatus(etapaId: string, newStatus: string) {
+    const supabase = getSupabase()
+    const now = new Date().toISOString().split('T')[0]
+    const update: Record<string, unknown> = { status: newStatus }
+    if (newStatus === 'em_andamento') update.data_inicio_real = now
+    if (newStatus === 'concluido') update.data_fim_real = now
+    const { error } = await supabase.from('cronograma_atividades').update(update).eq('id', etapaId)
+    if (!error) {
+      setCronograma(prev => prev.map(e =>
+        e.id === etapaId ? { ...e, ...update } as CronogramaAtividade : e
+      ))
+    }
+  }
+
   async function handleDelete() {
     if (!confirm('Tem certeza que deseja excluir este processo?')) return
     const { error } = await getSupabase().from('processos').delete().eq('id', id)
@@ -58,6 +101,10 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
 
   const canEdit = profile?.role && ['admin', 'gestor', 'consultor'].includes(profile.role)
   const canDelete = profile?.role && ['admin', 'gestor'].includes(profile.role)
+  const etapasConcluidas = cronograma.filter(e => e.status === 'concluido').length
+  const totalEtapas = cronograma.length
+  const progressoPct = totalEtapas > 0 ? Math.round((etapasConcluidas / totalEtapas) * 100) : 0
+  const etapasAtrasadas = cronograma.filter(isOverdue).length
 
   const cardStyle: React.CSSProperties = {
     background: 'rgba(30,41,59,0.7)',
@@ -73,9 +120,25 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
     border: '1px solid rgba(255,255,255,0.06)',
     padding: '12px 16px',
   }
+  const etapaStyle = (etapa: CronogramaAtividade): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '12px 16px',
+    background: 'rgba(30,41,59,0.5)',
+    borderRadius: 10,
+    borderLeft: `3px solid ${
+      etapa.status === 'concluido' ? '#10b981' :
+      isOverdue(etapa) ? '#ef4444' :
+      etapa.status === 'em_andamento' ? '#3b82f6' :
+      '#475569'
+    }`,
+    opacity: etapa.status === 'nao_iniciado' && !isOverdue(etapa) ? 0.6 : 1,
+  })
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => router.push('/pmo-dashboard')}
@@ -107,10 +170,11 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
+      {/* Info Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data de Entrada</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.data_entrada ? new Date(processo.data_entrada).toLocaleDateString('pt-BR') : '-'}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{formatDate(processo.data_entrada)}</div>
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coordenação</div>
@@ -129,32 +193,21 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.modalidade?.nome || '-'}</div>
         </div>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Demandante</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.demandante?.nome || '-'}</div>
-        </div>
-        <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qtd Itens</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.qtd_itens?.toString() || '-'}</div>
-        </div>
-        <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prioridade</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.prioridade || '-'}</div>
-        </div>
-        <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atividade Atual</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.atividade_atual || '-'}</div>
-        </div>
-        <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data Atividade</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.data_atividade ? new Date(processo.data_atividade).toLocaleDateString('pt-BR') : '-'}</div>
-        </div>
-        <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data Entrega</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.data_entrega ? new Date(processo.data_entrega).toLocaleDateString('pt-BR') : '-'}</div>
-        </div>
-        <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Progresso</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.progresso ? `${processo.progresso}%` : '-'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, height: 6, background: '#1e293b', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${progressoPct}%`,
+                background: progressoPct === 100 ? '#10b981' : '#3b82f6',
+                borderRadius: 3,
+                transition: 'width 0.3s',
+              }} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9' }}>
+              {progressoPct}% ({etapasConcluidas}/{totalEtapas})
+            </span>
+          </div>
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Estimado</div>
@@ -164,16 +217,30 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Homologado</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.valor_homologado ? `R$ ${Number(processo.valor_homologado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}</div>
         </div>
-        <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Despesa Evitada</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.despesa_evitada ? `R$ ${Number(processo.despesa_evitada).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}</div>
-        </div>
-        <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Houve Recurso?</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.houve_recurso || '-'}</div>
-        </div>
       </div>
 
+      {/* Barra de alerta de atraso */}
+      {etapasAtrasadas > 0 && (
+        <div style={{
+          ...cardStyle,
+          borderLeft: '4px solid #ef4444',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}>
+          <AlertTriangle size={20} className="text-red-400" />
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#fca5a5', margin: 0 }}>
+              {etapasAtrasadas} etapa{etapasAtrasadas > 1 ? 's' : ''} em atraso
+            </p>
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>
+              Prazo original estimado em {totalEtapas} dias úteis
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Observações */}
       {processo.observacoes && (
         <div style={cardStyle}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Observações</h3>
@@ -181,16 +248,117 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      {processo.drive && (
-        <div style={cardStyle}>
-          <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Drive</h3>
-          <a href={processo.drive} target="_blank" rel="noopener noreferrer"
-            style={{ color: '#60a5fa', fontSize: 13, textDecoration: 'underline' }}>
-            {processo.drive}
-          </a>
+      {/* Cronograma de Atividades */}
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Cronograma do Processo
+          </h3>
+          <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#64748b' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} /> Concluído
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} /> Em andamento
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} /> Atrasado
+            </span>
+          </div>
         </div>
-      )}
 
+        {cronograma.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#64748b' }}>
+            Nenhuma etapa de cronograma encontrada. Crie o processo novamente para gerar o cronograma.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {cronograma.map((etapa) => {
+              const overdue = isOverdue(etapa)
+              return (
+                <div key={etapa.id} style={etapaStyle(etapa)}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 24 }}>
+                    {statusIcon(etapa.status)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: '#64748b',
+                        background: '#1e293b',
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                      }}>
+                        #{etapa.ordem}
+                      </span>
+                      <span style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: '#3b82f6',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}>
+                        {etapa.fase}
+                      </span>
+                      <span style={{ fontSize: 9, color: '#64748b' }}>
+                        {etapa.setor}
+                      </span>
+                      {etapa.dias_uteis > 0 && (
+                        <span style={{ fontSize: 9, color: '#64748b' }}>
+                          {etapa.dias_uteis}d úteis
+                        </span>
+                      )}
+                    </div>
+                    <p style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: etapa.status === 'concluido' ? '#94a3b8' : '#f1f5f9',
+                      margin: 0,
+                      textDecoration: etapa.status === 'concluido' ? 'line-through' : 'none',
+                    }}>
+                      {etapa.descricao}
+                    </p>
+                    <div style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 11, color: '#64748b' }}>
+                      <span>
+                        {etapa.data_inicio ? `${formatDate(etapa.data_inicio)}` : '—'}
+                        {etapa.data_fim ? ` → ${formatDate(etapa.data_fim)}` : ''}
+                      </span>
+                      {overdue && (
+                        <span style={{ color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <AlertTriangle size={12} /> Atrasado
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {canEdit && etapa.status !== 'concluido' && (
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      {etapa.status === 'nao_iniciado' && (
+                        <button
+                          onClick={() => updateEtapaStatus(etapa.id, 'em_andamento')}
+                          className="cursor-pointer px-2 py-1 rounded text-[9px] font-bold bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 transition border-none"
+                        >
+                          Iniciar
+                        </button>
+                      )}
+                      {etapa.status === 'em_andamento' && (
+                        <button
+                          onClick={() => updateEtapaStatus(etapa.id, 'concluido')}
+                          className="cursor-pointer px-2 py-1 rounded text-[9px] font-bold bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition border-none"
+                        >
+                          Concluir
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Histórico de Atividades */}
       <div style={cardStyle}>
         <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Histórico de Atividades</h3>
         {atividades.length === 0 ? (
@@ -202,7 +370,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                   <span style={{ fontWeight: 600, fontSize: 13, color: '#f1f5f9' }}>{a.atividade}</span>
                   <span style={{ fontSize: 12, color: '#64748b' }}>
-                    {a.data ? new Date(a.data).toLocaleDateString('pt-BR') : ''}
+                    {a.data ? formatDate(a.data) : ''}
                     {a.responsavel && ` - ${a.responsavel}`}
                   </span>
                 </div>
