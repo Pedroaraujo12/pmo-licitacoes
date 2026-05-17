@@ -79,6 +79,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
     if (!deleteTarget) return
     setDeleting(true)
     const supabase = createClient()
+    await supabase.from('processos').delete().eq('id', deleteTarget.id)
     const { error } = await supabase.from('licitacoes').delete().eq('id', deleteTarget.id)
     if (!error) {
       setDeleteTarget(null)

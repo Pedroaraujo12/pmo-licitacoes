@@ -231,7 +231,7 @@ BEGIN
       ELSE v_data_atual := v_data_fim_atividade + 1; END IF;
 
       IF v_etapa.dias > 0 THEN
-        v_data_fim_atividade := somar_dias_uteis(v_data_atual, v_etapa.dias - 1);
+        v_data_fim_atividade := somar_dias_uteis(v_data_atual, v_etapa.dias);
       ELSE
         v_data_fim_atividade := NULL;
       END IF;
@@ -251,7 +251,7 @@ BEGIN
     ELSE v_data_atual := v_data_fim_atividade + 1; END IF;
 
     IF v_etapa.duracao_dias_uteis > 0 THEN
-      v_data_fim_atividade := somar_dias_uteis(v_data_atual, v_etapa.duracao_dias_uteis - 1);
+      v_data_fim_atividade := somar_dias_uteis(v_data_atual, v_etapa.duracao_dias_uteis);
     ELSE
       v_data_fim_atividade := NULL;
     END IF;

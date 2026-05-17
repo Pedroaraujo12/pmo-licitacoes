@@ -45,19 +45,63 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const supabase = getSupabase()
     async function load() {
+      // Try processos first, then licitacoes as fallback
       const { data: proc } = await supabase
         .from('processos')
         .select('*, coordenacao(nome), status(nome), responsavel(nome), demandante(nome), modalidade(nome)')
         .eq('id', id)
         .single()
-      setProcesso(proc)
 
-      const { data: crono } = await supabase
-        .from('cronograma_atividades')
-        .select('*')
-        .eq('processo_id', id)
-        .order('ordem', { ascending: true })
-      setCronograma(crono || [])
+      if (proc) {
+        setProcesso(proc)
+
+        const { data: crono } = await supabase
+          .from('cronograma_atividades')
+          .select('*')
+          .eq('processo_id', id)
+          .order('ordem', { ascending: true })
+        setCronograma(crono || [])
+      } else {
+        // Fallback to licitacoes table
+        const { data: lic } = await supabase
+          .from('licitacoes')
+          .select('*')
+          .eq('id', id)
+          .single()
+        if (lic) {
+          setProcesso({
+            id: lic.id,
+            id_processo: lic.id_processo || null,
+            objeto_resumido: lic.objeto_resumido || null,
+            data_entrada: lic.data_entrada || null,
+            valor_estimado: lic.vlr_estimado_anual || 0,
+            valor_homologado: lic.vlr_homologado || 0,
+            progresso: lic.progresso || 0,
+            prioridade: lic.prioridade || null,
+            observacoes: lic.observacoes || null,
+            drive: lic.processo_link || null,
+            atividade_atual: lic.fase_atual || null,
+            data_entrega: lic.data_prevista || null,
+            coordenacao: { nome: lic.coordenacao || '' },
+            status: { nome: lic.status || '' },
+            responsavel: { nome: lic.responsavel || '' },
+            modalidade: { nome: lic.modalidade || '' },
+            demandante: { nome: lic.demandante || '' },
+            data_atividade: null,
+            coordenacao_id: null,
+            status_id: null,
+            responsavel_id: null,
+            modalidade_id: null,
+            demandante_id: null,
+            qtd_itens: null,
+            despesa_evitada: null,
+            created_by: null,
+            houve_recurso: null,
+            created_at: lic.created_at || lic.data_entrada,
+            updated_at: lic.created_at || lic.data_entrada,
+          })
+        }
+      }
 
       const { data: atv } = await supabase
         .from('atividades')
@@ -92,8 +136,9 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
 
   async function handleDelete() {
     if (!confirm('Tem certeza que deseja excluir este processo?')) return
-    const { error } = await getSupabase().from('processos').delete().eq('id', id)
-    if (!error) router.push('/pmo-dashboard')
+    await getSupabase().from('processos').delete().eq('id', id)
+    await getSupabase().from('licitacoes').delete().eq('id', id)
+    router.push('/pmo-dashboard')
   }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Carregando...</div>

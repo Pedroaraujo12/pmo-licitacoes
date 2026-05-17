@@ -41,7 +41,6 @@ export default function NovoProcessoPage() {
     houve_recurso: '',
     valor_estimado: '',
     valor_homologado: '',
-    despesa_evitada: '',
     observacoes: '',
   })
 
@@ -69,7 +68,7 @@ export default function NovoProcessoPage() {
     const payload: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(form)) {
       if (value === '') continue
-      if (['qtd_itens', 'progresso', 'valor_estimado', 'valor_homologado', 'despesa_evitada'].includes(key)) {
+      if (['qtd_itens', 'progresso', 'valor_estimado', 'valor_homologado'].includes(key)) {
         payload[key] = Number(value)
       } else if (['data_entrada', 'data_atividade', 'data_entrega'].includes(key)) {
         payload[key] = value || null
@@ -77,6 +76,11 @@ export default function NovoProcessoPage() {
         payload[key] = value
       }
     }
+
+    // Auto-compute despesa_evitada
+    const estimado = Number(form.valor_estimado) || 0
+    const homologado = Number(form.valor_homologado) || 0
+    payload.despesa_evitada = estimado - homologado
 
     const { data: { user } } = await getSupabase().auth.getUser()
     if (user) payload.created_by = user.id
@@ -155,8 +159,6 @@ export default function NovoProcessoPage() {
           <Field label="Data Entrega" name="data_entrega" type="date" />
           <Field label="Valor Estimado (R$)" name="valor_estimado" type="number" />
           <Field label="Valor Homologado (R$)" name="valor_homologado" type="number" />
-          <Field label="Despesa Evitada (R$)" name="despesa_evitada" type="number" />
-          <Field label="Houve Recurso?" name="houve_recurso" />
         </div>
         <div style={{ marginBottom: 24 }}>
           <Field label="Objeto Resumido" name="objeto_resumido" type="textarea" />

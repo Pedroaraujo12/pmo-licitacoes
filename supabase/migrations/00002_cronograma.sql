@@ -143,7 +143,7 @@ BEGIN
     END IF;
 
     IF atividade.dias > 0 THEN
-      data_fim_atividade := somar_dias_uteis(data_atual, atividade.dias - 1);
+      data_fim_atividade := somar_dias_uteis(data_atual, atividade.dias);
     ELSE
       data_fim_atividade := NULL;
     END IF;
