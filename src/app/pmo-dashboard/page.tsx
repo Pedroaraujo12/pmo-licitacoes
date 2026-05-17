@@ -25,7 +25,6 @@ interface Licitacao {
   progresso: number
   observacoes: string
   processo_link: string
-  created_at: string
 }
 
 export default function DashboardPage() {
@@ -38,7 +37,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
-      supabase.from('licitacoes').select('*').order('created_at', { ascending: false }),
+      supabase.from('licitacoes').select('*').order('data_entrada', { ascending: false }),
       supabase.from('modalidades').select('*'),
       supabase.from('responsaveis').select('*'),
     ]).then(([l, m, r]) => {
@@ -101,8 +100,8 @@ export default function DashboardPage() {
         qtd_itens: null,
         despesa_evitada: null,
         created_by: null,
-        created_at: l.created_at,
-        updated_at: l.created_at,
+        created_at: l.data_entrada,
+        updated_at: l.data_entrada,
         houve_recurso: null,
       }))}
       modalidades={modalidades}
