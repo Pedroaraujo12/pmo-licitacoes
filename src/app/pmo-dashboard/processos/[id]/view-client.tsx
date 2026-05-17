@@ -59,11 +59,27 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
   const canEdit = profile?.role && ['admin', 'gestor', 'consultor'].includes(profile.role)
   const canDelete = profile?.role && ['admin', 'gestor'].includes(profile.role)
 
+  const cardStyle: React.CSSProperties = {
+    background: 'rgba(30,41,59,0.7)',
+    backdropFilter: 'blur(12px)',
+    borderRadius: 20,
+    border: '1px solid rgba(255,255,255,0.1)',
+    padding: 24,
+    marginBottom: 24,
+  }
+  const fieldStyle: React.CSSProperties = {
+    background: 'rgba(30,41,59,0.5)',
+    borderRadius: 10,
+    border: '1px solid rgba(255,255,255,0.06)',
+    padding: '12px 16px',
+  }
+
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => router.push('/pmo-dashboard')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+          <button onClick={() => router.push('/pmo-dashboard')}
+            className="cursor-pointer bg-transparent border-none text-slate-400 hover:text-slate-200 transition">
             <ArrowLeft size={20} />
           </button>
           <div>
@@ -75,7 +91,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           {canEdit && (
             <button
               onClick={() => router.push(`/pmo-dashboard/processos/${id}/edit`)}
-              style={{ padding: '8px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none bg-amber-600 hover:bg-amber-500 text-white"
             >
               <Edit size={14} /> Editar
             </button>
@@ -83,7 +99,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           {canDelete && (
             <button
               onClick={handleDelete}
-              style={{ padding: '8px 16px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none bg-red-600 hover:bg-red-500 text-white"
             >
               <Trash2 size={14} /> Excluir
             </button>
@@ -92,71 +108,110 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-        <Field label="Data de Entrada" value={processo.data_entrada ? new Date(processo.data_entrada).toLocaleDateString('pt-BR') : '-'} />
-        <Field label="Coordenação" value={processo.coordenacao?.nome || '-'} />
-        <Field label="Status" value={processo.status?.nome || '-'} />
-        <Field label="Responsável" value={processo.responsavel?.nome || '-'} />
-        <Field label="Modalidade" value={processo.modalidade?.nome || '-'} />
-        <Field label="Demandante" value={processo.demandante?.nome || '-'} />
-        <Field label="Qtd Itens" value={processo.qtd_itens?.toString() || '-'} />
-        <Field label="Prioridade" value={processo.prioridade || '-'} />
-        <Field label="Atividade Atual" value={processo.atividade_atual || '-'} />
-        <Field label="Data Atividade" value={processo.data_atividade ? new Date(processo.data_atividade).toLocaleDateString('pt-BR') : '-'} />
-        <Field label="Data Entrega" value={processo.data_entrega ? new Date(processo.data_entrega).toLocaleDateString('pt-BR') : '-'} />
-        <Field label="Progresso" value={processo.progresso ? `${processo.progresso}%` : '-'} />
-        <Field label="Valor Estimado" value={processo.valor_estimado ? `R$ ${Number(processo.valor_estimado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'} />
-        <Field label="Valor Homologado" value={processo.valor_homologado ? `R$ ${Number(processo.valor_homologado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'} />
-        <Field label="Despesa Evitada" value={processo.despesa_evitada ? `R$ ${Number(processo.despesa_evitada).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'} />
-        <Field label="Houve Recurso?" value={processo.houve_recurso || '-'} />
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data de Entrada</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.data_entrada ? new Date(processo.data_entrada).toLocaleDateString('pt-BR') : '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coordenação</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.coordenacao?.nome || '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.status?.nome || '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Responsável</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.responsavel?.nome || '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modalidade</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.modalidade?.nome || '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Demandante</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.demandante?.nome || '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qtd Itens</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.qtd_itens?.toString() || '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prioridade</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.prioridade || '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atividade Atual</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.atividade_atual || '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data Atividade</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.data_atividade ? new Date(processo.data_atividade).toLocaleDateString('pt-BR') : '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data Entrega</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.data_entrega ? new Date(processo.data_entrega).toLocaleDateString('pt-BR') : '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Progresso</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.progresso ? `${processo.progresso}%` : '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Estimado</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.valor_estimado ? `R$ ${Number(processo.valor_estimado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Homologado</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.valor_homologado ? `R$ ${Number(processo.valor_homologado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Despesa Evitada</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.despesa_evitada ? `R$ ${Number(processo.despesa_evitada).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Houve Recurso?</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.houve_recurso || '-'}</div>
+        </div>
       </div>
 
       {processo.observacoes && (
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 16, marginBottom: 24 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: '0 0 8px' }}>Observações</h3>
-          <p style={{ fontSize: 13, color: '#475569', margin: 0 }}>{processo.observacoes}</p>
+        <div style={cardStyle}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Observações</h3>
+          <p style={{ fontSize: 13, color: '#cbd5e1', margin: 0 }}>{processo.observacoes}</p>
         </div>
       )}
 
       {processo.drive && (
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 16, marginBottom: 24 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: '0 0 8px' }}>Drive</h3>
+        <div style={cardStyle}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Drive</h3>
           <a href={processo.drive} target="_blank" rel="noopener noreferrer"
-            style={{ color: '#2563eb', fontSize: 13, textDecoration: 'underline' }}>
+            style={{ color: '#60a5fa', fontSize: 13, textDecoration: 'underline' }}>
             {processo.drive}
           </a>
         </div>
       )}
 
-      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: '0 0 16px' }}>Histórico de Atividades</h3>
+      <div style={cardStyle}>
+        <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Histórico de Atividades</h3>
         {atividades.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#94a3b8' }}>Nenhuma atividade registrada</p>
+          <p style={{ fontSize: 13, color: '#64748b' }}>Nenhuma atividade registrada</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {atividades.map(a => (
-              <div key={a.id} style={{ padding: '12px', background: '#f8fafc', borderRadius: 8, borderLeft: '3px solid #2563eb' }}>
+              <div key={a.id} style={{ padding: '12px', background: 'rgba(30,41,59,0.5)', borderRadius: 8, borderLeft: '3px solid #3b82f6' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{a.atividade}</span>
-                  <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: '#f1f5f9' }}>{a.atividade}</span>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
                     {a.data ? new Date(a.data).toLocaleDateString('pt-BR') : ''}
                     {a.responsavel && ` - ${a.responsavel}`}
                   </span>
                 </div>
-                {a.observacao && <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{a.observacao}</p>}
+                {a.observacao && <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{a.observacao}</p>}
               </div>
             ))}
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '12px 16px' }}>
-      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 500, color: '#0f172a' }}>{value}</div>
     </div>
   )
 }

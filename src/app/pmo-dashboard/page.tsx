@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import DashboardContent from './dashboard-content'
-import type { Modalidade, Responsavel } from '@/types/database'
+import type { Modalidade, Responsavel, Profile } from '@/types/database'
 
 interface Licitacao {
   id: string
@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [licitacoes, setLicitacoes] = useState<Licitacao[]>([])
   const [modalidades, setModalidades] = useState<Modalidade[]>([])
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -40,17 +41,24 @@ export default function DashboardPage() {
       supabase.from('licitacoes').select('*').order('data_entrada', { ascending: false }),
       supabase.from('modalidades').select('*'),
       supabase.from('responsaveis').select('*'),
-    ]).then(([l, m, r]) => {
-      const errs = [l.error, m.error, r.error].filter(Boolean)
-      if (errs.length > 0) {
-        console.error('Erros Supabase:', errs)
-        setError(errs.map((e: unknown) => (e as { message: string }).message).join(' | '))
+      supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) =>
+        user ? supabase.from('profiles').select('*').eq('id', user.id).single() : null
+      ),
+    ]).then(([l, m, r, profResult]) => {
+      const errors = [l.error, m.error, r.error].filter(Boolean)
+      if (errors.length > 0) {
+        console.error('Erros Supabase:', errors)
+        setError(errors.map((e: unknown) => (e as { message: string }).message).join(' | '))
         setLoading(false)
         return
       }
       if (l.data) setLicitacoes(l.data as Licitacao[])
       if (m.data) setModalidades(m.data)
       if (r.data) setResponsaveis(r.data)
+      if (profResult && 'data' in profResult) {
+        const prof = (profResult as { data: Profile | null }).data
+        if (prof) setProfile(prof)
+      }
       setLoading(false)
     }).catch(err => {
       console.error('Erro inesperado:', err)
@@ -106,6 +114,7 @@ export default function DashboardPage() {
       }))}
       modalidades={modalidades}
       responsaveis={responsaveis}
+      userRole={profile?.role || null}
     />
   )
 }

@@ -96,32 +96,31 @@ export default function NovoProcessoPage() {
     label: string; name: string; type?: string; options?: { id: string; nome: string }[]
   }) {
     const value = form[name as keyof typeof form]
+    const baseInput = {
+      width: '100%',
+      padding: '8px 10px',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 8,
+      fontSize: 13,
+      background: 'rgba(30,41,59,0.5)',
+      color: '#cbd5e1',
+      outline: 'none',
+    } as const
     return (
       <div>
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 }}>{label}</label>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
         {options ? (
-          <select
-            value={value}
-            onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
-            style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, background: '#fff' }}
-          >
+          <select value={value} onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
+            style={{ ...baseInput, cursor: 'pointer' }}>
             <option value="">Selecione...</option>
             {options.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
           </select>
         ) : type === 'textarea' ? (
-          <textarea
-            value={value}
-            onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
-            rows={3}
-            style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, resize: 'vertical' }}
-          />
+          <textarea value={value} onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
+            rows={3} style={{ ...baseInput, resize: 'vertical' }} />
         ) : (
-          <input
-            type={type}
-            value={value}
-            onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
-            style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }}
-          />
+          <input type={type} value={value} onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
+            style={baseInput} />
         )}
       </div>
     )
@@ -135,12 +134,12 @@ export default function NovoProcessoPage() {
       </div>
 
       {error && (
-        <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#dc2626', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+        <div style={{ padding: '10px 14px', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', borderRadius: 8, fontSize: 13, marginBottom: 16, border: '1px solid rgba(239,68,68,0.3)' }}>
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 24 }}>
+      <form onSubmit={handleSubmit} style={{ background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', padding: 24 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
           <Field label="Data de Entrada" name="data_entrada" type="date" />
           <Field label="Coordenação" name="coordenacao_id" options={coordenacoes} />
@@ -173,27 +172,13 @@ export default function NovoProcessoPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            style={{ padding: '10px 20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}
-          >
+          <button type="button" onClick={() => router.back()}
+            className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer border-none">
             Cancelar
           </button>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              padding: '10px 20px',
-              background: loading ? '#93c5fd' : '#2563eb',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
+          <button type="submit" disabled={loading}
+            className={`${loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-500'} text-white px-5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer border-none disabled:opacity-50`}
+            style={{ background: loading ? '#60a5fa' : '#2563eb' }}>
             {loading ? 'Salvando...' : 'Salvar Processo'}
           </button>
         </div>

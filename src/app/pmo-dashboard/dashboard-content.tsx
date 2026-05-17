@@ -2,8 +2,11 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js'
 import { Doughnut, Bar } from 'react-chartjs-2'
+import { Plus, Edit, Trash2, ExternalLink } from 'lucide-react'
+import DeleteConfirmDialog from '@/components/ui/delete-confirm-dialog'
 import type { Processo, Modalidade, Responsavel } from '@/types/database'
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement)
@@ -47,9 +50,10 @@ interface Props {
   processos: Processo[]
   modalidades: Modalidade[]
   responsaveis: Responsavel[]
+  userRole?: string | null
 }
 
-export default function DashboardContent({ processos, modalidades, responsaveis }: Props) {
+export default function DashboardContent({ processos, modalidades, responsaveis, userRole }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -57,7 +61,38 @@ export default function DashboardContent({ processos, modalidades, responsaveis 
   const [responsavelFilter, setResponsavelFilter] = useState('')
   const [chartFilter, setChartFilter] = useState<{ type: string; value: string } | null>(null)
   const [modalProcesso, setModalProcesso] = useState<Processo | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Processo | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [sortField, setSortField] = useState<string>('data_entrega')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const modalRef = useRef<HTMLDivElement>(null)
+
+  const canEdit = userRole && ['admin', 'gestor', 'consultor'].includes(userRole)
+  const canDelete = userRole && ['admin', 'gestor'].includes(userRole)
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('licitacoes').delete().eq('id', deleteTarget.id)
+    if (!error) {
+      setDeleteTarget(null)
+      setModalProcesso(null)
+      window.location.reload()
+    } else {
+      console.error('Erro ao excluir:', error)
+      setDeleting(false)
+    }
+  }
+
+  function toggleSort(field: string) {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDir('asc')
+    }
+  }
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -94,8 +129,16 @@ export default function DashboardContent({ processos, modalidades, responsaveis 
       if (modalidadeFilter && (p.modalidade?.nome || 'N/I') !== modalidadeFilter) return false
       if (responsavelFilter && (p.responsavel?.nome || 'N/I') !== responsavelFilter) return false
       return true
+    }).sort((a, b) => {
+      let cmp = 0
+      if (sortField === 'id_processo') cmp = (a.id_processo || '').localeCompare(b.id_processo || '')
+      else if (sortField === 'objeto_resumido') cmp = (a.objeto_resumido || '').localeCompare(b.objeto_resumido || '')
+      else if (sortField === 'atividade_atual') cmp = (a.atividade_atual || '').localeCompare(b.atividade_atual || '')
+      else if (sortField === 'data_entrega') cmp = ((a.data_entrega || '') > (b.data_entrega || '') ? 1 : -1)
+      else if (sortField === 'valor_estimado') cmp = cleanNum(a.valor_estimado) - cleanNum(b.valor_estimado)
+      return sortDir === 'asc' ? cmp : -cmp
     })
-  }, [processos, search, chartFilter, statusFilter, modalidadeFilter, responsavelFilter])
+  }, [processos, search, chartFilter, statusFilter, modalidadeFilter, responsavelFilter, sortField, sortDir])
 
   const kpis = useMemo(() => {
     const total = filtered.length
@@ -183,8 +226,17 @@ export default function DashboardContent({ processos, modalidades, responsaveis 
           </div>
         </div>
         <div className="flex gap-3">
+          {canEdit && (
+            <button
+              onClick={() => router.push('/pmo-dashboard/processos/novo')}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer border-none"
+            >
+              <Plus size={14} />
+              Novo Processo
+            </button>
+          )}
           <button onClick={() => setChartFilter(null)}
-            className="bg-slate-800/50 text-slate-300 px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-700 hover:bg-slate-700/50 transition">
+            className="bg-slate-800/50 text-slate-300 px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-700 hover:bg-slate-700/50 transition cursor-pointer">
             Resetar
           </button>
         </div>
@@ -252,15 +304,28 @@ export default function DashboardContent({ processos, modalidades, responsaveis 
             <table className="w-full text-left table-fixed">
               <thead className="sticky top-0 bg-[#1e293b] z-10 shadow-sm">
                 <tr className="text-[9px] font-black uppercase text-slate-500 border-b border-white/10 tracking-tighter">
-                  <th className="w-[18%] px-2 py-3">ID Processo</th>
-                  <th className="w-[28%] px-2 py-3">Objeto / Serviço</th>
-                  <th className="w-[24%] px-2 py-3">Atividade Atual</th>
-                  <th className="w-[15%] px-2 py-3 text-center">Data</th>
-                  <th className="w-[15%] px-2 py-3 text-right">Estimado</th>
+                  {(['id_processo', 'objeto_resumido', 'atividade_atual', 'data_entrega', 'valor_estimado'] as const).map(field => (
+                    <th
+                      key={field}
+                      onClick={() => toggleSort(field)}
+                      className="cursor-pointer hover:text-slate-300 transition select-none"
+                      style={{
+                        width: field === 'id_processo' ? '15%' : field === 'objeto_resumido' ? '25%' : field === 'atividade_atual' ? '20%' : field === 'data_entrega' ? '12%' : '13%',
+                        padding: '12px 8px',
+                        textAlign: field === 'valor_estimado' ? 'right' : field === 'data_entrega' ? 'center' : 'left',
+                      }}
+                    >
+                      {field === 'id_processo' ? 'ID Processo' : field === 'objeto_resumido' ? 'Objeto / Serviço' : field === 'atividade_atual' ? 'Atividade Atual' : field === 'data_entrega' ? 'Data' : 'Estimado'}
+                      {sortField === field && (
+                        <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>
+                      )}
+                    </th>
+                  ))}
+                  {canEdit && <th className="w-[15%] px-2 py-3 text-center">Ações</th>}
                 </tr>
               </thead>
               <tbody className="text-[10px] divide-y divide-white/5">
-                {filtered.map(p => {
+                  {filtered.map(p => {
                   const ag = getAging(p.data_entrega)
                   return (
                     <tr
@@ -283,12 +348,41 @@ export default function DashboardContent({ processos, modalidades, responsaveis 
                       <td className="px-2 py-3 text-right font-bold text-slate-100">
                         {formatBRL(p.valor_estimado)}
                       </td>
+                      {canEdit && (
+                        <td className="px-2 py-3 text-center" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => router.push(`/pmo-dashboard/processos/${p.id}`)}
+                              className="p-1.5 rounded-md text-blue-400 hover:bg-blue-500/20 transition cursor-pointer border-none bg-transparent"
+                              title="Ver detalhes"
+                            >
+                              <ExternalLink size={14} />
+                            </button>
+                            <button
+                              onClick={() => router.push(`/pmo-dashboard/processos/${p.id}/edit`)}
+                              className="p-1.5 rounded-md text-amber-400 hover:bg-amber-500/20 transition cursor-pointer border-none bg-transparent"
+                              title="Editar"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={() => setDeleteTarget(p)}
+                                className="p-1.5 rounded-md text-red-400 hover:bg-red-500/20 transition cursor-pointer border-none bg-transparent"
+                                title="Excluir"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-10 text-center opacity-30 uppercase font-black tracking-widest text-[10px]">
+                    <td colSpan={canEdit ? 6 : 5} className="p-10 text-center opacity-30 uppercase font-black tracking-widest text-[10px]">
                       Sem dados
                     </td>
                   </tr>
@@ -462,18 +556,46 @@ export default function DashboardContent({ processos, modalidades, responsaveis 
             <div className="px-6 py-4 border-t border-white/5 flex justify-end gap-3 shrink-0">
               <button
                 onClick={() => router.push(`/pmo-dashboard/processos/${modalProcesso.id}`)}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-[10px] font-bold transition"
+                className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-[10px] font-bold transition cursor-pointer border-none flex items-center gap-1.5"
               >
+                <ExternalLink size={12} />
                 Ver Detalhes
               </button>
+              {canEdit && (
+                <button
+                  onClick={() => router.push(`/pmo-dashboard/processos/${modalProcesso.id}/edit`)}
+                  className="bg-amber-600 hover:bg-amber-500 text-white px-5 py-2 rounded-lg text-[10px] font-bold transition cursor-pointer border-none flex items-center gap-1.5"
+                >
+                  <Edit size={12} />
+                  Editar
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={() => { setDeleteTarget(modalProcesso); setModalProcesso(null) }}
+                  className="bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-lg text-[10px] font-bold transition cursor-pointer border-none flex items-center gap-1.5"
+                >
+                  <Trash2 size={12} />
+                  Excluir
+                </button>
+              )}
               <button onClick={() => setModalProcesso(null)}
-                className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2 rounded-lg text-[10px] font-bold transition">
+                className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2 rounded-lg text-[10px] font-bold transition cursor-pointer border-none">
                 Fechar
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => { setDeleteTarget(null); setDeleting(false) }}
+        onConfirm={handleDelete}
+        loading={deleting}
+        titulo="Excluir Processo"
+        mensagem={`Tem certeza que deseja excluir o processo "${deleteTarget?.id_processo}"? Esta ação é irreversível.`}
+      />
 
       <style jsx>{`
         .glass-card {

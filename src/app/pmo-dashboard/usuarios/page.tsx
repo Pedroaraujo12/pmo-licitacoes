@@ -56,6 +56,39 @@ export default function UsuariosPage() {
 
   const isAdmin = currentUserRole === 'admin'
 
+  const tableCard: React.CSSProperties = {
+    background: 'rgba(30,41,59,0.7)',
+    backdropFilter: 'blur(12px)',
+    borderRadius: 20,
+    border: '1px solid rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  }
+  const thStyle: React.CSSProperties = {
+    padding: '10px 14px',
+    textAlign: 'left',
+    fontWeight: 700,
+    color: '#64748b',
+    whiteSpace: 'nowrap',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+  }
+  const tdStyle: React.CSSProperties = {
+    padding: '10px 14px',
+    color: '#cbd5e1',
+    fontSize: 13,
+  }
+
+  const inputStyle: React.CSSProperties = {
+    padding: '4px 8px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 6,
+    fontSize: 12,
+    background: 'rgba(30,41,59,0.5)',
+    color: '#cbd5e1',
+    outline: 'none',
+  }
+
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
@@ -63,34 +96,29 @@ export default function UsuariosPage() {
         <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>Controle de níveis de acesso</p>
       </div>
 
-      <div style={{
-        background: '#fff',
-        borderRadius: 12,
-        border: '1px solid #e2e8f0',
-        overflow: 'hidden',
-      }}>
+      <div style={tableCard}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
-              <Th>Nome</Th>
-              <Th>Email</Th>
-              <Th>Nível de Acesso</Th>
-              <Th>Criado em</Th>
-              {isAdmin && <Th>Ações</Th>}
+            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <th style={thStyle}>Nome</th>
+              <th style={thStyle}>Email</th>
+              <th style={thStyle}>Nível de Acesso</th>
+              <th style={thStyle}>Criado em</th>
+              {isAdmin && <th style={thStyle}>Ações</th>}
             </tr>
           </thead>
           <tbody>
             {profiles.map(p => (
-              <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <Td style={{ fontWeight: 500 }}>{p.name}</Td>
-                <Td style={{ color: '#64748b' }}>{p.id}</Td>
-                <Td>
+              <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <td style={tdStyle}>{p.name}</td>
+                <td style={{ ...tdStyle, color: '#64748b', fontSize: 11 }}>{p.id.substring(0, 8)}...</td>
+                <td style={tdStyle}>
                   {editingId === p.id ? (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <select
                         value={newRole}
                         onChange={e => setNewRole(e.target.value)}
-                        style={{ padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }}
+                        style={inputStyle}
                       >
                         <option value="admin">Admin</option>
                         <option value="gestor">Gestor</option>
@@ -102,7 +130,7 @@ export default function UsuariosPage() {
                         OK
                       </button>
                       <button onClick={() => setEditingId(null)}
-                        style={{ padding: '4px 10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+                        className="text-slate-300 bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer border-none">
                         Cancelar
                       </button>
                     </div>
@@ -123,27 +151,19 @@ export default function UsuariosPage() {
                       {p.role}
                     </span>
                   )}
-                </Td>
-                <Td style={{ color: '#64748b' }}>
+                </td>
+                <td style={{ ...tdStyle, color: '#64748b' }}>
                   {new Date(p.created_at).toLocaleDateString('pt-BR')}
-                </Td>
+                </td>
                 {isAdmin && (
-                  <Td>
+                  <td style={tdStyle}>
                     <button
                       onClick={() => { setEditingId(p.id); setNewRole(p.role) }}
-                      style={{
-                        padding: '4px 12px',
-                        background: '#f1f5f9',
-                        color: '#475569',
-                        border: 'none',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        cursor: 'pointer',
-                      }}
+                      className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer border-none"
                     >
                       Alterar Nível
                     </button>
-                  </Td>
+                  </td>
                 )}
               </tr>
             ))}
@@ -164,20 +184,18 @@ export default function UsuariosPage() {
 
 function RoleCard({ icon, role, desc, color }: { icon: React.ReactNode; role: string; desc: string; color: string }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: 16 }}>
+    <div style={{
+      background: 'rgba(30,41,59,0.7)',
+      backdropFilter: 'blur(12px)',
+      borderRadius: 16,
+      border: '1px solid rgba(255,255,255,0.1)',
+      padding: 16,
+    }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ color }}>{icon}</span>
-        <span style={{ fontWeight: 600, fontSize: 14, color: '#0f172a', textTransform: 'capitalize' }}>{role}</span>
+        <span style={{ fontWeight: 600, fontSize: 14, color: '#f1f5f9', textTransform: 'capitalize' }}>{role}</span>
       </div>
       <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{desc}</p>
     </div>
   )
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>{children}</th>
-}
-
-function Td({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <td style={{ padding: '10px 14px', color: '#334155', ...style }}>{children}</td>
 }
