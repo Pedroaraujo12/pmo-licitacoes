@@ -5,12 +5,13 @@ import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types/database'
 import {
-  LayoutDashboard, FileText, Users, LogOut, Menu, X,
+  LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X,
 } from 'lucide-react'
 
 const navItems = [
   { href: '/pmo-dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pmo-dashboard/processos', label: 'Processos', icon: FileText },
+  { href: '/pmo-dashboard/cronograma', label: 'Cronograma', icon: Calendar },
   { href: '/pmo-dashboard/usuarios', label: 'Usuários', icon: Users },
 ]
 

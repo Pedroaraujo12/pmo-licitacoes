@@ -52,53 +52,62 @@ BEGIN
 END;
 $$;
 
--- Recreate views as SECURITY INVOKER
+-- Recreate views as SECURITY INVOKER (preserving original column names)
 DROP VIEW IF EXISTS public.vw_cronograma_processo CASCADE;
 DROP VIEW IF EXISTS public.vw_status_processo_cronograma CASCADE;
 
 CREATE VIEW public.vw_cronograma_processo WITH (security_invoker = true) AS
 SELECT
-  p.id,
-  p.id_processo,
-  p.modalidade_id,
-  p.data_entrada,
-  ca.id as atividade_id,
-  ca.ordem,
-  ca.dias_uteis,
-  ca.fase,
-  ca.descricao,
-  ca.setor,
-  ca.status,
-  ca.data_inicio,
-  ca.data_fim,
-  CASE WHEN ca.dias_uteis > 0 THEN ca.data_fim ELSE NULL END as data_prevista
-FROM processos p
-LEFT JOIN cronograma_atividades ca ON ca.processo_id = p.id;
+  ca.id, ca.processo_id, p.id_processo, p.modalidade_id,
+  m.nome AS modalidade_nome,
+  ca.ordem, ca.fase, ca.descricao AS atividade_descricao,
+  ca.setor, ca.dias_uteis, ca.status,
+  ca.data_inicio, ca.data_fim, ca.modelo_etapa_id,
+  r.nome AS responsavel_nome,
+  ca.data_inicio_real, ca.data_fim_real, ca.observacao,
+  CASE
+    WHEN ca.status != 'concluido' AND ca.data_fim IS NOT NULL AND ca.data_fim < CURRENT_DATE THEN true
+    ELSE false
+  END AS em_atraso
+FROM cronograma_atividades ca
+JOIN processos p ON p.id = ca.processo_id
+LEFT JOIN modalidades m ON m.id = p.modalidade_id
+LEFT JOIN responsaveis r ON r.id = ca.responsavel_id;
 
 CREATE VIEW public.vw_status_processo_cronograma WITH (security_invoker = true) AS
-WITH atividade_status AS (
-  SELECT
-    p.id,
-    p.id_processo,
-    COUNT(ca.id) as total_atividades,
-    COUNT(ca.id) FILTER (WHERE ca.status = 'concluido') as concluidas,
-    COUNT(ca.id) FILTER (WHERE ca.status = 'em_andamento') as em_andamento,
-    COUNT(ca.id) FILTER (WHERE ca.status = 'nao_iniciado') as nao_iniciadas
-  FROM processos p
-  LEFT JOIN cronograma_atividades ca ON ca.processo_id = p.id
-  GROUP BY p.id, p.id_processo
-)
 SELECT
-  id,
-  id_processo,
-  total_atividades,
-  concluidas,
-  em_andamento,
-  nao_iniciadas,
+  ca.processo_id,
+  p.id_processo,
+  p.modalidade_id,
+  m.nome AS modalidade_nome,
+  (
+    SELECT ca2.descricao FROM cronograma_atividades ca2
+    WHERE ca2.processo_id = ca.processo_id AND ca2.status != 'concluido'
+    ORDER BY ca2.ordem LIMIT 1
+  ) AS atividade_atual,
+  (
+    SELECT ca2.data_fim FROM cronograma_atividades ca2
+    WHERE ca2.processo_id = ca.processo_id AND ca2.status != 'concluido'
+    ORDER BY ca2.ordem LIMIT 1
+  ) AS data_fim_atividade_atual,
+  (
+    SELECT ca2.ordem FROM cronograma_atividades ca2
+    WHERE ca2.processo_id = ca.processo_id AND ca2.status != 'concluido'
+    ORDER BY ca2.ordem LIMIT 1
+  ) AS ordem_atividade_atual,
+  MAX(ca.ordem) AS total_etapas,
+  COUNT(ca.status) FILTER (WHERE ca.status = 'concluido') AS etapas_concluidas,
+  COUNT(ca.status) FILTER (WHERE ca.status != 'concluido' AND ca.data_fim IS NOT NULL AND ca.data_fim < CURRENT_DATE) AS etapas_atrasadas,
   CASE
-    WHEN total_atividades = 0 THEN 'sem_cronograma'
-    WHEN concluidas = total_atividades THEN 'concluido'
-    WHEN em_andamento > 0 THEN 'em_andamento'
-    ELSE 'nao_iniciado'
-  END as status_cronograma
-FROM atividade_status;
+    WHEN COUNT(ca.status) FILTER (WHERE ca.status != 'concluido' AND ca.data_fim IS NOT NULL AND ca.data_fim < CURRENT_DATE) > 0 THEN true
+    ELSE false
+  END AS processo_atrasado,
+  CASE
+    WHEN COUNT(ca.status) = 0 THEN 0
+    ELSE ROUND((COUNT(ca.status) FILTER (WHERE ca.status = 'concluido')::DECIMAL / COUNT(ca.status)::DECIMAL) * 100)
+  END AS progresso_calculado,
+  MAX(ca.data_fim) AS data_fim_prevista_total
+FROM cronograma_atividades ca
+JOIN processos p ON p.id = ca.processo_id
+LEFT JOIN modalidades m ON m.id = p.modalidade_id
+GROUP BY ca.processo_id, p.id_processo, p.modalidade_id, m.nome;
