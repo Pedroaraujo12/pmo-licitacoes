@@ -58,7 +58,7 @@ export default function LoginPage() {
       }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            PMO Licitações
+            LICITAÇÕES
           </h1>
           <p style={{ color: '#64748b', marginTop: 8, fontSize: 14 }}>
             {mode === 'login' ? 'Acesse sua conta' : 'Crie sua conta'}

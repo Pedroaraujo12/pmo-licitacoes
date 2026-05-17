@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'PMO Licitações | AgSUS CCS-RD',
+  title: 'LICITAÇÕES | AgSUS CCS-RD',
   description: 'Gestão de Processos de Licitação',
 }
 

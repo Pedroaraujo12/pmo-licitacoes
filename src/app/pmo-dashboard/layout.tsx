@@ -65,7 +65,7 @@ export default function DashboardLayout({
           borderBottom: '1px solid #334155',
         }}>
           {sidebarOpen && (
-            <span style={{ fontWeight: 700, fontSize: 16 }}>PMO Licitações</span>
+            <span style={{ fontWeight: 700, fontSize: 16 }}>LICITAÇÕES</span>
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
