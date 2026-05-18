@@ -36,8 +36,15 @@ export default function ProcessosPage() {
         if (m.data) setModalidades(m.data)
         if (r.data) setResponsaveis(r.data)
 
-        const user = (userResult as { data: { user: { user_metadata?: { role?: string } } | null } }).data?.user
-        setProfile(user?.user_metadata?.role ? { role: user.user_metadata.role } as Profile : null)
+        const user = (userResult as { data: { user: { id?: string } | null } }).data?.user
+        if (user?.id) {
+          const { data: profileData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+          if (profileData) {
+            setProfile(profileData as Profile)
+          } else if ((user as Record<string, unknown>).user_metadata && (user as Record<string, unknown>).user_metadata && ((user as { user_metadata?: { role?: string } }).user_metadata?.role)) {
+            setProfile({ role: (user as { user_metadata: { role: string } }).user_metadata.role } as Profile)
+          }
+        }
 
         const merged: (Processo & { processo_atrasado?: boolean; etapas_concluidas?: number; total_etapas?: number; data_fim_prevista_total?: string | null })[] = []
 
