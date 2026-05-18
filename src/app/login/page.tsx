@@ -8,34 +8,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [message, setMessage] = useState('')
   const supabase = createClient()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
-    setMessage('')
 
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        setError(error.message)
-      } else {
-        window.location.href = '/pmo-dashboard'
-      }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setError(error.message)
     } else {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { name: email.split('@')[0] } },
-      })
-      if (error) {
-        setError(error.message)
-      } else {
-        setMessage('Cadastro realizado! Verifique seu email para confirmar.')
-      }
+      window.location.href = '/pmo-dashboard'
     }
     setLoading(false)
   }
@@ -61,7 +45,7 @@ export default function LoginPage() {
             LICITAÇÕES
           </h1>
           <p style={{ color: '#64748b', marginTop: 8, fontSize: 14 }}>
-            {mode === 'login' ? 'Acesse sua conta' : 'Crie sua conta'}
+            Acesse sua conta
           </p>
         </div>
 
@@ -114,12 +98,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {message && (
-            <div style={{ padding: '10px 14px', background: '#f0fdf4', color: '#16a34a', borderRadius: 8, fontSize: 13 }}>
-              {message}
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
@@ -135,25 +113,9 @@ export default function LoginPage() {
               cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Cadastrar'}
+            {loading ? 'Aguarde...' : 'Entrar'}
           </button>
         </form>
-
-        <div style={{ textAlign: 'center', marginTop: 20 }}>
-          <button
-            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setMessage('') }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#2563eb',
-              fontSize: 14,
-              cursor: 'pointer',
-              textDecoration: 'underline',
-            }}
-          >
-            {mode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Faça login'}
-          </button>
-        </div>
       </div>
     </div>
   )
