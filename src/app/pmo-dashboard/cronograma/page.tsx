@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Processo, StatusProcessoCronograma } from '@/types/database'
 import {
-  CheckCircle2, Clock, Circle, AlertTriangle, ArrowRight,
+  CheckCircle2, Clock, Circle, AlertTriangle, ArrowRight, Search,
 } from 'lucide-react'
 
 function useIsMobile(breakpoint = 768) {
@@ -37,8 +37,18 @@ function statusBadge(status: string) {
 export default function CronogramaPage() {
   const router = useRouter()
   const [processos, setProcessos] = useState<(Processo & { status_cronograma?: StatusProcessoCronograma })[]>([])
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const isMobile = useIsMobile()
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return processos
+    const q = search.toLowerCase()
+    return processos.filter(p =>
+      (p.id_processo?.toLowerCase() || '').includes(q) ||
+      (p.objeto_resumido?.toLowerCase() || '').includes(q)
+    )
+  }, [processos, search])
 
   useEffect(() => {
     let cancelled = false
@@ -79,17 +89,41 @@ export default function CronogramaPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, color: '#f1f5f9' }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: '#f1f5f9' }}>
         Cronograma de Processos
       </h1>
 
-      {processos.length === 0 ? (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20,
+        background: 'rgba(30,41,59,0.5)', borderRadius: 10,
+        border: '1px solid rgba(255,255,255,0.1)', padding: '0 12px',
+      }}>
+        <Search size={16} color="#64748b" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar por ID ou objeto..."
+          style={{
+            flex: 1, padding: '10px 0', border: 'none', background: 'transparent',
+            color: '#f1f5f9', fontSize: 14, outline: 'none', width: '100%',
+          }}
+        />
+        {search && (
+          <button onClick={() => setSearch('')}
+            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16 }}>
+            ×
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
-          Nenhum processo encontrado. Crie um processo no Dashboard para gerar o cronograma automaticamente.
+          {search ? 'Nenhum processo encontrado para esta busca.' : 'Nenhum processo encontrado. Crie um processo no Dashboard para gerar o cronograma automaticamente.'}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {processos.map(p => {
+          {filtered.map(p => {
             const sc = p.status_cronograma
             const badge = statusBadge(sc?.processo_atrasado ? 'em_andamento' : (sc?.etapas_concluidas === sc?.total_etapas && sc?.total_etapas ? 'concluido' : 'nao_iniciado'))
             const Icon = badge.icon
@@ -111,10 +145,15 @@ export default function CronogramaPage() {
               >
                 <Icon size={24} color={badge.color} />
 
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: '#f1f5f9', fontWeight: 600, marginBottom: 4 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: '#f1f5f9', fontWeight: 600, marginBottom: 2 }}>
                     {p.id_processo || 'Sem ID'} {p.modalidades?.nome ? `- ${p.modalidades.nome}` : ''}
                   </div>
+                  {p.objeto_resumido && (
+                    <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.objeto_resumido}
+                    </div>
+                  )}
                   <div style={{ color: '#94a3b8', fontSize: 13 }}>
                     {p.data_entrada ? `Entrada: ${formatDate(p.data_entrada)}` : ''}
                     {sc?.total_etapas ? ` · ${sc.etapas_concluidas}/${sc.total_etapas} etapas` : ' · Sem cronograma'}
