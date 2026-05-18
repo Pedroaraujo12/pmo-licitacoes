@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Edit, Trash2, ExternalLink, Save } from 'lucide-react'
+import { Plus, Edit, Trash2, ExternalLink, Save, UserPlus, X } from 'lucide-react'
 import DeleteConfirmDialog from '@/components/ui/delete-confirm-dialog'
 import type { Processo, Modalidade, Responsavel } from '@/types/database'
 
@@ -49,10 +49,12 @@ interface Props {
   modalidades: Modalidade[]
   responsaveis: Responsavel[]
   userRole?: string | null
+  onDataChange?: () => void
 }
 
-export default function GestaoProcessos({ processos, modalidades, responsaveis, userRole }: Props) {
+export default function GestaoProcessos({ processos, modalidades, responsaveis, userRole, onDataChange }: Props) {
   const router = useRouter()
+  const supabase = createClient()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [coordenacaoFilter, setCoordenacaoFilter] = useState('')
@@ -64,14 +66,27 @@ export default function GestaoProcessos({ processos, modalidades, responsaveis, 
   const [deleting, setDeleting] = useState(false)
   const [savingResp, setSavingResp] = useState<string | null>(null)
 
+  const [showRespModal, setShowRespModal] = useState(false)
+  const [respList, setRespList] = useState<Responsavel[]>(responsaveis)
+  const [newRespNome, setNewRespNome] = useState('')
+  const [editingResp, setEditingResp] = useState<string | null>(null)
+  const [editRespNome, setEditRespNome] = useState('')
+  const [respSaving, setRespSaving] = useState(false)
+  const [deleteRespTarget, setDeleteRespTarget] = useState<Responsavel | null>(null)
+
   const canEdit = userRole && ['admin', 'gestor', 'consultor'].includes(userRole)
   const canDelete = userRole && ['admin', 'gestor'].includes(userRole)
   const canAssign = userRole && ['admin', 'gestor'].includes(userRole)
-  const isAdmin = userRole === 'admin'
+  const canManageResp = userRole && ['admin', 'gestor'].includes(userRole)
 
-  const supabase = createClient()
+  function refreshResp() {
+    if (onDataChange) onDataChange()
+    supabase.from('responsaveis').select('*').then((r: { data: Responsavel[] | null }) => {
+      if (r.data) setRespList(r.data)
+    })
+  }
 
-  async function handleDelete() {
+  async function handleDeleteProcess() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
@@ -90,7 +105,7 @@ export default function GestaoProcessos({ processos, modalidades, responsaveis, 
   }
 
   async function handleChangeResponsavel(processoId: string, newResponsavelId: string) {
-    if (!newResponsavelId || !canAssign) return
+    if (!canAssign) return
     setSavingResp(processoId)
     try {
       const { error } = await supabase
@@ -98,15 +113,69 @@ export default function GestaoProcessos({ processos, modalidades, responsaveis, 
         .update({ responsavel_id: newResponsavelId === 'null' ? null : newResponsavelId })
         .eq('id', processoId)
       if (error) {
-        console.error('Erro ao atualizar responsável:', error)
-        alert('Erro ao alterar responsável.')
+        alert('Erro ao alterar responsável: ' + error.message)
       } else {
-        window.location.reload()
+        if (onDataChange) onDataChange()
+        else window.location.reload()
       }
     } catch (err) {
       console.error('Erro inesperado:', err)
     } finally {
       setSavingResp(null)
+    }
+  }
+
+  async function handleAddResponsavel() {
+    if (!newRespNome.trim() || !canManageResp) return
+    setRespSaving(true)
+    try {
+      const { error } = await supabase.from('responsaveis').insert({ nome: newRespNome.trim() })
+      if (error) {
+        alert('Erro ao adicionar: ' + error.message)
+      } else {
+        setNewRespNome('')
+        refreshResp()
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setRespSaving(false)
+    }
+  }
+
+  async function handleEditResponsavel(id: string) {
+    if (!editRespNome.trim() || !canManageResp) return
+    setRespSaving(true)
+    try {
+      const { error } = await supabase.from('responsaveis').update({ nome: editRespNome.trim() }).eq('id', id)
+      if (error) {
+        alert('Erro ao editar: ' + error.message)
+      } else {
+        setEditingResp(null)
+        refreshResp()
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setRespSaving(false)
+    }
+  }
+
+  async function handleDeleteResponsavel() {
+    if (!deleteRespTarget || !canManageResp) return
+    setRespSaving(true)
+    try {
+      const { error } = await supabase.from('responsaveis').delete().eq('id', deleteRespTarget.id)
+      if (error) {
+        alert('Erro ao excluir: ' + error.message)
+      } else {
+        setDeleteRespTarget(null)
+        refreshResp()
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setRespSaving(false)
     }
   }
 
@@ -121,37 +190,25 @@ export default function GestaoProcessos({ processos, modalidades, responsaveis, 
 
   const coordNames = useMemo(() => {
     const seen = new Set<string>()
-    processos.forEach(p => {
-      const n = p.coordenacoes?.nome
-      if (n) seen.add(n)
-    })
+    processos.forEach(p => { const n = p.coordenacoes?.nome; if (n) seen.add(n) })
     return [...seen].sort()
   }, [processos])
 
   const respNames = useMemo(() => {
     const seen = new Set<string>()
-    processos.forEach(p => {
-      const n = p.responsaveis?.nome
-      if (n) seen.add(n)
-    })
+    processos.forEach(p => { const n = p.responsaveis?.nome; if (n) seen.add(n) })
     return [...seen].sort()
   }, [processos])
 
   const statusNames = useMemo(() => {
     const seen = new Set<string>()
-    processos.forEach(p => {
-      const n = p.status_processo?.nome
-      if (n) seen.add(n)
-    })
+    processos.forEach(p => { const n = p.status_processo?.nome; if (n) seen.add(n) })
     return [...seen].sort()
   }, [processos])
 
   const modalNames = useMemo(() => {
     const seen = new Set<string>()
-    processos.forEach(p => {
-      const n = p.modalidades?.nome
-      if (n) seen.add(n)
-    })
+    processos.forEach(p => { const n = p.modalidades?.nome; if (n) seen.add(n) })
     return [...seen].sort()
   }, [processos])
 
@@ -199,6 +256,15 @@ export default function GestaoProcessos({ processos, modalidades, responsaveis, 
           </div>
         </div>
         <div className="flex gap-3">
+          {canManageResp && (
+            <button
+              onClick={() => { setRespList(responsaveis); setShowRespModal(true) }}
+              className="bg-slate-800/50 text-slate-300 px-4 py-2.5 rounded-xl text-[10px] font-bold border border-slate-700 hover:bg-slate-700/50 transition cursor-pointer border-none flex items-center gap-1.5"
+            >
+              <UserPlus size={14} />
+              Responsáveis
+            </button>
+          )}
           <button
             onClick={() => { setSearch(''); setStatusFilter(''); setCoordenacaoFilter(''); setModalidadeFilter(''); setResponsavelFilter('') }}
             className="bg-slate-800/50 text-slate-300 px-4 py-2.5 rounded-xl text-[10px] font-bold border border-slate-700 hover:bg-slate-700/50 transition cursor-pointer border-none"
@@ -302,32 +368,28 @@ export default function GestaoProcessos({ processos, modalidades, responsaveis, 
                     <td className="px-3 py-3 text-slate-300 truncate">{p.coordenacoes?.nome || '-'}</td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="min-w-0 flex-1">
-                          {canAssign ? (
-                            <select
-                              value={currentRespId}
-                              onChange={e => {
-                                const val = e.target.value
-                                if (val !== currentRespId) {
-                                  if (confirm('Alterar responsável do processo ' + (p.id_processo || '') + '?')) {
-                                    handleChangeResponsavel(p.id, val)
-                                  } else {
-                                    e.target.value = currentRespId
-                                  }
+                        {canAssign ? (
+                          <select
+                            value={currentRespId}
+                            onChange={e => {
+                              const val = e.target.value
+                              if (val !== currentRespId) {
+                                if (confirm('Alterar responsável do processo ' + (p.id_processo || '') + '?')) {
+                                  handleChangeResponsavel(p.id, val)
                                 }
-                              }}
-                              disabled={savingResp === p.id}
-                              className="resp-select"
-                            >
-                              <option value="">N/I</option>
-                              {responsaveis.map(r => (
-                                <option key={r.id} value={r.id}>{r.nome}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className="text-slate-100 font-bold">{p.responsaveis?.nome || 'N/I'}</span>
-                          )}
-                        </div>
+                              }
+                            }}
+                            disabled={savingResp === p.id}
+                            className="resp-select"
+                          >
+                            <option value="">N/I</option>
+                            {respList.map(r => (
+                              <option key={r.id} value={r.id}>{r.nome}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-slate-100 font-bold">{p.responsaveis?.nome || 'N/I'}</span>
+                        )}
                         {savingResp === p.id && (
                           <Save size={10} className="text-blue-400 animate-pulse shrink-0" />
                         )}
@@ -383,10 +445,138 @@ export default function GestaoProcessos({ processos, modalidades, responsaveis, 
         </div>
       </div>
 
+      {/* Responsaveis Management Modal */}
+      {showRespModal && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+          onClick={() => setShowRespModal(false)}
+        >
+          <div
+            className="glass-card w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[80vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center shrink-0">
+              <h2 className="text-sm font-extrabold text-slate-100 uppercase tracking-tight">Gerenciar Responsáveis</h2>
+              <button
+                onClick={() => setShowRespModal(false)}
+                className="p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-white/10 transition cursor-pointer border-none bg-transparent"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              {/* Add new */}
+              <div className="flex gap-2 mb-6">
+                <input
+                  type="text"
+                  value={newRespNome}
+                  onChange={e => setNewRespNome(e.target.value)}
+                  placeholder="Nome do responsável..."
+                  className="flex-1 bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none focus:border-violet-500/50"
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddResponsavel() } }}
+                />
+                <button
+                  onClick={handleAddResponsavel}
+                  disabled={respSaving || !newRespNome.trim()}
+                  className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-[10px] font-bold transition cursor-pointer border-none flex items-center gap-1.5"
+                >
+                  <Plus size={12} />
+                  Adicionar
+                </button>
+              </div>
+
+              {/* List */}
+              <div className="space-y-2">
+                {respList.map(r => (
+                  <div key={r.id} className="flex items-center justify-between bg-slate-800/30 rounded-lg px-4 py-3 border border-white/5">
+                    {editingResp === r.id ? (
+                      <div className="flex items-center gap-2 flex-1 mr-2">
+                        <input
+                          type="text"
+                          value={editRespNome}
+                          onChange={e => setEditRespNome(e.target.value)}
+                          className="flex-1 bg-slate-800/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-violet-500/50"
+                          onKeyDown={e => { if (e.key === 'Enter') handleEditResponsavel(r.id); if (e.key === 'Escape') setEditingResp(null) }}
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleEditResponsavel(r.id)}
+                          disabled={respSaving}
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-[9px] font-bold transition cursor-pointer border-none"
+                        >
+                          OK
+                        </button>
+                        <button
+                          onClick={() => setEditingResp(null)}
+                          className="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg text-[9px] font-bold transition cursor-pointer border-none"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-sm font-bold text-slate-100">{r.nome}</span>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => { setEditingResp(r.id); setEditRespNome(r.nome) }}
+                            className="p-1.5 rounded-md text-amber-400 hover:bg-amber-500/20 transition cursor-pointer border-none bg-transparent"
+                            title="Editar nome"
+                          >
+                            <Edit size={12} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteRespTarget(r)}
+                            className="p-1.5 rounded-md text-red-400 hover:bg-red-500/20 transition cursor-pointer border-none bg-transparent"
+                            title="Excluir"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+                {respList.length === 0 && (
+                  <p className="text-center text-slate-500 text-xs py-8">Nenhum responsável cadastrado</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Responsavel Confirm */}
+      {deleteRespTarget && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-sm p-6 text-center">
+            <p className="text-sm font-bold text-slate-100 mb-2">Excluir Responsável</p>
+            <p className="text-xs text-slate-400 mb-6">
+              Tem certeza que deseja excluir <strong className="text-slate-200">{deleteRespTarget.nome}</strong>?
+              Processos atribuídos a ele ficarão sem responsável.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setDeleteRespTarget(null)}
+                className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteResponsavel}
+                disabled={respSaving}
+                className="bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white px-5 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none"
+              >
+                {respSaving ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <DeleteConfirmDialog
         open={!!deleteTarget}
         onClose={() => { setDeleteTarget(null); setDeleting(false) }}
-        onConfirm={handleDelete}
+        onConfirm={handleDeleteProcess}
         loading={deleting}
         titulo="Excluir Processo"
         mensagem={`Tem certeza que deseja excluir o processo "${deleteTarget?.id_processo}"? Esta ação é irreversível.`}
