@@ -5,6 +5,17 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [breakpoint])
+  return isMobile
+}
+
 export default function EditProcessoClient({ params }: { params: Promise<{ id: string }> }) {
   const paramsId = use(params).id
   const [id, setId] = useState(paramsId)
@@ -13,6 +24,7 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  const isMobile = useIsMobile()
 
   function getSupabase() {
     if (!supabaseRef.current) supabaseRef.current = createClient()
@@ -172,8 +184,12 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', padding: 24 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      <form onSubmit={handleSubmit} style={{ background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', padding: isMobile ? 16 : 24 }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: 16, marginBottom: 24,
+        }}>
           {fields.map(f => (
             <div key={f.name}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</label>

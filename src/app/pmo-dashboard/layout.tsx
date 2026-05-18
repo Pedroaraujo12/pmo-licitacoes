@@ -15,13 +15,25 @@ const navItems = [
   { href: '/pmo-dashboard/usuarios', label: 'Usuários', icon: Users },
 ]
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(true)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [breakpoint])
+  return isMobile
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const isMobile = useIsMobile()
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -43,26 +55,44 @@ export default function DashboardLayout({
       })
   }, [])
 
+  useEffect(() => {
+    if (!isMobile) setSidebarOpen(true)
+    else setSidebarOpen(false)
+  }, [isMobile])
+
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', background: '#020617' }}>
+      {/* Mobile overlay backdrop */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 49, transition: 'opacity 0.2s',
+          }}
+        />
+      )}
+
       {/* Sidebar */}
       <aside style={{
-        width: sidebarOpen ? 240 : 64,
+        width: 240,
         background: '#1e293b',
         color: '#f1f5f9',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'width 0.2s',
+        transition: 'transform 0.25s ease, width 0.2s',
         position: 'fixed',
         top: 0,
         left: 0,
         bottom: 0,
         zIndex: 50,
+        transform: sidebarOpen ? 'translateX(0)' : (isMobile ? 'translateX(-100%)' : 'none'),
+        ...(isMobile || !sidebarOpen ? {} : {}),
       }}>
         <div style={{
           padding: '16px',
@@ -71,14 +101,12 @@ export default function DashboardLayout({
           justifyContent: 'space-between',
           borderBottom: '1px solid #334155',
         }}>
-          {sidebarOpen && (
-            <span style={{ fontWeight: 700, fontSize: 16 }}>LICITAÇÕES</span>
-          )}
+          <span style={{ fontWeight: 700, fontSize: 16 }}>LICITAÇÕES</span>
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() => setSidebarOpen(false)}
             style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}
           >
-            {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+            <X size={18} />
           </button>
         </div>
 
@@ -90,6 +118,7 @@ export default function DashboardLayout({
               <a
                 key={item.href}
                 href={item.href}
+                onClick={() => isMobile && setSidebarOpen(false)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -104,14 +133,14 @@ export default function DashboardLayout({
                 }}
               >
                 <Icon size={18} />
-                {sidebarOpen && <span>{item.label}</span>}
+                <span>{item.label}</span>
               </a>
             )
           })}
         </nav>
 
         <div style={{ padding: '12px', borderTop: '1px solid #334155' }}>
-          {sidebarOpen && profile && (
+          {profile && (
             <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 8 }}>
               <div style={{ color: '#f1f5f9', fontWeight: 500 }}>{profile.name}</div>
               <div style={{ textTransform: 'capitalize' }}>{profile.role}</div>
@@ -134,18 +163,50 @@ export default function DashboardLayout({
             }}
           >
             <LogOut size={18} />
-            {sidebarOpen && <span>Sair</span>}
+            <span>Sair</span>
           </button>
         </div>
       </aside>
 
+      {/* Floating menu button (mobile) */}
+      {isMobile && !sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          style={{
+            position: 'fixed', bottom: 20, left: 20, zIndex: 40,
+            width: 48, height: 48,
+            background: '#2563eb', color: '#fff',
+            border: 'none', borderRadius: '50%',
+            cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(37,99,235,0.4)',
+          }}
+        >
+          <Menu size={22} />
+        </button>
+      )}
+
+      {/* Desktop collapsed sidebar trigger */}
+      {!isMobile && !sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          style={{
+            position: 'fixed', top: 16, left: 12, zIndex: 40,
+            background: '#1e293b', color: '#94a3b8',
+            border: '1px solid #334155', borderRadius: 8,
+            cursor: 'pointer', padding: 8,
+          }}
+        >
+          <Menu size={18} />
+        </button>
+      )}
+
       {/* Main */}
       <main style={{
-        marginLeft: sidebarOpen ? 240 : 64,
-        flex: 1,
-        padding: 24,
+        marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64),
+        padding: isMobile ? 16 : 24,
+        paddingBottom: isMobile ? 80 : 24,
         transition: 'margin-left 0.2s',
-        background: '#020617',
         minHeight: '100vh',
       }}>
         {children}

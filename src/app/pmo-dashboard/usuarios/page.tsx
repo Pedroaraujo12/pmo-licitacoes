@@ -3,7 +3,18 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types/database'
-import { Shield, ShieldAlert, Eye, UserCheck } from 'lucide-react'
+import { Shield, ShieldAlert, Eye, UserCheck, Users } from 'lucide-react'
+
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [breakpoint])
+  return isMobile
+}
 
 const roleIcons: Record<string, React.ReactNode> = {
   admin: <ShieldAlert size={16} />,
@@ -21,6 +32,7 @@ const roleColors: Record<string, string> = {
 
 export default function UsuariosPage() {
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  const isMobile = useIsMobile()
 
   function getSupabase() {
     if (!supabaseRef.current) supabaseRef.current = createClient()
@@ -97,7 +109,8 @@ export default function UsuariosPage() {
       </div>
 
       <div style={tableCard}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: isMobile ? 600 : 'auto' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <th style={thStyle}>Nome</th>
@@ -169,10 +182,15 @@ export default function UsuariosPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Role info */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 24 }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: 12, marginTop: 24,
+      }}>
         <RoleCard icon={<ShieldAlert size={18} />} role="Admin" desc="Acesso total ao sistema" color="#dc2626" />
         <RoleCard icon={<Shield size={18} />} role="Gestor" desc="CRUD + gerenciar usuários" color="#2563eb" />
         <RoleCard icon={<UserCheck size={18} />} role="Consultor" desc="CRUD de processos" color="#f59e0b" />

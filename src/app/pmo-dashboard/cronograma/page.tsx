@@ -8,6 +8,17 @@ import {
   CheckCircle2, Clock, Circle, AlertTriangle, ArrowRight,
 } from 'lucide-react'
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [breakpoint])
+  return isMobile
+}
+
 function formatDate(d: string | null | undefined) {
   if (!d) return '-'
   const date = new Date(d)
@@ -27,6 +38,7 @@ export default function CronogramaPage() {
   const router = useRouter()
   const [processos, setProcessos] = useState<(Processo & { status_cronograma?: StatusProcessoCronograma })[]>([])
   const [loading, setLoading] = useState(true)
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     const supabase = createClient()
@@ -84,10 +96,11 @@ export default function CronogramaPage() {
                 style={{
                   background: '#1e293b',
                   borderRadius: 12,
-                  padding: 16,
+                  padding: isMobile ? 12 : 16,
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: 16,
+                  flexDirection: isMobile ? 'column' : 'row',
+                  alignItems: isMobile ? 'stretch' : 'center',
+                  gap: isMobile ? 8 : 16,
                   cursor: 'pointer',
                   border: sc?.processo_atrasado ? '1px solid #dc2626' : '1px solid #334155',
                 }}

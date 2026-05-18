@@ -5,12 +5,24 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [breakpoint])
+  return isMobile
+}
+
 export default function NovoProcessoPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  const isMobile = useIsMobile()
 
   function getSupabase() {
     if (!supabaseRef.current) supabaseRef.current = createClient()
@@ -139,8 +151,12 @@ export default function NovoProcessoPage() {
         </div>
       )}
 
-      <form ref={formRef} onSubmit={handleSubmit} style={{ background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', padding: 24 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      <form ref={formRef} onSubmit={handleSubmit} style={{ background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', padding: isMobile ? 16 : 24 }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: 16, marginBottom: 24,
+        }}>
           {renderInput('data_entrada', 'Data de Entrada', 'date', new Date().toISOString().split('T')[0])}
           {renderSelect('coordenacao_id', 'Coordenação', coordenacoes)}
           {renderInput('id_processo', 'ID Processo')}

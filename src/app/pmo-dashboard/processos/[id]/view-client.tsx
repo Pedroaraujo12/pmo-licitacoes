@@ -27,6 +27,17 @@ function isOverdue(etapa: CronogramaAtividade) {
   return new Date(etapa.data_fim) < new Date(new Date().toDateString())
 }
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [breakpoint])
+  return isMobile
+}
+
 export default function ProcessoViewClient({ params }: { params: Promise<{ id: string }> }) {
   const paramsId = use(params).id
   const [id, setId] = useState(paramsId)
@@ -37,6 +48,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
   const [profile, setProfile] = useState<{ role: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  const isMobile = useIsMobile()
 
   function getSupabase() {
     if (!supabaseRef.current) supabaseRef.current = createClient()
@@ -174,7 +186,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
     backdropFilter: 'blur(12px)',
     borderRadius: 20,
     border: '1px solid rgba(255,255,255,0.1)',
-    padding: 24,
+    padding: isMobile ? 16 : 24,
     marginBottom: 24,
   }
   const fieldStyle: React.CSSProperties = {
@@ -185,7 +197,8 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
   }
   const etapaStyle = (etapa: CronogramaAtividade): React.CSSProperties => ({
     display: 'flex',
-    alignItems: 'center',
+    flexDirection: isMobile ? 'column' : 'row',
+    alignItems: isMobile ? 'stretch' : 'center',
     gap: 12,
     padding: '12px 16px',
     background: 'rgba(30,41,59,0.5)',
@@ -202,22 +215,27 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{
+        display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        justifyContent: 'space-between', marginBottom: 24, gap: 12,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: isMobile ? '100%' : 'auto' }}>
           <button onClick={() => router.push('/pmo-dashboard')}
             className="cursor-pointer bg-transparent border-none text-slate-400 hover:text-slate-200 transition">
             <ArrowLeft size={20} />
           </button>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>{processo.id_processo}</h1>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word' }}>{processo.id_processo}</h1>
             <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>{processo.objeto_resumido}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
           {canEdit && (
             <button
               onClick={() => router.push(`/pmo-dashboard/processos/${id}/edit`)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none bg-amber-600 hover:bg-amber-500 text-white"
+              style={{ flex: isMobile ? 1 : undefined }}
             >
               <Edit size={14} /> Editar
             </button>
@@ -226,6 +244,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
             <button
               onClick={handleDelete}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none bg-red-600 hover:bg-red-500 text-white"
+              style={{ flex: isMobile ? 1 : undefined }}
             >
               <Trash2 size={14} /> Excluir
             </button>
@@ -234,7 +253,11 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
       </div>
 
       {/* Info Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+        gap: 16, marginBottom: 24,
+      }}>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data de Entrada</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{formatDate(processo.data_entrada)}</div>
@@ -317,7 +340,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Cronograma do Processo
           </h3>
-          <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#64748b' }}>
+          <div style={{ display: 'flex', gap: isMobile ? 8 : 16, fontSize: 11, color: '#64748b', flexWrap: 'wrap' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} /> Concluído
             </span>
@@ -430,7 +453,10 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {atividades.map(a => (
               <div key={a.id} style={{ padding: '12px', background: 'rgba(30,41,59,0.5)', borderRadius: 8, borderLeft: '3px solid #3b82f6' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{
+                  display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+                  justifyContent: 'space-between', marginBottom: 4, gap: 2,
+                }}>
                   <span style={{ fontWeight: 600, fontSize: 13, color: '#f1f5f9' }}>{a.atividade}</span>
                   <span style={{ fontSize: 12, color: '#64748b' }}>
                     {a.data ? formatDate(a.data) : ''}
