@@ -11,9 +11,10 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [processos, setProcessos] = useState<(Processo & { processo_atrasado?: boolean; etapas_concluidas?: number; total_etapas?: number; data_fim_prevista_total?: string | null })[]>([])
+  const [processos, setProcessos] = useState<Processo[]>([])
 
   useEffect(() => {
+    let cancelled = false
     const supabase = createClient()
     async function load() {
       try {
@@ -23,6 +24,8 @@ export default function DashboardPage() {
           supabase.from('responsaveis').select('*'),
           supabase.auth.getUser(),
         ])
+
+        if (cancelled) return
 
         if (procResult.error) {
           setError(procResult.error.message)
@@ -36,56 +39,21 @@ export default function DashboardPage() {
         const user = (userResult as { data: { user: { id?: string } | null } }).data?.user
         if (user?.id) {
           const { data: profileData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-          if (profileData) {
-            setProfile(profileData as Profile)
-          }
+          if (profileData && !cancelled) setProfile(profileData as Profile)
         }
 
-        const procData = (procResult.data || []) as (Processo & { coordenacoes?: { nome: string } | null; status_processo?: { nome: string } | null; responsaveis?: { nome: string } | null; demandantes?: { nome: string } | null; modalidades?: { nome: string } | null })[]
-
-        const merged = procData.map(p => ({
-          ...p,
-          processo_atrasado: false,
-          etapas_concluidas: 0,
-          total_etapas: 0,
-          data_fim_prevista_total: null,
-        }))
-
-        const allIds = merged.map(p => p.id_processo).filter(Boolean) as string[]
-        if (allIds.length > 0) {
-          const { data: cronData } = await supabase
-            .from('vw_status_processo_cronograma')
-            .select('*')
-            .in('id_processo', allIds)
-          if (cronData) {
-            const map: Record<string, StatusProcessoCronograma> = {}
-            ;(cronData as StatusProcessoCronograma[]).forEach(c => {
-              if (c.id_processo) map[c.id_processo] = c
-            })
-            for (const item of merged) {
-              if (item.id_processo && map[item.id_processo]) {
-                const c = map[item.id_processo]
-                const r = item as unknown as { [key: string]: unknown }
-                if (c.processo_atrasado != null) r.processo_atrasado = !!c.processo_atrasado
-                if (c.etapas_concluidas != null) r.etapas_concluidas = c.etapas_concluidas
-                if (c.total_etapas != null) r.total_etapas = c.total_etapas
-                if (c.data_fim_prevista_total) r.data_fim_prevista_total = c.data_fim_prevista_total
-                if (c.atividade_atual) r.atividade_atual = c.atividade_atual
-                if (c.data_fim_atividade_atual) r.data_entrega = c.data_fim_atividade_atual
-              }
-            }
-          }
-        }
-
-        setProcessos(merged)
+        setProcessos((procResult.data || []) as Processo[])
         setLoading(false)
       } catch (err) {
-        console.error('Erro inesperado:', err)
-        setError((err as Error)?.message || 'Erro de conexão')
-        setLoading(false)
+        if (!cancelled) {
+          console.error('Erro inesperado:', err)
+          setError((err as Error)?.message || 'Erro de conexão')
+          setLoading(false)
+        }
       }
     }
     load()
+    return () => { cancelled = true }
   }, [])
 
   if (loading) return (

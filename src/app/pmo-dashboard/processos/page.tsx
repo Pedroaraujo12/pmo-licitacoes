@@ -1,86 +1,75 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import GestaoProcessos from './gestao-processos'
-import type { Processo, Modalidade, Responsavel, Profile, StatusProcessoCronograma } from '@/types/database'
+import type { Processo, Modalidade, Responsavel, Profile } from '@/types/database'
 
 export default function ProcessosPage() {
-  const supabase = createClient()
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [modalidades, setModalidades] = useState<Modalidade[]>([])
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [processos, setProcessos] = useState<(Processo & { processo_atrasado?: boolean; etapas_concluidas?: number; total_etapas?: number; data_fim_prevista_total?: string | null })[]>([])
+  const [processos, setProcessos] = useState<Processo[]>([])
 
-  const loadData = useCallback(async () => {
-    try {
-      const [m, r, userResult] = await Promise.all([
-        supabase.from('modalidades').select('*'),
-        supabase.from('responsaveis').select('*'),
-        supabase.auth.getUser(),
-      ])
+  function getSupabase() {
+    if (!supabaseRef.current) supabaseRef.current = createClient()
+    return supabaseRef.current
+  }
 
-      const user = (userResult as { data: { user: { id?: string } | null } }).data?.user
-      if (user?.id) {
-        const { data: profileData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-        if (profileData) {
-          setProfile(profileData as Profile)
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const supabase = getSupabase()
+
+        const [userResult, m, r, procResult] = await Promise.all([
+          supabase.auth.getUser(),
+          supabase.from('modalidades').select('*'),
+          supabase.from('responsaveis').select('*'),
+          supabase
+            .from('processos')
+            .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
+            .order('data_entrada', { ascending: false }),
+        ])
+
+        if (cancelled) return
+
+        if (procResult.error) {
+          setError(procResult.error.message)
+          setLoading(false)
+          return
         }
-      }
 
-      if (m.data) setModalidades(m.data)
-      if (r.data) setResponsaveis(r.data)
+        const user = (userResult as { data: { user: { id?: string } | null } }).data?.user
+        if (user?.id) {
+          const { data: profileData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+          if (profileData && !cancelled) setProfile(profileData as Profile)
+        }
 
-      const { data: procData, error: procError } = await supabase
-        .from('processos')
-        .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
-        .order('data_entrada', { ascending: false })
-
-      if (procError) {
-        setError(procError.message)
+        if (m.data) setModalidades(m.data)
+        if (r.data) setResponsaveis(r.data)
+        setProcessos(procResult.data as Processo[] || [])
         setLoading(false)
-        return
-      }
-
-      const merged: (Processo & { processo_atrasado?: boolean; etapas_concluidas?: number; total_etapas?: number; data_fim_prevista_total?: string | null })[] = []
-
-      for (const p of (procData || [])) {
-        merged.push({ ...p, processo_atrasado: false, etapas_concluidas: 0, total_etapas: 0, data_fim_prevista_total: null })
-      }
-
-      const allIds = merged.map(p => p.id_processo).filter(Boolean) as string[]
-      if (allIds.length > 0) {
-        const { data: cronData } = await supabase.from('vw_status_processo_cronograma').select('*').in('id_processo', allIds)
-        if (cronData) {
-          const map: Record<string, StatusProcessoCronograma> = {}
-          ;(cronData as StatusProcessoCronograma[]).forEach(c => { if (c.id_processo) map[c.id_processo] = c })
-          for (const item of merged) {
-            if (item.id_processo && map[item.id_processo]) {
-              const c = map[item.id_processo]
-              const r = item as unknown as { [key: string]: unknown }
-              if (c.processo_atrasado != null) r.processo_atrasado = !!c.processo_atrasado
-              if (c.etapas_concluidas != null) r.etapas_concluidas = c.etapas_concluidas
-              if (c.total_etapas != null) r.total_etapas = c.total_etapas
-              if (c.data_fim_prevista_total) r.data_fim_prevista_total = c.data_fim_prevista_total
-              if (c.atividade_atual) r.atividade_atual = c.atividade_atual
-              if (c.data_fim_atividade_atual) r.data_entrega = c.data_fim_atividade_atual
-            }
-          }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Erro inesperado:', err)
+          setError((err as Error)?.message || 'Erro de conexão')
+          setLoading(false)
         }
       }
-
-      setProcessos(merged)
-      setLoading(false)
-    } catch (err) {
-      console.error('Erro inesperado:', err)
-      setError((err as Error)?.message || 'Erro de conexão')
-      setLoading(false)
     }
-  }, [])
+    load()
+    return () => { cancelled = true }
+  }, [reloadKey])
 
-  useEffect(() => { loadData() }, [loadData])
+  function handleDataChange() {
+    setLoading(true)
+    setReloadKey(k => k + 1)
+  }
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -98,7 +87,7 @@ export default function ProcessosPage() {
       modalidades={modalidades}
       responsaveis={responsaveis}
       userRole={profile?.role || null}
-      onDataChange={loadData}
+       onDataChange={handleDataChange}
     />
   )
 }

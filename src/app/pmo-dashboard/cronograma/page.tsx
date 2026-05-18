@@ -41,25 +41,28 @@ export default function CronogramaPage() {
   const isMobile = useIsMobile()
 
   useEffect(() => {
+    let cancelled = false
     const supabase = createClient()
     async function load() {
       const { data: procs } = await supabase
         .from('processos')
         .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
         .order('data_entrada', { ascending: false })
+      if (cancelled) return
       if (!procs) { setLoading(false); return }
 
       const ids = procs.map((p: Processo) => p.id_processo).filter(Boolean) as string[]
-      let cronoMap: Record<string, StatusProcessoCronograma> = {}
-      if (ids.length > 0) {
-        const { data: cronoData } = await supabase
-          .from('vw_status_processo_cronograma')
-          .select('*')
-          .in('id_processo', ids)
-        if (cronoData) {
-          for (const c of cronoData as StatusProcessoCronograma[]) {
-            if (c.id_processo) cronoMap[c.id_processo] = c
-          }
+
+      const { data: cronoData } = ids.length > 0
+        ? await supabase.from('vw_status_processo_cronograma').select('*').in('id_processo', ids)
+        : { data: null }
+
+      if (cancelled) return
+
+      const cronoMap: Record<string, StatusProcessoCronograma> = {}
+      if (cronoData) {
+        for (const c of cronoData as StatusProcessoCronograma[]) {
+          if (c.id_processo) cronoMap[c.id_processo] = c
         }
       }
 
@@ -67,6 +70,7 @@ export default function CronogramaPage() {
       setLoading(false)
     }
     load()
+    return () => { cancelled = true }
   }, [])
 
   if (loading) return (
