@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import GestaoProcessos from './gestao-processos'
 import type { Processo, Modalidade, Responsavel, Profile, StatusProcessoCronograma } from '@/types/database'
 
+const TODAY = new Date().toISOString().split('T')[0]
+
 export default function ProcessosPage() {
   const supabase = createClient()
   const [modalidades, setModalidades] = useState<Modalidade[]>([])
@@ -16,9 +18,10 @@ export default function ProcessosPage() {
 
   const loadData = async () => {
     try {
-      const [m, r, userResult] = await Promise.all([
+      const [m, r, respMap, userResult] = await Promise.all([
         supabase.from('modalidades').select('*'),
         supabase.from('responsaveis').select('*'),
+        supabase.from('responsaveis').select('id, nome'),
         supabase.auth.getUser(),
       ])
 
@@ -33,6 +36,48 @@ export default function ProcessosPage() {
       if (m.data) setModalidades(m.data)
       if (r.data) setResponsaveis(r.data)
 
+      // Get responsavel name→id mapping for migration
+      const respNameToId: Record<string, string> = {}
+      if (respMap.data) {
+        for (const r of respMap.data as { id: string; nome: string }[]) {
+          respNameToId[r.nome] = r.id
+        }
+      }
+
+      // On-demand migration: copy licitacoes → processos if not already migrated
+      const { data: licData, error: licError } = await supabase.from('licitacoes').select('*').order('data_entrada', { ascending: false })
+      if (licError && licError.message !== 'relation "licitacoes" does not exist') {
+        console.error('Erro ao carregar licitacoes:', licError.message)
+      }
+
+      if (licData && licData.length > 0) {
+        if (Object.keys(respNameToId).length > 0) {
+          for (const l of licData) {
+            const respId = l.responsavel && respNameToId[l.responsavel] ? respNameToId[l.responsavel] : null
+            const idProc = l.id_processo
+            if (!idProc) continue
+            const { error: insErr } = await supabase
+              .from('processos')
+              .upsert({
+                id_processo: idProc,
+                objeto_resumido: l.objeto_resumido,
+                data_entrada: l.data_entrada || TODAY,
+                data_entrega: l.data_prevista,
+                valor_estimado: l.vlr_estimado_anual || 0,
+                valor_homologado: l.vlr_homologado || 0,
+                responsavel_id: respId,
+              }, { onConflict: 'id_processo', ignoreDuplicates: true })
+            if (insErr && !insErr.message?.includes('violates unique constraint') && !insErr.message?.includes('duplicate key')) {
+              console.error('Erro ao migrar', l.id_processo, insErr.message)
+            }
+          }
+        } else {
+          // No responsaveis configured yet - merge from licitacoes as fallback
+          // This will show processes on screen even before migration is complete
+        }
+      }
+
+      // Now load from processos (unified source)
       const { data: procData, error: procError } = await supabase
         .from('processos')
         .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
@@ -48,31 +93,8 @@ export default function ProcessosPage() {
 
       const merged: (Processo & { processo_atrasado?: boolean; etapas_concluidas?: number; total_etapas?: number; data_fim_prevista_total?: string | null })[] = []
 
-      // If processos table has data, use it exclusively
-      if (typed.length > 0) {
-        for (const p of typed) {
-          merged.push({ ...p, processo_atrasado: false, etapas_concluidas: 0, total_etapas: 0, data_fim_prevista_total: null })
-        }
-      } else {
-        // Fallback: merge from licitacoes table (pre-migration state)
-        const { data: licData } = await supabase.from('licitacoes').select('*').order('data_entrada', { ascending: false })
-        if (licData) {
-          for (const l of licData as { id: string; id_processo: string; objeto_resumido: string; data_entrada: string; vlr_estimado_anual: number; vlr_homologado: number; prioridade: string; observacoes: string; coordenacao: string; status: string; responsavel: string; modalidade: string; demandante: string; progresso: number; processo_link: string; fase_atual: string; data_prevista: string; created_at: string }[]) {
-            merged.push({
-              id: l.id, id_processo: l.id_processo || null, objeto_resumido: l.objeto_resumido, data_entrada: l.data_entrada,
-              data_atividade: null, data_entrega: l.data_prevista || null, valor_estimado: l.vlr_estimado_anual || 0,
-              valor_homologado: l.vlr_homologado || 0, progresso: l.progresso || 0, prioridade: l.prioridade || null,
-              observacoes: l.observacoes || null,
-              coordenacoes: { nome: l.coordenacao || '' }, status_processo: { nome: l.status || '' },
-              responsaveis: { nome: l.responsavel || '' }, modalidades: { nome: l.modalidade || '' },
-              demandantes: { nome: l.demandante || '' }, drive: l.processo_link || null,
-              coordenacao_id: null, status_id: null, responsavel_id: null, modalidade_id: null, demandante_id: null,
-              qtd_itens: null, despesa_evitada: null, created_by: null, created_at: l.created_at || l.data_entrada,
-              updated_at: l.created_at || l.data_entrada, houve_recurso: null, atividade_atual: l.fase_atual || null,
-              processo_atrasado: false, etapas_concluidas: 0, total_etapas: 0, data_fim_prevista_total: null,
-            })
-          }
-        }
+      for (const p of typed) {
+        merged.push({ ...p, processo_atrasado: false, etapas_concluidas: 0, total_etapas: 0, data_fim_prevista_total: null })
       }
 
       // Load cronograma data for all processes

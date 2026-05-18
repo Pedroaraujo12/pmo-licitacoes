@@ -108,11 +108,11 @@ export default function NovoProcessoPage() {
     )
   }
 
-  function renderInput(name: string, label: string, type = 'text') {
+  function renderInput(name: string, label: string, type = 'text', defaultValue = '') {
     return (
       <div>
         <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
-        <input type={type} name={name} defaultValue="" style={baseInput} />
+        <input type={type} name={name} defaultValue={defaultValue} style={baseInput} />
       </div>
     )
   }
@@ -141,7 +141,7 @@ export default function NovoProcessoPage() {
 
       <form ref={formRef} onSubmit={handleSubmit} style={{ background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', padding: 24 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-          {renderInput('data_entrada', 'Data de Entrada', 'date')}
+          {renderInput('data_entrada', 'Data de Entrada', 'date', new Date().toISOString().split('T')[0])}
           {renderSelect('coordenacao_id', 'Coordenação', coordenacoes)}
           {renderInput('id_processo', 'ID Processo')}
           {renderSelect('status_id', 'Status', statusList)}
