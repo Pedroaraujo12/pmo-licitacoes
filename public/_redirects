@@ -1,3 +1,4 @@
 # Cloudflare Pages SPA-style redirects for dynamic routes
-/pmo-dashboard/processos/* /pmo-dashboard/processos/placeholder 200
+# Order matters: more specific rules first
 /pmo-dashboard/processos/*/edit /pmo-dashboard/processos/placeholder/edit 200
+/pmo-dashboard/processos/* /pmo-dashboard/processos/placeholder 200
