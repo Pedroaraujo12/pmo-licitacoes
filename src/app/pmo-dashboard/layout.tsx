@@ -85,7 +85,7 @@ export default function DashboardLayout({
         <nav style={{ flex: 1, padding: '8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {navItems.map(item => {
             const Icon = item.icon
-            const active = pathname === item.href || pathname.startsWith(item.href + '/')
+            const active = pathname === item.href || (item.href !== '/pmo-dashboard' && pathname.startsWith(item.href + '/'))
             return (
               <a
                 key={item.href}
