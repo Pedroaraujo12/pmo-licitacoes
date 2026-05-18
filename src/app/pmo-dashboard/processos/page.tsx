@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import DashboardContent from '../dashboard-content'
+import GestaoProcessos from './gestao-processos'
 import type { Processo, Modalidade, Responsavel, Profile, StatusProcessoCronograma } from '@/types/database'
 
 export default function ProcessosPage() {
@@ -17,15 +17,14 @@ export default function ProcessosPage() {
     const supabase = createClient()
     async function load() {
       try {
-        const [procResult, licResult, m, r, userResult] = await Promise.all([
+        const [procResult, m, r, userResult] = await Promise.all([
           supabase.from('processos').select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)').order('data_entrada', { ascending: false }),
-          supabase.from('licitacoes').select('*').order('data_entrada', { ascending: false }),
           supabase.from('modalidades').select('*'),
           supabase.from('responsaveis').select('*'),
           supabase.auth.getUser(),
         ])
 
-        const errors = [procResult.error, licResult.error, m.error, r.error].filter(Boolean)
+        const errors = [procResult.error, m.error, r.error].filter(Boolean)
         if (errors.length > 0) {
           setError(errors.map((e: unknown) => (e as { message: string }).message).join(' | '))
           setLoading(false)
@@ -33,7 +32,6 @@ export default function ProcessosPage() {
         }
 
         const procData = procResult.data as (Processo & { coordenacoes?: { nome: string } | null; status_processo?: { nome: string } | null; responsaveis?: { nome: string } | null; demandantes?: { nome: string } | null; modalidades?: { nome: string } | null })[] | null
-        const licData = licResult.data as { id: string; id_processo: string; objeto_resumido: string; data_entrada: string; vlr_estimado_anual: number; vlr_homologado: number; prioridade: string; observacoes: string; coordenacao: string; status: string; responsavel: string; modalidade: string; demandante: string; progresso: number; processo_link: string; fase_atual: string; data_prevista: string; created_at: string }[] | null
 
         if (m.data) setModalidades(m.data)
         if (r.data) setResponsaveis(r.data)
@@ -46,26 +44,6 @@ export default function ProcessosPage() {
         if (procData) {
           for (const p of procData) {
             merged.push({ ...p, processo_atrasado: false, etapas_concluidas: 0, total_etapas: 0, data_fim_prevista_total: null })
-          }
-        }
-
-        if (licData) {
-          const procIds = new Set(procData?.map(p => p.id_processo).filter(Boolean) ?? [])
-          for (const l of licData) {
-            if (l.id_processo && procIds.has(l.id_processo)) continue
-            merged.push({
-              id: l.id, id_processo: l.id_processo || null, objeto_resumido: l.objeto_resumido, data_entrada: l.data_entrada,
-              data_atividade: null, data_entrega: l.data_prevista || null, valor_estimado: l.vlr_estimado_anual || 0,
-              valor_homologado: l.vlr_homologado || 0, progresso: l.progresso || 0, prioridade: l.prioridade || null,
-              observacoes: l.observacoes || null,
-              coordenacoes: { nome: l.coordenacao || '' }, status_processo: { nome: l.status || '' },
-              responsaveis: { nome: l.responsavel || '' }, modalidades: { nome: l.modalidade || '' },
-              demandantes: { nome: l.demandante || '' }, drive: l.processo_link || null,
-              coordenacao_id: null, status_id: null, responsavel_id: null, modalidade_id: null, demandante_id: null,
-              qtd_itens: null, despesa_evitada: null, created_by: null, created_at: l.created_at || l.data_entrada,
-              updated_at: l.created_at || l.data_entrada, houve_recurso: null, atividade_atual: l.fase_atual || null,
-              processo_atrasado: false, etapas_concluidas: 0, total_etapas: 0, data_fim_prevista_total: null,
-            })
           }
         }
 
@@ -111,7 +89,7 @@ export default function ProcessosPage() {
   )
 
   return (
-    <DashboardContent
+    <GestaoProcessos
       processos={processos}
       modalidades={modalidades}
       responsaveis={responsaveis}
