@@ -17,23 +17,18 @@ export default function DashboardPage() {
     const supabase = createClient()
     async function load() {
       try {
-        const [procResult, licResult, m, r, userResult] = await Promise.all([
+        const [procResult, m, r, userResult] = await Promise.all([
           supabase.from('processos').select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)').order('data_entrada', { ascending: false }),
-          supabase.from('licitacoes').select('*').order('data_entrada', { ascending: false }),
           supabase.from('modalidades').select('*'),
           supabase.from('responsaveis').select('*'),
           supabase.auth.getUser(),
         ])
 
-        const errors = [procResult.error, licResult.error, m.error, r.error].filter(Boolean)
-        if (errors.length > 0) {
-          setError(errors.map((e: unknown) => (e as { message: string }).message).join(' | '))
+        if (procResult.error) {
+          setError(procResult.error.message)
           setLoading(false)
           return
         }
-
-        const procData = procResult.data as (Processo & { coordenacoes?: { nome: string } | null; status_processo?: { nome: string } | null; responsaveis?: { nome: string } | null; demandantes?: { nome: string } | null; modalidades?: { nome: string } | null })[] | null
-        const licData = licResult.data as { id: string; id_processo: string; objeto_resumido: string; data_entrada: string; vlr_estimado_anual: number; vlr_homologado: number; prioridade: string; observacoes: string; coordenacao: string; status: string; responsavel: string; modalidade: string; demandante: string; progresso: number; processo_link: string; fase_atual: string; data_prevista: string; created_at: string }[] | null
 
         if (m.data) setModalidades(m.data)
         if (r.data) setResponsaveis(r.data)
@@ -46,66 +41,16 @@ export default function DashboardPage() {
           }
         }
 
-        // Merge processos + licitacoes into unified process list
-        const merged: (Processo & { processo_atrasado?: boolean; etapas_concluidas?: number; total_etapas?: number; data_fim_prevista_total?: string | null })[] = []
+        const procData = (procResult.data || []) as (Processo & { coordenacoes?: { nome: string } | null; status_processo?: { nome: string } | null; responsaveis?: { nome: string } | null; demandantes?: { nome: string } | null; modalidades?: { nome: string } | null })[]
 
-        // Add from processos table
-        if (procData) {
-          for (const p of procData) {
-            merged.push({
-              ...p,
-              processo_atrasado: false,
-              etapas_concluidas: 0,
-              total_etapas: 0,
-              data_fim_prevista_total: null,
-            })
-          }
-        }
+        const merged = procData.map(p => ({
+          ...p,
+          processo_atrasado: false,
+          etapas_concluidas: 0,
+          total_etapas: 0,
+          data_fim_prevista_total: null,
+        }))
 
-        // Add from licitacoes (skip if already in processos by matching NUP)
-        if (licData) {
-          const procIds = new Set(procData?.map(p => p.id_processo).filter(Boolean) ?? [])
-          for (const l of licData) {
-            if (l.id_processo && procIds.has(l.id_processo)) continue
-            merged.push({
-              id: l.id,
-              id_processo: l.id_processo,
-              objeto_resumido: l.objeto_resumido,
-              data_entrada: l.data_entrada,
-              data_atividade: null,
-              data_entrega: l.data_prevista || null,
-              valor_estimado: l.vlr_estimado_anual || 0,
-              valor_homologado: l.vlr_homologado || 0,
-              progresso: l.progresso || 0,
-              prioridade: l.prioridade || null,
-              observacoes: l.observacoes || null,
-              coordenacoes: { nome: l.coordenacao || '' },
-              status_processo: { nome: l.status || '' },
-              responsaveis: { nome: l.responsavel || '' },
-              modalidades: { nome: l.modalidade || '' },
-              demandantes: { nome: l.demandante || '' },
-              drive: l.processo_link || null,
-              coordenacao_id: null,
-              status_id: null,
-              responsavel_id: null,
-              modalidade_id: null,
-              demandante_id: null,
-              qtd_itens: null,
-              despesa_evitada: null,
-              created_by: null,
-              created_at: l.created_at || l.data_entrada,
-              updated_at: l.created_at || l.data_entrada,
-              houve_recurso: null,
-              atividade_atual: l.fase_atual || null,
-              processo_atrasado: false,
-              etapas_concluidas: 0,
-              total_etapas: 0,
-              data_fim_prevista_total: null,
-            })
-          }
-        }
-
-        // Load cronograma status for all merged processos
         const allIds = merged.map(p => p.id_processo).filter(Boolean) as string[]
         if (allIds.length > 0) {
           const { data: cronData } = await supabase
@@ -117,16 +62,16 @@ export default function DashboardPage() {
             ;(cronData as StatusProcessoCronograma[]).forEach(c => {
               if (c.id_processo) map[c.id_processo] = c
             })
-            // Update merged items with cronograma data
             for (const item of merged) {
               if (item.id_processo && map[item.id_processo]) {
                 const c = map[item.id_processo]
-                item.processo_atrasado = c.processo_atrasado ?? false
-                item.etapas_concluidas = c.etapas_concluidas ?? 0
-                item.total_etapas = c.total_etapas ?? 0
-                item.data_fim_prevista_total = c.data_fim_prevista_total ?? null
-                item.atividade_atual = c.atividade_atual || item.atividade_atual
-                item.data_entrega = c.data_fim_atividade_atual || item.data_entrega
+                const r = item as unknown as { [key: string]: unknown }
+                if (c.processo_atrasado != null) r.processo_atrasado = !!c.processo_atrasado
+                if (c.etapas_concluidas != null) r.etapas_concluidas = c.etapas_concluidas
+                if (c.total_etapas != null) r.total_etapas = c.total_etapas
+                if (c.data_fim_prevista_total) r.data_fim_prevista_total = c.data_fim_prevista_total
+                if (c.atividade_atual) r.atividade_atual = c.atividade_atual
+                if (c.data_fim_atividade_atual) r.data_entrega = c.data_fim_atividade_atual
               }
             }
           }

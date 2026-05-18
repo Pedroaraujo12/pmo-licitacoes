@@ -78,39 +78,54 @@ export default function DashboardLayout({
         />
       )}
 
+      {/* Mobile overlay backdrop */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 49,
+          }}
+        />
+      )}
+
       {/* Sidebar */}
       <aside style={{
-        width: 240,
+        width: isMobile ? 240 : (sidebarOpen ? 240 : 64),
         background: '#1e293b',
         color: '#f1f5f9',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'transform 0.25s ease, width 0.2s',
+        transition: isMobile ? 'transform 0.25s ease' : 'width 0.2s',
         position: 'fixed',
         top: 0,
         left: 0,
         bottom: 0,
         zIndex: 50,
-        transform: sidebarOpen ? 'translateX(0)' : (isMobile ? 'translateX(-100%)' : 'none'),
-        ...(isMobile || !sidebarOpen ? {} : {}),
+        transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(-100%)') : 'none',
+        overflow: 'hidden',
       }}>
         <div style={{
-          padding: '16px',
+          padding: sidebarOpen ? '16px' : '16px 12px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: sidebarOpen ? 'space-between' : 'center',
           borderBottom: '1px solid #334155',
+          minHeight: 52,
         }}>
-          <span style={{ fontWeight: 700, fontSize: 16 }}>LICITAÇÕES</span>
+          {sidebarOpen && <span style={{ fontWeight: 700, fontSize: 16, whiteSpace: 'nowrap' }}>LICITAÇÕES</span>}
           <button
             onClick={() => setSidebarOpen(false)}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}
+            style={{
+              background: 'none', border: 'none', color: '#94a3b8',
+              cursor: 'pointer', padding: 4, flexShrink: 0,
+            }}
           >
             <X size={18} />
           </button>
         </div>
 
-        <nav style={{ flex: 1, padding: '8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav style={{ flex: 1, padding: '8px 4px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {navItems.map(item => {
             const Icon = item.icon
             const active = pathname === item.href || (item.href !== '/pmo-dashboard' && pathname.startsWith(item.href + '/'))
@@ -118,29 +133,38 @@ export default function DashboardLayout({
               <a
                 key={item.href}
                 href={item.href}
-                onClick={() => isMobile && setSidebarOpen(false)}
+                onClick={() => { if (isMobile) setSidebarOpen(false) }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: sidebarOpen ? 'flex-start' : 'center',
                   gap: 12,
-                  padding: '10px 12px',
+                  padding: '10px 8px',
                   borderRadius: 8,
                   textDecoration: 'none',
                   color: active ? '#fff' : '#94a3b8',
                   background: active ? '#334155' : 'transparent',
                   fontSize: 14,
                   fontWeight: active ? 600 : 400,
+                  whiteSpace: 'nowrap',
                 }}
+                title={!sidebarOpen ? item.label : undefined}
               >
                 <Icon size={18} />
-                <span>{item.label}</span>
+                {sidebarOpen && <span>{item.label}</span>}
               </a>
             )
           })}
         </nav>
 
-        <div style={{ padding: '12px', borderTop: '1px solid #334155' }}>
-          {profile && (
+        <div style={{
+          padding: sidebarOpen ? '12px' : '12px 4px',
+          borderTop: '1px solid #334155',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: sidebarOpen ? 'stretch' : 'center',
+        }}>
+          {sidebarOpen && profile && (
             <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 8 }}>
               <div style={{ color: '#f1f5f9', fontWeight: 500 }}>{profile.name}</div>
               <div style={{ textTransform: 'capitalize' }}>{profile.role}</div>
@@ -151,8 +175,9 @@ export default function DashboardLayout({
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: sidebarOpen ? 'flex-start' : 'center',
               gap: 12,
-              padding: '10px 12px',
+              padding: '10px 8px',
               borderRadius: 8,
               border: 'none',
               background: 'transparent',
@@ -161,9 +186,10 @@ export default function DashboardLayout({
               width: '100%',
               fontSize: 14,
             }}
+            title={!sidebarOpen ? 'Sair' : undefined}
           >
             <LogOut size={18} />
-            <span>Sair</span>
+            {sidebarOpen && <span>Sair</span>}
           </button>
         </div>
       </aside>
@@ -183,21 +209,6 @@ export default function DashboardLayout({
           }}
         >
           <Menu size={22} />
-        </button>
-      )}
-
-      {/* Desktop collapsed sidebar trigger */}
-      {!isMobile && !sidebarOpen && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          style={{
-            position: 'fixed', top: 16, left: 12, zIndex: 40,
-            background: '#1e293b', color: '#94a3b8',
-            border: '1px solid #334155', borderRadius: 8,
-            cursor: 'pointer', padding: 8,
-          }}
-        >
-          <Menu size={18} />
         </button>
       )}
 
