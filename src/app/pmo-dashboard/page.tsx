@@ -8,17 +8,17 @@ import type { Processo, Modalidade, Responsavel, Profile, StatusProcessoCronogra
 export default function DashboardPage() {
   const [modalidades, setModalidades] = useState<Modalidade[]>([])
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
-  const [statusCronograma, setStatusCronograma] = useState<Record<string, StatusProcessoCronograma>>({})
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [processos, setProcessos] = useState<(Processo & { processo_atrasado?: boolean; etapas_concluidas?: number; total_etapas?: number; data_fim_prevista_total?: string | null })[]>([])
 
   useEffect(() => {
     const supabase = createClient()
     async function load() {
       try {
         const [procResult, licResult, m, r, userResult] = await Promise.all([
-          supabase.from('processos').select('*, coordenacao(nome), status(nome), responsavel(nome), demandante(nome), modalidade(nome)').order('data_entrada', { ascending: false }),
+          supabase.from('processos').select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)').order('data_entrada', { ascending: false }),
           supabase.from('licitacoes').select('*').order('data_entrada', { ascending: false }),
           supabase.from('modalidades').select('*'),
           supabase.from('responsaveis').select('*'),
@@ -32,32 +32,27 @@ export default function DashboardPage() {
           return
         }
 
-        const procData = procResult.data as (Processo & { coordenacao?: { nome: string } | null; status?: { nome: string } | null; responsavel?: { nome: string } | null; demandante?: { nome: string } | null; modalidade?: { nome: string } | null })[] | null
+        const procData = procResult.data as (Processo & { coordenacoes?: { nome: string } | null; status_processo?: { nome: string } | null; responsaveis?: { nome: string } | null; demandantes?: { nome: string } | null; modalidades?: { nome: string } | null })[] | null
         const licData = licResult.data as { id: string; id_processo: string; objeto_resumido: string; data_entrada: string; vlr_estimado_anual: number; vlr_homologado: number; prioridade: string; observacoes: string; coordenacao: string; status: string; responsavel: string; modalidade: string; demandante: string; progresso: number; processo_link: string; fase_atual: string; data_prevista: string; created_at: string }[] | null
 
         if (m.data) setModalidades(m.data)
         if (r.data) setResponsaveis(r.data)
 
         const user = (userResult as { data: { user: { user_metadata?: { role?: string } } | null } }).data?.user
-        if (user?.user_metadata?.role) {
-          setProfile({ role: user.user_metadata.role } as Profile)
-        }
+        setProfile(user?.user_metadata?.role ? { role: user.user_metadata.role } as Profile : null)
 
         // Merge processos + licitacoes into unified process list
         const merged: (Processo & { processo_atrasado?: boolean; etapas_concluidas?: number; total_etapas?: number; data_fim_prevista_total?: string | null })[] = []
-        const seenIds = new Set<string>()
 
         // Add from processos table
         if (procData) {
           for (const p of procData) {
-            seenIds.add(p.id)
-            const crono = p.id_processo ? statusCronograma[p.id_processo] : null
             merged.push({
               ...p,
-              processo_atrasado: crono?.processo_atrasado ?? false,
-              etapas_concluidas: crono?.etapas_concluidas ?? 0,
-              total_etapas: crono?.total_etapas ?? 0,
-              data_fim_prevista_total: crono?.data_fim_prevista_total ?? null,
+              processo_atrasado: false,
+              etapas_concluidas: 0,
+              total_etapas: 0,
+              data_fim_prevista_total: null,
             })
           }
         }
@@ -79,11 +74,11 @@ export default function DashboardPage() {
               progresso: l.progresso || 0,
               prioridade: l.prioridade || null,
               observacoes: l.observacoes || null,
-              coordenacao: { nome: l.coordenacao || '' },
-              status: { nome: l.status || '' },
-              responsavel: { nome: l.responsavel || '' },
-              modalidade: { nome: l.modalidade || '' },
-              demandante: { nome: l.demandante || '' },
+              coordenacoes: { nome: l.coordenacao || '' },
+              status_processo: { nome: l.status || '' },
+              responsaveis: { nome: l.responsavel || '' },
+              modalidades: { nome: l.modalidade || '' },
+              demandantes: { nome: l.demandante || '' },
               drive: l.processo_link || null,
               coordenacao_id: null,
               status_id: null,
@@ -117,7 +112,6 @@ export default function DashboardPage() {
             ;(cronData as StatusProcessoCronograma[]).forEach(c => {
               if (c.id_processo) map[c.id_processo] = c
             })
-            setStatusCronograma(map)
             // Update merged items with cronograma data
             for (const item of merged) {
               if (item.id_processo && map[item.id_processo]) {
@@ -144,8 +138,6 @@ export default function DashboardPage() {
     load()
   }, [])
 
-  const [processos, setProcessos] = useState<(Processo & { processo_atrasado?: boolean; etapas_concluidas?: number; total_etapas?: number; data_fim_prevista_total?: string | null })[]>([])
-
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
       <div className="loading-spinner" />
@@ -164,7 +156,6 @@ export default function DashboardPage() {
       modalidades={modalidades}
       responsaveis={responsaveis}
       userRole={profile?.role || null}
-      statusCronograma={statusCronograma}
     />
   )
 }

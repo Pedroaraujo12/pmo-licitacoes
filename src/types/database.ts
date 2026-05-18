@@ -34,11 +34,11 @@ export interface Processo {
   created_at: string
   updated_at: string
   // Joins
-  coordenacao?: { nome: string } | null
-  status?: { nome: string } | null
-  responsavel?: { nome: string } | null
-  demandante?: { nome: string } | null
-  modalidade?: { nome: string } | null
+  coordenacoes?: { nome: string } | null
+  status_processo?: { nome: string } | null
+  responsaveis?: { nome: string } | null
+  demandantes?: { nome: string } | null
+  modalidades?: { nome: string } | null
   // Cronograma fields (from vw_status_processo_cronograma)
   processo_atrasado?: boolean
   etapas_concluidas?: number

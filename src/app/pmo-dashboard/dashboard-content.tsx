@@ -55,7 +55,6 @@ interface Props {
   modalidades: Modalidade[]
   responsaveis: Responsavel[]
   userRole?: string | null
-  statusCronograma?: Record<string, unknown>
 }
 
 export default function DashboardContent({ processos, modalidades, responsaveis, userRole }: Props) {
@@ -78,15 +77,18 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
-    const supabase = createClient()
-    await supabase.from('processos').delete().eq('id', deleteTarget.id)
-    const { error } = await supabase.from('licitacoes').delete().eq('id', deleteTarget.id)
-    if (!error) {
-      setDeleteTarget(null)
-      setModalProcesso(null)
+    try {
+      const supabase = createClient()
+      const { error: err1 } = await supabase.from('processos').delete().eq('id', deleteTarget.id)
+      const { error: err2 } = await supabase.from('licitacoes').delete().eq('id', deleteTarget.id)
+      if (err1 || err2) {
+        console.error('Erro ao excluir:', err1 || err2)
+        setDeleting(false)
+        return
+      }
       window.location.reload()
-    } else {
-      console.error('Erro ao excluir:', error)
+    } catch (err) {
+      console.error('Erro inesperado ao excluir:', err)
       setDeleting(false)
     }
   }
@@ -119,11 +121,11 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
       if (search && !`${p.id_processo} ${p.objeto_resumido}`.toLowerCase().includes(search.toLowerCase())) return false
       if (chartFilter) {
         if (chartFilter.type === 'responsavel') {
-          const resp = p.responsavel?.nome || 'N/I'
+          const resp = p.responsaveis?.nome || 'N/I'
           if (resp !== chartFilter.value) return false
         }
         if (chartFilter.type === 'modalidade') {
-          const mod = p.modalidade?.nome || 'N/I'
+          const mod = p.modalidades?.nome || 'N/I'
           if (mod !== chartFilter.value) return false
         }
       }
@@ -132,8 +134,8 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
         if (statusFilter === 'Atrasados' && ag.class !== 'aging-red') return false
         if (statusFilter === 'No Prazo' && ag.class === 'aging-red') return false
       }
-      if (modalidadeFilter && (p.modalidade?.nome || 'N/I') !== modalidadeFilter) return false
-      if (responsavelFilter && (p.responsavel?.nome || 'N/I') !== responsavelFilter) return false
+      if (modalidadeFilter && (p.modalidades?.nome || 'N/I') !== modalidadeFilter) return false
+      if (responsavelFilter && (p.responsaveis?.nome || 'N/I') !== responsavelFilter) return false
       return true
     }).sort((a, b) => {
       let cmp = 0
@@ -164,8 +166,8 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
       const counts: Record<string, number> = {}
       filtered.forEach(p => {
         let v: string
-        if (key === 'responsavel') v = p.responsavel?.nome || 'N/I'
-        else if (key === 'modalidade') v = p.modalidade?.nome || 'N/I'
+        if (key === 'responsavel') v = p.responsaveis?.nome || 'N/I'
+        else if (key === 'modalidade') v = p.modalidades?.nome || 'N/I'
         else return
         if (!v.trim()) v = 'N/I'
         counts[v] = (counts[v] || 0) + 1
@@ -193,7 +195,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
   const uniqueStatuses = useMemo(() => {
     const set = new Set<string>()
     processos.forEach(p => {
-      const resp = p.responsavel?.nome
+      const resp = p.responsaveis?.nome
       if (resp) set.add(resp)
     })
     return [...set].sort()
@@ -202,7 +204,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
   const uniqueModalidades = useMemo(() => {
     const set = new Set<string>()
     processos.forEach(p => {
-      const mod = p.modalidade?.nome
+      const mod = p.modalidades?.nome
       if (mod) set.add(mod)
     })
     return [...set].sort()
@@ -521,19 +523,19 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
               </div>
               <div className="p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-slate-500 mb-1">Status</p>
-                <p className="text-base font-black text-amber-500">{modalProcesso.status?.nome || '-'}</p>
+                <p className="text-base font-black text-amber-500">{modalProcesso.status_processo?.nome || '-'}</p>
               </div>
               <div className="p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-slate-500 mb-1">Coordenação</p>
-                <p className="text-sm font-bold text-slate-100">{modalProcesso.coordenacao?.nome || '-'}</p>
+                <p className="text-sm font-bold text-slate-100">{modalProcesso.coordenacoes?.nome || '-'}</p>
               </div>
               <div className="p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-slate-500 mb-1">Responsável</p>
-                <p className="text-sm font-bold text-slate-100">{modalProcesso.responsavel?.nome || '-'}</p>
+                <p className="text-sm font-bold text-slate-100">{modalProcesso.responsaveis?.nome || '-'}</p>
               </div>
               <div className="p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-slate-500 mb-1">Modalidade</p>
-                <p className="text-sm font-bold text-slate-100">{modalProcesso.modalidade?.nome || '-'}</p>
+                <p className="text-sm font-bold text-slate-100">{modalProcesso.modalidades?.nome || '-'}</p>
               </div>
               <div className="p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-slate-500 mb-1">Estimado</p>

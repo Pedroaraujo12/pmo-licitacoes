@@ -33,7 +33,7 @@ export default function CronogramaPage() {
     async function load() {
       const { data: procs } = await supabase
         .from('processos')
-        .select('*, coordenacao(nome), status(nome), responsavel(nome), demandante(nome), modalidade(nome)')
+        .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
         .order('data_entrada', { ascending: false })
       if (!procs) { setLoading(false); return }
 
@@ -96,7 +96,7 @@ export default function CronogramaPage() {
 
                 <div style={{ flex: 1 }}>
                   <div style={{ color: '#f1f5f9', fontWeight: 600, marginBottom: 4 }}>
-                    {p.id_processo || 'Sem ID'} {p.modalidade?.nome ? `- ${p.modalidade.nome}` : ''}
+                    {p.id_processo || 'Sem ID'} {p.modalidades?.nome ? `- ${p.modalidades.nome}` : ''}
                   </div>
                   <div style={{ color: '#94a3b8', fontSize: 13 }}>
                     {p.data_entrada ? `Entrada: ${formatDate(p.data_entrada)}` : ''}

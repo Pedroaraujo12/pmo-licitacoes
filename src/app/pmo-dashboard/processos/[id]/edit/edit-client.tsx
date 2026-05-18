@@ -28,37 +28,42 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
 
   useEffect(() => {
     async function load() {
-      const [proc, c, m, d, r, s] = await Promise.all([
-        getSupabase().from('processos').select('*').eq('id', id).single(),
-        getSupabase().from('coordenacoes').select('*'),
-        getSupabase().from('modalidades').select('*'),
-        getSupabase().from('demandantes').select('*'),
-        getSupabase().from('responsaveis').select('*'),
-        getSupabase().from('status_processo').select('*'),
-      ])
+      try {
+        const [proc, c, m, d, r, s] = await Promise.all([
+          getSupabase().from('processos').select('*').eq('id', id).single(),
+          getSupabase().from('coordenacoes').select('*'),
+          getSupabase().from('modalidades').select('*'),
+          getSupabase().from('demandantes').select('*'),
+          getSupabase().from('responsaveis').select('*'),
+          getSupabase().from('status_processo').select('*'),
+        ])
 
-      if (c.data) setCoordenacoes(c.data)
-      if (m.data) setModalidades(m.data)
-      if (d.data) setDemandantes(d.data)
-      if (r.data) setResponsaveis(r.data)
-      if (s.data) setStatusList(s.data)
+        if (c.data) setCoordenacoes(c.data)
+        if (m.data) setModalidades(m.data)
+        if (d.data) setDemandantes(d.data)
+        if (r.data) setResponsaveis(r.data)
+        if (s.data) setStatusList(s.data)
 
-      if (proc.data) {
-        const f: Record<string, string> = {}
-        for (const [key, value] of Object.entries(proc.data)) {
-          f[key] = value === null || value === undefined ? '' : String(value)
-        }
-        setForm(f)
-      } else {
-        // Check if this is a legacy licitacoes record
-        const { data: lic } = await getSupabase().from('licitacoes').select('id').eq('id', id).single()
-        if (lic) {
-          setNotFound(true)
-          setError('Registros legados não podem ser editados pelo novo formulário. Crie um novo processo para este item.')
+        if (proc.data) {
+          const f: Record<string, string> = {}
+          for (const [key, value] of Object.entries(proc.data)) {
+            f[key] = value === null || value === undefined ? '' : String(value)
+          }
+          setForm(f)
         } else {
-          setNotFound(true)
-          setError('Processo não encontrado.')
+          // Check if this is a legacy licitacoes record
+          const { data: lic } = await getSupabase().from('licitacoes').select('id').eq('id', id).single()
+          if (lic) {
+            setNotFound(true)
+            setError('Registros legados não podem ser editados pelo novo formulário. Crie um novo processo para este item.')
+          } else {
+            setNotFound(true)
+            setError('Processo não encontrado.')
+          }
         }
+      } catch (err: unknown) {
+        console.error('Erro ao carregar processo:', err)
+        setError('Erro de conexão ao carregar dados.')
       }
     }
     load()
@@ -104,13 +109,13 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
   const fields = [
     { label: 'Data de Entrada', name: 'data_entrada', type: 'date' },
     { label: 'Coordenação', name: 'coordenacao_id', options: coordenacoes },
-    { label: 'ID Processo', name: 'id_processo' },
+    { label: 'ID Processo', name: 'id_processo', type: 'text' },
     { label: 'Status', name: 'status_id', options: statusList },
     { label: 'Qtd Itens', name: 'qtd_itens', type: 'number' },
     { label: 'Responsável', name: 'responsavel_id', options: responsaveis },
     { label: 'Demandante', name: 'demandante_id', options: demandantes },
     { label: 'Modalidade', name: 'modalidade_id', options: modalidades },
-    { label: 'Prioridade', name: 'prioridade' },
+    { label: 'Prioridade', name: 'prioridade', type: 'text' },
     { label: 'Data Atividade', name: 'data_atividade', type: 'date' },
     { label: 'Progresso (%)', name: 'progresso', type: 'number' },
     { label: 'Data Entrega', name: 'data_entrega', type: 'date' },

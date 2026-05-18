@@ -48,7 +48,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
       // Try processos first, then licitacoes as fallback
       const { data: proc } = await supabase
         .from('processos')
-        .select('*, coordenacao(nome), status(nome), responsavel(nome), demandante(nome), modalidade(nome)')
+        .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
         .eq('id', id)
         .single()
 
@@ -82,11 +82,11 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
             drive: lic.processo_link || null,
             atividade_atual: lic.fase_atual || null,
             data_entrega: lic.data_prevista || null,
-            coordenacao: { nome: lic.coordenacao || '' },
-            status: { nome: lic.status || '' },
-            responsavel: { nome: lic.responsavel || '' },
-            modalidade: { nome: lic.modalidade || '' },
-            demandante: { nome: lic.demandante || '' },
+            coordenacoes: { nome: lic.coordenacao || '' },
+            status_processo: { nome: lic.status || '' },
+            responsaveis: { nome: lic.responsavel || '' },
+            modalidades: { nome: lic.modalidade || '' },
+            demandantes: { nome: lic.demandante || '' },
             data_atividade: null,
             coordenacao_id: null,
             status_id: null,
@@ -136,9 +136,17 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
 
   async function handleDelete() {
     if (!confirm('Tem certeza que deseja excluir este processo?')) return
-    await getSupabase().from('processos').delete().eq('id', id)
-    await getSupabase().from('licitacoes').delete().eq('id', id)
-    router.push('/pmo-dashboard')
+    try {
+      const { error: err1 } = await getSupabase().from('processos').delete().eq('id', id)
+      const { error: err2 } = await getSupabase().from('licitacoes').delete().eq('id', id)
+      if (err1 || err2) {
+        console.error('Erro ao excluir:', err1 || err2)
+        return
+      }
+      router.push('/pmo-dashboard')
+    } catch (err) {
+      console.error('Erro inesperado ao excluir:', err)
+    }
   }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Carregando...</div>
@@ -223,19 +231,19 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coordenação</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.coordenacao?.nome || '-'}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.coordenacoes?.nome || '-'}</div>
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.status?.nome || '-'}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.status_processo?.nome || '-'}</div>
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Responsável</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.responsavel?.nome || '-'}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.responsaveis?.nome || '-'}</div>
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modalidade</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.modalidade?.nome || '-'}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.modalidades?.nome || '-'}</div>
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Progresso</div>

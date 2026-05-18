@@ -57,6 +57,8 @@ export default function NovoProcessoPage() {
       if (d.data) setDemandantes(d.data)
       if (r.data) setResponsaveis(r.data)
       if (s.data) setStatusList(s.data)
+    }).catch((err: unknown) => {
+      console.error('Erro ao carregar dados do formulário:', err)
     })
   }, [])
 

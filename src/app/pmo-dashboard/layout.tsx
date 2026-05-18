@@ -27,14 +27,20 @@ export default function DashboardLayout({
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
-      if (!user) {
+    supabase.auth.getUser()
+      .then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
+        if (!user) {
+          router.push('/login')
+          return
+        }
+        supabase.from('profiles').select('*').eq('id', user.id).single()
+          .then(({ data }: { data: Profile | null }) => setProfile(data))
+          .catch((err: unknown) => console.error('Erro ao carregar perfil:', err))
+      })
+      .catch((err: unknown) => {
+        console.error('Erro ao verificar autenticação:', err)
         router.push('/login')
-        return
-      }
-      supabase.from('profiles').select('*').eq('id', user.id).single()
-        .then(({ data }: { data: Profile | null }) => setProfile(data))
-    })
+      })
   }, [])
 
   async function handleLogout() {
