@@ -67,35 +67,39 @@ export default function NovoProcessoPage() {
     setLoading(true)
     setError('')
 
-    const payload: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(form)) {
-      if (value === '') continue
-      if (['qtd_itens', 'progresso', 'valor_estimado', 'valor_homologado'].includes(key)) {
-        payload[key] = Number(value)
-      } else if (['data_entrada', 'data_atividade', 'data_entrega'].includes(key)) {
-        payload[key] = value || null
-      } else {
-        payload[key] = value
+    try {
+      const payload: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(form)) {
+        if (value === '') continue
+        if (['qtd_itens', 'progresso', 'valor_estimado', 'valor_homologado'].includes(key)) {
+          payload[key] = Number(value)
+        } else if (['data_entrada', 'data_atividade', 'data_entrega'].includes(key)) {
+          payload[key] = value || null
+        } else {
+          payload[key] = value
+        }
       }
-    }
 
-    // Auto-compute despesa_evitada
-    const estimado = Number(form.valor_estimado) || 0
-    const homologado = Number(form.valor_homologado) || 0
-    payload.despesa_evitada = estimado - homologado
+      const estimado = Number(form.valor_estimado) || 0
+      const homologado = Number(form.valor_homologado) || 0
+      payload.despesa_evitada = estimado - homologado
 
-    const { data: { user } } = await getSupabase().auth.getUser()
-    if (user) payload.created_by = user.id
+      const { data: { user } } = await getSupabase().auth.getUser()
+      if (user) payload.created_by = user.id
 
-    const { error: err } = await getSupabase().from('processos').insert(payload)
-    if (err) {
-      setError(err.message)
+      const { error: err } = await getSupabase().from('processos').insert(payload)
+      if (err) {
+        setError(err.message)
+        setLoading(false)
+        return
+      }
+
+      router.push('/pmo-dashboard')
+      router.refresh()
+    } catch (err) {
+      setError((err as Error)?.message || 'Erro de conexão ao salvar')
       setLoading(false)
-      return
     }
-
-    router.push('/pmo-dashboard')
-    router.refresh()
   }
 
   function Field({ label, name, type = 'text', options }: {
