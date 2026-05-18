@@ -146,14 +146,12 @@ export default function CronogramaPage() {
                 <Icon size={24} color={badge.color} />
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: '#f1f5f9', fontWeight: 600, marginBottom: 2 }}>
-                    {p.id_processo || 'Sem ID'} {p.modalidades?.nome ? `- ${p.modalidades.nome}` : ''}
+                  <div style={{ color: '#f1f5f9', fontWeight: 600, fontSize: 14, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {p.objeto_resumido || 'Sem objeto'}
                   </div>
-                  {p.objeto_resumido && (
-                    <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {p.objeto_resumido}
-                    </div>
-                  )}
+                  <div style={{ color: '#64748b', fontSize: 12, marginBottom: 4 }}>
+                    {p.id_processo || 'Sem ID'}{p.modalidades?.nome ? ` · ${p.modalidades.nome}` : ''}
+                  </div>
                   <div style={{ color: '#94a3b8', fontSize: 13 }}>
                     {p.data_entrada ? `Entrada: ${formatDate(p.data_entrada)}` : ''}
                     {sc?.total_etapas ? ` · ${sc.etapas_concluidas}/${sc.total_etapas} etapas` : ' · Sem cronograma'}
