@@ -34,6 +34,7 @@ export default function NovoProcessoPage() {
   const [demandantes, setDemandantes] = useState<Demandante[]>([])
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
   const [statusList, setStatusList] = useState<StatusProcesso[]>([])
+  const [atividadesAtuais, setAtividadesAtuais] = useState<string[]>([])
 
   useEffect(() => {
     Promise.all([
@@ -42,16 +43,51 @@ export default function NovoProcessoPage() {
       getSupabase().from('demandantes').select('*'),
       getSupabase().from('responsaveis').select('*'),
       getSupabase().from('status_processo').select('*'),
-    ]).then(([c, m, d, r, s]) => {
+      getSupabase().from('processos').select('atividade_atual').not('atividade_atual', 'is', null),
+    ]).then(([c, m, d, r, s, a]) => {
       if (c.data) setCoordenacoes(c.data)
       if (m.data) setModalidades(m.data)
       if (d.data) setDemandantes(d.data)
       if (r.data) setResponsaveis(r.data)
       if (s.data) setStatusList(s.data)
+      if (a.data) {
+        const vals = [...new Set(a.data.map((x: { atividade_atual: string }) => x.atividade_atual).filter(Boolean))].sort()
+        setAtividadesAtuais(vals as string[])
+      }
     }).catch((err: unknown) => {
       console.error('Erro ao carregar dados do formulário:', err)
     })
   }, [])
+
+  function formatIdProcesso(raw: string): string {
+    const digits = raw.replace(/[^0-9]/g, '')
+    let parts: string[] = []
+    if (digits.length <= 6) {
+      parts = ['AGSUS', digits.padEnd(6, '0'), new Date().getFullYear().toString(), '00']
+    } else {
+      parts = ['AGSUS', digits.slice(0, 6), digits.slice(6, 10) || new Date().getFullYear().toString(), digits.slice(10, 12) || '00']
+    }
+    return `${parts[0]}.${parts[1]}/${parts[2]}-${parts[3]}`
+  }
+
+  function handleIdInput(e: React.FormEvent<HTMLInputElement>) {
+    const raw = (e.target as HTMLInputElement).value
+    const cleaned = raw.replace(/[^A-Za-z0-9./\-]/g, '')
+    const match = cleaned.match(/^([A-Za-z]+\.)?(\d{0,6})(\/?)(\d{0,4})(-?)(\d{0,2})/)
+    if (match) {
+      const parts = [
+        match[1] || '',
+        match[2],
+        match[3] && match[2].length === 6 ? '/' : '',
+        match[4],
+        match[5] && match[4].length === 4 ? '-' : '',
+        match[6],
+      ]
+      ;(e.target as HTMLInputElement).value = parts.join('')
+    } else {
+      ;(e.target as HTMLInputElement).value = ''
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -61,6 +97,14 @@ export default function NovoProcessoPage() {
     try {
       const form = e.currentTarget as HTMLFormElement
       const fd = new FormData(form)
+      const idProc = (fd.get('id_processo') as string || '').trim()
+
+      if (idProc && !/^AGSUS\.\d{6}\/\d{4}-\d{2}$/.test(idProc)) {
+        setError('ID Processo deve seguir o formato AGSUS.000000/2026-00 (6 dígitos + ano + 2 dígitos)')
+        setLoading(false)
+        return
+      }
+
       const payload: Record<string, unknown> = {}
 
       for (const [key, value] of fd.entries()) {
@@ -159,7 +203,16 @@ export default function NovoProcessoPage() {
         }}>
           {renderInput('data_entrada', 'Data de Entrada', 'date', new Date().toISOString().split('T')[0])}
           {renderSelect('coordenacao_id', 'Coordenação', coordenacoes)}
-          {renderInput('id_processo', 'ID Processo')}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ID Processo</label>
+            <input
+              type="text"
+              name="id_processo"
+              placeholder="AGSUS.000000/2026-00"
+              onInput={handleIdInput}
+              style={{ ...baseInput, fontFamily: 'monospace' }}
+            />
+          </div>
           {renderSelect('status_id', 'Status', statusList)}
           {renderInput('qtd_itens', 'Qtd Itens', 'number')}
           {renderSelect('responsavel_id', 'Responsável', responsaveis)}
@@ -176,7 +229,11 @@ export default function NovoProcessoPage() {
           {renderTextarea('objeto_resumido', 'Objeto Resumido')}
         </div>
         <div style={{ marginBottom: 24 }}>
-          {renderTextarea('atividade_atual', 'Atividade Atual')}
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atividade Atual</label>
+          <select name="atividade_atual" defaultValue="" style={{ ...baseInput, cursor: 'pointer' }}>
+            <option value="">Selecione...</option>
+            {atividadesAtuais.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
         </div>
         <div style={{ marginBottom: 24 }}>
           {renderTextarea('observacoes', 'Observações')}
