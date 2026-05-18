@@ -28,7 +28,8 @@ function isOverdue(etapa: CronogramaAtividade) {
 }
 
 export default function ProcessoViewClient({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+  const paramsId = use(params).id
+  const [id, setId] = useState(paramsId)
   const router = useRouter()
   const [processo, setProcesso] = useState<Processo | null>(null)
   const [cronograma, setCronograma] = useState<CronogramaAtividade[]>([])
@@ -51,6 +52,15 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
         .eq('id', id)
         .single()
+
+      if (!proc && typeof window !== 'undefined') {
+        // Fallback: extract ID from URL (handles _redirects proxy)
+        const m = window.location.pathname.match(/\/processos\/([a-f0-9-]+)/)
+        if (m && m[1] !== id) {
+          setId(m[1])
+          return
+        }
+      }
 
       if (proc) {
         setProcesso(proc)

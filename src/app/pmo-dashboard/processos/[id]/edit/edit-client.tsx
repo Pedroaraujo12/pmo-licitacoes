@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 
 export default function EditProcessoClient({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+  const paramsId = use(params).id
+  const [id, setId] = useState(paramsId)
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [notFound, setNotFound] = useState(false)
@@ -50,7 +51,12 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
             f[key] = value === null || value === undefined ? '' : String(value)
           }
           setForm(f)
-        } else {
+        } else if (typeof window !== 'undefined') {
+          const m = window.location.pathname.match(/\/processos\/([a-f0-9-]+)/)
+          if (m && m[1] !== id) {
+            setId(m[1])
+            return
+          }
           // Check if this is a legacy licitacoes record
           const { data: lic } = await getSupabase().from('licitacoes').select('id').eq('id', id).single()
           if (lic) {
@@ -60,6 +66,9 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
             setNotFound(true)
             setError('Processo não encontrado.')
           }
+        } else {
+          setNotFound(true)
+          setError('Processo não encontrado.')
         }
       } catch (err: unknown) {
         console.error('Erro ao carregar processo:', err)
