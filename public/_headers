@@ -1,0 +1,5 @@
+# Disable caching to force fresh content from every deployment
+/*
+  Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
+  Pragma: no-cache
+  Expires: 0

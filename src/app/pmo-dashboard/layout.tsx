@@ -18,6 +18,20 @@ const navItems = [
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    function handleGlobalError(event: ErrorEvent) {
+      console.warn('Unhandled error:', event.error || event.message)
+    }
+    function handleRejection(event: PromiseRejectionEvent) {
+      console.warn('Unhandled rejection:', event.reason)
+    }
+    window.addEventListener('error', handleGlobalError)
+    window.addEventListener('unhandledrejection', handleRejection)
+    return () => {
+      window.removeEventListener('error', handleGlobalError)
+      window.removeEventListener('unhandledrejection', handleRejection)
+    }
+  }, [])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
