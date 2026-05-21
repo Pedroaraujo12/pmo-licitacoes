@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { AuthProvider, useAuth } from '@/lib/auth-context'
+import type { Profile } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ToastProvider } from '@/components/ui/toast'
 import {
@@ -18,17 +18,11 @@ const navItems = [
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthProvider>
-      <DashboardShell>{children}</DashboardShell>
-    </AuthProvider>
-  )
-}
-
-function DashboardShell({ children }: { children: React.ReactNode }) {
-  const { profile, loading, atrasadosCount, proximosVencimentos } = useAuth()
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [atrasadosCount, setAtrasadosCount] = useState(0)
+  const [proximosVencimentos, setProximosVencimentos] = useState(0)
   const isMobile = useIsMobile()
   const sidebarOpen = isMobile ? mobileOpen : !desktopCollapsed
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
@@ -40,10 +34,58 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   useEffect(() => {
-    if (!loading && !profile) {
-      router.push('/login')
-    }
-  }, [loading, profile, router])
+    const supabase = getSupabase()
+    const ac = new AbortController()
+
+    supabase.auth.getUser()
+      .then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
+        if (!user) {
+          router.push('/login')
+          return
+        }
+        supabase.from('profiles').select('*').eq('id', user.id).single()
+          .then(({ data }: { data: unknown }) => { if (data) setProfile(data as Profile) })
+          .catch(() => {})
+
+        supabase.from('processos').select('id, data_entrega').then(({ data: procs }: { data: { id: string; data_entrega: string | null }[] | null }) => {
+          if (!procs) return
+          supabase.from('cronograma_atividades').select('processo_id, status, data_fim').then(({ data: crono }: { data: { processo_id: string; status: string; data_fim: string | null }[] | null }) => {
+            if (!crono) return
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+
+            const stats = new Map<string, { total: number; concluido: number }>()
+            for (const a of crono) {
+              const s = stats.get(a.processo_id) || { total: 0, concluido: 0 }
+              s.total++
+              if (a.status === 'concluido') s.concluido++
+              stats.set(a.processo_id, s)
+            }
+            const concluido: Record<string, boolean> = {}
+            for (const [id, s] of stats) concluido[id] = s.total === s.concluido
+
+            const count = procs.filter(p => {
+              if (concluido[p.id]) return false
+              if (!p.data_entrega) return false
+              const d = new Date(p.data_entrega)
+              return !isNaN(d.getTime()) && d < today
+            }).length
+            setAtrasadosCount(count)
+
+            const venc = crono.filter(a => {
+              if (a.status === 'concluido' || !a.data_fim) return false
+              const fim = new Date(a.data_fim)
+              const diff = Math.ceil((fim.getTime() - today.getTime()) / 86400000)
+              return diff >= 0 && diff <= 3
+            }).length
+            setProximosVencimentos(venc)
+          })
+        })
+      })
+      .catch(() => router.push('/login'))
+
+    return () => ac.abort()
+  }, []) /* eslint-disable-line react-hooks/exhaustive-deps */
 
   async function handleLogout() {
     await getSupabase().auth.signOut()
