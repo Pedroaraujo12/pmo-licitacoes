@@ -84,10 +84,11 @@ export default function ProcessosPage() {
   return (
     <GestaoProcessos
       processos={processos}
+      setProcessos={setProcessos}
       modalidades={modalidades}
       responsaveis={responsaveis}
       userRole={profile?.role || null}
-       onDataChange={handleDataChange}
+      onDataChange={handleDataChange}
     />
   )
 }

@@ -4,7 +4,12 @@ import { useEffect, useState, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Processo, Atividade, CronogramaAtividade } from '@/types/database'
-import { ArrowLeft, Edit, Trash2, CheckCircle2, Circle, Clock, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, ExternalLink, AlertTriangle } from 'lucide-react'
+import DeleteConfirmDialog from '@/components/ui/delete-confirm-dialog'
+import CronogramaDinamico from '@/components/ui/cronograma-dinamico'
+import { formatBRL } from '@/lib/utils'
+import { useToast } from '@/components/ui/toast'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 function formatDate(d: string | null | undefined) {
   if (!d) return '-'
@@ -13,29 +18,10 @@ function formatDate(d: string | null | undefined) {
   return date.toLocaleDateString('pt-BR')
 }
 
-function statusIcon(status: string) {
-  switch (status) {
-    case 'concluido': return <CheckCircle2 size={16} className="text-emerald-400" />
-    case 'em_andamento': return <Clock size={16} className="text-blue-400" />
-    default: return <Circle size={16} className="text-slate-600" />
-  }
-}
-
 function isOverdue(etapa: CronogramaAtividade) {
   if (etapa.status === 'concluido') return false
   if (!etapa.data_fim) return false
   return new Date(etapa.data_fim) < new Date(new Date().toDateString())
-}
-
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < breakpoint)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [breakpoint])
-  return isMobile
 }
 
 export default function ProcessoViewClient({ params }: { params: Promise<{ id: string }> }) {
@@ -44,9 +30,11 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
   const router = useRouter()
   const [processo, setProcesso] = useState<Processo | null>(null)
   const [cronograma, setCronograma] = useState<CronogramaAtividade[]>([])
-  const [atividades, setAtividades] = useState<Atividade[]>([])
-  const [profile, setProfile] = useState<{ role: string } | null>(null)
   const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+  const [atividades, setAtividades] = useState<Atividade[]>([])
+  const [linkSei, setLinkSei] = useState<string | null>(null)
+  const [profile, setProfile] = useState<{ role: string } | null>(null)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const isMobile = useIsMobile()
 
@@ -58,7 +46,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const supabase = getSupabase()
     async function load() {
-      // Try processos first, then licitacoes as fallback
+      // Try processos first
       const { data: proc } = await supabase
         .from('processos')
         .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
@@ -83,55 +71,15 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           .eq('processo_id', id)
           .order('ordem', { ascending: true })
         setCronograma(crono || [])
-      } else {
-        // Fallback to licitacoes table
-        const { data: lic } = await supabase
-          .from('licitacoes')
-          .select('*')
-          .eq('id', id)
-          .single()
-        if (lic) {
-          setProcesso({
-            id: lic.id,
-            id_processo: lic.id_processo || null,
-            objeto_resumido: lic.objeto_resumido || null,
-            data_entrada: lic.data_entrada || null,
-            valor_estimado: lic.vlr_estimado_anual || 0,
-            valor_homologado: lic.vlr_homologado || 0,
-            progresso: lic.progresso || 0,
-            prioridade: lic.prioridade || null,
-            observacoes: lic.observacoes || null,
-            drive: lic.processo_link || null,
-            atividade_atual: lic.fase_atual || null,
-            data_entrega: lic.data_prevista || null,
-            coordenacoes: { nome: lic.coordenacao || '' },
-            status_processo: { nome: lic.status || '' },
-            responsaveis: { nome: lic.responsavel || '' },
-            modalidades: { nome: lic.modalidade || '' },
-            demandantes: { nome: lic.demandante || '' },
-            data_atividade: null,
-            coordenacao_id: null,
-            status_id: null,
-            responsavel_id: null,
-            modalidade_id: null,
-            demandante_id: null,
-            qtd_itens: null,
-            despesa_evitada: null,
-            created_by: null,
-            houve_recurso: null,
-            created_at: lic.created_at || lic.data_entrada,
-            updated_at: lic.created_at || lic.data_entrada,
-          })
-        }
       }
-
       const { data: atv } = await supabase
         .from('atividades')
         .select('*')
         .eq('processo_id', id)
         .order('created_at', { ascending: false })
       setAtividades(atv || [])
-
+      const seiLink = (atv || []).find((a: { atividade: string }) => a.atividade === '__SEI_LINK__')
+      setLinkSei(seiLink?.observacao || null)
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
@@ -142,39 +90,41 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
     load()
   }, [id])
 
-  async function updateEtapaStatus(etapaId: string, newStatus: string) {
-    const supabase = getSupabase()
-    const now = new Date().toISOString().split('T')[0]
-    const update: Record<string, unknown> = { status: newStatus }
-    if (newStatus === 'em_andamento') update.data_inicio_real = now
-    if (newStatus === 'concluido') update.data_fim_real = now
-    const { error } = await supabase.from('cronograma_atividades').update(update).eq('id', etapaId)
-    if (!error) {
-      setCronograma(prev => prev.map(e =>
-        e.id === etapaId ? { ...e, ...update } as CronogramaAtividade : e
-      ))
-    }
-  }
+  const [deleteTarget, setDeleteTarget] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function handleDelete() {
-    if (!confirm('Tem certeza que deseja excluir este processo?')) return
+    setDeleting(true)
     try {
       const { error: err1 } = await getSupabase().from('processos').delete().eq('id', id)
-      const { error: err2 } = await getSupabase().from('licitacoes').delete().eq('id', id)
-      if (err1 || err2) {
-        console.error('Erro ao excluir:', err1 || err2)
+      if (err1) {
+        console.error('Erro ao excluir:', err1)
+        toast('Erro ao excluir processo', 'error')
+        setDeleting(false)
         return
       }
+      toast('Processo excluído com sucesso', 'success')
       router.push('/pmo-dashboard')
     } catch (err) {
       console.error('Erro inesperado ao excluir:', err)
+      setDeleting(false)
     }
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Carregando...</div>
+  if (loading) return (
+    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      {[1,2,3].map(i => (
+        <div key={i} style={{ background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', padding: isMobile ? 16 : 24, marginBottom: 16 }}>
+          {[1,2,3,4].map(j => (
+            <div key={j} style={{ height: 14, background: 'rgba(71,85,105,0.4)', borderRadius: 6, marginBottom: 10, width: `${40 + j * 15}%` }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
   if (!processo) return <div style={{ padding: 40, textAlign: 'center', color: '#ef4444' }}>Processo não encontrado</div>
 
-  const canEdit = profile?.role && ['admin', 'gestor', 'consultor'].includes(profile.role)
+  const canEdit = !!(profile?.role && ['admin', 'gestor', 'consultor'].includes(profile.role))
   const canDelete = profile?.role && ['admin', 'gestor'].includes(profile.role)
   const etapasConcluidas = cronograma.filter(e => e.status === 'concluido').length
   const totalEtapas = cronograma.length
@@ -195,23 +145,6 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
     border: '1px solid rgba(255,255,255,0.06)',
     padding: '12px 16px',
   }
-  const etapaStyle = (etapa: CronogramaAtividade): React.CSSProperties => ({
-    display: 'flex',
-    flexDirection: isMobile ? 'column' : 'row',
-    alignItems: isMobile ? 'stretch' : 'center',
-    gap: 12,
-    padding: '12px 16px',
-    background: 'rgba(30,41,59,0.5)',
-    borderRadius: 10,
-    borderLeft: `3px solid ${
-      etapa.status === 'concluido' ? '#10b981' :
-      isOverdue(etapa) ? '#ef4444' :
-      etapa.status === 'em_andamento' ? '#3b82f6' :
-      '#475569'
-    }`,
-    opacity: etapa.status === 'nao_iniciado' && !isOverdue(etapa) ? 0.6 : 1,
-  })
-
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
       {/* Header */}
@@ -226,7 +159,12 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
             <ArrowLeft size={20} />
           </button>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word' }}>{processo.id_processo}</h1>
+            <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word' }}>
+              <a href={linkSei || '#'} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: linkSei ? 'underline' : 'none', textUnderlineOffset: 3 }}>
+                {processo.id_processo}
+                {!linkSei && <span style={{ color: '#64748b', fontSize: 10, marginLeft: 6, fontWeight: 400 }}>(sem link)</span>}
+              </a>
+            </h1>
             <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>{processo.objeto_resumido}</p>
           </div>
         </div>
@@ -242,7 +180,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           )}
           {canDelete && (
             <button
-              onClick={handleDelete}
+              onClick={() => setDeleteTarget(true)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none bg-red-600 hover:bg-red-500 text-white"
               style={{ flex: isMobile ? 1 : undefined }}
             >
@@ -297,11 +235,22 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Estimado</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.valor_estimado ? `R$ ${Number(processo.valor_estimado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.valor_estimado ? formatBRL(processo.valor_estimado) : '-'}</div>
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Homologado</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.valor_homologado ? `R$ ${Number(processo.valor_homologado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.valor_homologado ? formatBRL(processo.valor_homologado) : '-'}</div>
+        </div>
+        <div style={fieldStyle}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Drive</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>
+            {processo.drive ? (
+              <a href={processo.drive} target="_blank" rel="noopener noreferrer"
+                style={{ color: '#60a5fa', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                <ExternalLink size={14} /> Abrir documento
+              </a>
+            ) : '-'}
+          </div>
         </div>
       </div>
 
@@ -334,114 +283,58 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      {/* Cronograma de Atividades */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Cronograma do Processo
-          </h3>
-          <div style={{ display: 'flex', gap: isMobile ? 8 : 16, fontSize: 11, color: '#64748b', flexWrap: 'wrap' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} /> Concluído
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} /> Em andamento
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} /> Atrasado
-            </span>
-          </div>
-        </div>
-
+        <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          📅 Cronograma Dinâmico
+        </h3>
         {cronograma.length === 0 ? (
           <p style={{ fontSize: 13, color: '#64748b' }}>
-            Nenhuma etapa de cronograma encontrada. Crie o processo novamente para gerar o cronograma.
+            Nenhuma etapa de cronograma encontrada.
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {cronograma.map((etapa) => {
-              const overdue = isOverdue(etapa)
-              return (
-                <div key={etapa.id} style={etapaStyle(etapa)}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 24 }}>
-                    {statusIcon(etapa.status)}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <span style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: '#64748b',
-                        background: '#1e293b',
-                        padding: '1px 6px',
-                        borderRadius: 4,
-                      }}>
-                        #{etapa.ordem}
-                      </span>
-                      <span style={{
-                        fontSize: 9,
-                        fontWeight: 700,
-                        color: '#3b82f6',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}>
-                        {etapa.fase}
-                      </span>
-                      <span style={{ fontSize: 9, color: '#64748b' }}>
-                        {etapa.setor}
-                      </span>
-                      {etapa.dias_uteis > 0 && (
-                        <span style={{ fontSize: 9, color: '#64748b' }}>
-                          {etapa.dias_uteis}d úteis
-                        </span>
-                      )}
-                    </div>
-                    <p style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: etapa.status === 'concluido' ? '#94a3b8' : '#f1f5f9',
-                      margin: 0,
-                      textDecoration: etapa.status === 'concluido' ? 'line-through' : 'none',
-                    }}>
-                      {etapa.descricao}
-                    </p>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 11, color: '#64748b' }}>
-                      <span>
-                        {etapa.data_inicio ? `${formatDate(etapa.data_inicio)}` : '—'}
-                        {etapa.data_fim ? ` → ${formatDate(etapa.data_fim)}` : ''}
-                      </span>
-                      {overdue && (
-                        <span style={{ color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <AlertTriangle size={12} /> Atrasado
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {canEdit && etapa.status !== 'concluido' && (
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                      {etapa.status === 'nao_iniciado' && (
-                        <button
-                          onClick={() => updateEtapaStatus(etapa.id, 'em_andamento')}
-                          className="cursor-pointer px-2 py-1 rounded text-[9px] font-bold bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 transition border-none"
-                        >
-                          Iniciar
-                        </button>
-                      )}
-                      {etapa.status === 'em_andamento' && (
-                        <button
-                          onClick={() => updateEtapaStatus(etapa.id, 'concluido')}
-                          className="cursor-pointer px-2 py-1 rounded text-[9px] font-bold bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition border-none"
-                        >
-                          Concluir
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          <CronogramaDinamico
+            atividades={cronograma}
+            processoId={id}
+            canEdit={canEdit}
+            userRole={profile?.role || null}
+            onUpdate={(updated) => setCronograma(updated)}
+          />
         )}
+      </div>
+
+      {/* Adicionar Atividade */}
+      <div style={cardStyle}>
+        <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registrar Atividade</h3>
+        <form onSubmit={async (e) => {
+          e.preventDefault()
+          const fd = new FormData(e.currentTarget)
+          const atividade = fd.get('atividade') as string
+          const observacao = fd.get('observacao') as string
+          if (!atividade.trim()) return
+          const supabase = getSupabase()
+          const { data: { user } } = await supabase.auth.getUser()
+          const { data: saved, error } = await supabase.from('atividades').insert({
+            processo_id: id,
+            atividade: atividade.trim(),
+            observacao: observacao.trim() || null,
+            data: new Date().toISOString().split('T')[0],
+            responsavel: user?.email || null,
+            created_by: user?.id || null,
+          }).select().single()
+          if (error) { console.error(error); return }
+          if (saved) setAtividades(prev => [saved as Atividade, ...prev])
+          e.currentTarget.reset()
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+            <input name="atividade" placeholder="Título da atividade" required
+              style={{ padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none' }} />
+            <textarea name="observacao" placeholder="Observação (opcional)" rows={2}
+              style={{ padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none', resize: 'vertical' }} />
+          </div>
+          <button type="submit"
+            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none"
+          >Registrar</button>
+        </form>
       </div>
 
       {/* Histórico de Atividades */}
@@ -469,6 +362,15 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           </div>
         )}
       </div>
+
+      <DeleteConfirmDialog
+        open={deleteTarget}
+        onClose={() => { setDeleteTarget(false); setDeleting(false) }}
+        onConfirm={handleDelete}
+        loading={deleting}
+        titulo="Excluir Processo"
+        mensagem={`Tem certeza que deseja excluir o processo "${processo.id_processo}"? Esta ação é irreversível.`}
+      />
     </div>
   )
 }

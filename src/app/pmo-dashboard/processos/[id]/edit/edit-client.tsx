@@ -4,17 +4,8 @@ import { useEffect, useState, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
-
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < breakpoint)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [breakpoint])
-  return isMobile
-}
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { upsertSeiLink, fetchSeiLink } from '@/lib/utils'
 
 export default function EditProcessoClient({ params }: { params: Promise<{ id: string }> }) {
   const paramsId = use(params).id
@@ -39,6 +30,26 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
 
   const [form, setForm] = useState<Record<string, string>>({})
 
+  const atividadesAtuais = [
+    'Análise do Termo de Referência e anexos',
+    'Pesquisa de Preços e levantamento do custo estimado da Contratação',
+    'Relatório de Pesquisa Preços',
+    'Disponibilidade orçamentária',
+    'Designação da Comissão de Seleção',
+    'Elaboração Da Minuta de Edital e Anexos. Envio à UJUR/AGSUS',
+    'Análise jurídica e Emissão de Parecer',
+    'Adequações e atendimento ao Parecer Jurídico quanto aos aspectos técnicos do Edital e Anexos e Autorização de Governança publicação do Edital',
+    'Publicação do Edital (prazos legais: 3 dias úteis - Cotação de Preços,  8 dias úteis - Pregão bens e materiais, 10 dias úteis - Pregão serviços e 15 dias úteis concorrência)',
+    'Abertura e Fase de Lances',
+    'Fase de Julgamento das Propostas, Aceitação e Habilitação',
+    'Envio da proposta e documentação de qualificação técnica para análise da área demandante',
+    'Resposta da Área demandante',
+    'Prazo recursal (3 DIAS ÚTEIS)',
+    'Prazo contrarrazões (3 DIAS ÚTEIS)',
+    'Decisão quanto ao recurso (5 dias úteis)',
+    'Envio do Recurso ao Jurídico e Ratificação autoridade competente da decisão do pregoeiro',
+  ]
+
   useEffect(() => {
     async function load() {
       try {
@@ -62,6 +73,8 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
           for (const [key, value] of Object.entries(proc.data)) {
             f[key] = value === null || value === undefined ? '' : String(value)
           }
+          const sei = await fetchSeiLink(getSupabase(), id)
+          if (sei) f.link_sei = sei
           setForm(f)
         } else if (typeof window !== 'undefined') {
           const m = window.location.pathname.match(/\/processos\/([a-f0-9-]+)/)
@@ -69,15 +82,9 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
             setId(m[1])
             return
           }
-          // Check if this is a legacy licitacoes record
-          const { data: lic } = await getSupabase().from('licitacoes').select('id').eq('id', id).single()
-          if (lic) {
-            setNotFound(true)
-            setError('Registros legados não podem ser editados pelo novo formulário. Crie um novo processo para este item.')
-          } else {
-            setNotFound(true)
-            setError('Processo não encontrado.')
-          }
+          // Check if this is a legacy record (no longer supported)
+          setNotFound(true)
+          setError('Processo não encontrado.')
         } else {
           setNotFound(true)
           setError('Processo não encontrado.')
@@ -95,9 +102,15 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
     setLoading(true)
     setError('')
 
+    if (!form.responsavel_id) {
+      setError('Responsável é obrigatório.')
+      setLoading(false)
+      return
+    }
+
     const payload: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(form)) {
-      if (['id', 'created_by', 'created_at', 'updated_at'].includes(key)) continue
+      if (['id', 'created_by', 'created_at', 'updated_at', 'link_sei'].includes(key)) continue
       if (value === '') {
         payload[key] = null
         continue
@@ -123,6 +136,12 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
       return
     }
 
+    if (form.link_sei?.trim()) {
+      await upsertSeiLink(getSupabase(), id, form.link_sei.trim())
+    } else {
+      await upsertSeiLink(getSupabase(), id, null)
+    }
+
     router.push(`/pmo-dashboard/processos/${id}`)
     router.refresh()
   }
@@ -136,7 +155,12 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
     { label: 'Responsável', name: 'responsavel_id', options: responsaveis },
     { label: 'Demandante', name: 'demandante_id', options: demandantes },
     { label: 'Modalidade', name: 'modalidade_id', options: modalidades },
-    { label: 'Prioridade', name: 'prioridade', type: 'text' },
+    { label: 'Prioridade', name: 'prioridade', type: 'select', options: [
+      { id: 'Baixa', nome: 'Baixa' },
+      { id: 'Média', nome: 'Média' },
+      { id: 'Alta', nome: 'Alta' },
+      { id: 'Urgente', nome: 'Urgente' },
+    ] },
     { label: 'Data Atividade', name: 'data_atividade', type: 'date' },
     { label: 'Progresso (%)', name: 'progresso', type: 'number' },
     { label: 'Data Entrega', name: 'data_entrega', type: 'date' },
@@ -154,6 +178,18 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
     color: '#cbd5e1',
     outline: 'none',
   } as const
+
+  function handleIdInput(e: React.FormEvent<HTMLInputElement>) {
+    const raw = e.currentTarget.value.replace(/[^0-9A-Za-z\/\-\.]/g, '').toUpperCase()
+    const m = raw.match(/^(AGSUS\.?)?(\d{0,6})?(\/?)(\d{0,4})?(\-?)(\d{0,2})?/)
+    if (!m) return
+    let v = 'AGSUS.'
+    if (m[2]) v += m[2].padEnd(6, '0').slice(0, 6)
+    if (m[4]) v += '/' + m[4].padEnd(4, '0').slice(0, 4) + (m[6] ? '-' + m[6].padEnd(2, '0').slice(0, 2) : m[5] ? '-' : '')
+    else if (m[3]) v += '/'
+    else if (raw.length <= 6) v = 'AGSUS.' + raw
+    setForm(fm => ({ ...fm, id_processo: v }))
+  }
 
   if (notFound) {
     return (
@@ -207,6 +243,7 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
                   type={f.type || 'text'}
                   value={form[f.name] || ''}
                   onChange={e => setForm(fm => ({ ...fm, [f.name]: e.target.value }))}
+                  onInput={f.name === 'id_processo' ? handleIdInput : undefined}
                   style={baseInput}
                 />
               )}
@@ -226,12 +263,35 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
 
         <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atividade Atual</label>
-          <textarea
+          <select
             value={form.atividade_atual || ''}
             onChange={e => setForm(fm => ({ ...fm, atividade_atual: e.target.value }))}
-            rows={3}
-            style={{ ...baseInput, resize: 'vertical' }}
+            style={{ ...baseInput, cursor: 'pointer' }}
+          >
+            <option value="">Selecione...</option>
+            {atividadesAtuais.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Drive (Google Docs)</label>
+          <input
+            value={form.drive || ''}
+            onChange={e => setForm(fm => ({ ...fm, drive: e.target.value }))}
+            placeholder="https://drive.google.com/..."
+            style={baseInput}
           />
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>Link para pasta/arquivo no Google Drive com os documentos do processo</p>
+        </div>
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Link SEI (Processo Administrativo)</label>
+          <input
+            value={form.link_sei || ''}
+            onChange={e => setForm(fm => ({ ...fm, link_sei: e.target.value }))}
+            placeholder="https://sei.agenciasus.org.br/sei/controlador.php?acao=procedimento_trabalhar&id_procedimento=..."
+            style={baseInput}
+          />
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>Link para o processo no SEI (Sistema Eletrônico de Informações)</p>
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

@@ -4,71 +4,42 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js'
-import { Doughnut, Bar } from 'react-chartjs-2'
-import { Plus, Edit, Trash2, ExternalLink } from 'lucide-react'
+import { Bar } from 'react-chartjs-2'
+import { Edit, Trash2, ExternalLink, AlertTriangle, Download } from 'lucide-react'
 import DeleteConfirmDialog from '@/components/ui/delete-confirm-dialog'
-import type { Processo, Modalidade, Responsavel } from '@/types/database'
+import { cleanNum, formatBRL, formatDate, getAging, exportCSV, fetchAllSeiLinks } from '@/lib/utils'
+import { useDebounce } from '@/hooks/useDebounce'
+import { useToast } from '@/components/ui/toast'
+import Pagination from '@/components/ui/pagination'
+import type { Processo } from '@/types/database'
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement)
 
-function cleanNum(v: unknown): number {
-  if (!v) return 0
-  if (typeof v === 'number') return v
-  const s = String(v).replace('R$', '').trim()
-  if (s.includes(',') && !s.includes('e')) {
-    return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0
-  }
-  return parseFloat(s) || 0
-}
-
-function formatBRL(v: unknown) {
-  return cleanNum(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
-function formatDate(d: string | null | undefined) {
-  if (!d || d === 'None') return '-'
-  const date = new Date(d)
-  if (isNaN(date.getTime())) return d
-  return date.toLocaleDateString('pt-BR')
-}
-
-function getAging(dateStr: string | null | undefined, processo_atrasado?: boolean) {
-  if (dateStr && dateStr !== 'None') {
-    const target = new Date(dateStr)
-    if (!isNaN(target.getTime())) {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const diff = Math.ceil((target.getTime() - today.getTime()) / 86400000)
-      if (diff < 0) return { label: `Atrasado ${Math.abs(diff)}d`, class: 'aging-red' }
-      if (diff <= 2) return { label: `Vence em ${diff}d`, class: 'aging-yellow' }
-      return { label: `No Prazo (${diff}d)`, class: 'aging-green' }
-    }
-  }
-  if (processo_atrasado === true) return { label: 'Atrasado', class: 'aging-red' }
-  return { label: 'N/A', class: '' }
-}
-
-const chartColors = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899']
-
 interface Props {
   processos: Processo[]
-  modalidades: Modalidade[]
-  responsaveis: Responsavel[]
   userRole?: string | null
 }
 
-export default function DashboardContent({ processos, modalidades, responsaveis, userRole }: Props) {
+export default function DashboardContent({ processos: initialProcessos, userRole }: Props) {
+  const { toast } = useToast()
   const router = useRouter()
+  const [processos, setProcessos] = useState<Processo[]>(initialProcessos)
+  const [etapaData, setEtapaData] = useState<{ fase: string; qtd: number }[]>([])
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const [modalidadeFilter, setModalidadeFilter] = useState('')
   const [responsavelFilter, setResponsavelFilter] = useState('')
-  const [chartFilter, setChartFilter] = useState<{ type: string; value: string } | null>(null)
+  const [prioridadeFilter, setPrioridadeFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [faseFilter, setFaseFilter] = useState('')
   const [modalProcesso, setModalProcesso] = useState<Processo | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Processo | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [sortField, setSortField] = useState<string>('data_entrega')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [seiLinks, setSeiLinks] = useState<Record<string, string>>({})
+  const [page, setPage] = useState(1)
+  const pageSize = 5
   const modalRef = useRef<HTMLDivElement>(null)
 
   const canEdit = userRole && ['admin', 'gestor', 'consultor'].includes(userRole)
@@ -80,15 +51,18 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
     try {
       const supabase = createClient()
       const { error: err1 } = await supabase.from('processos').delete().eq('id', deleteTarget.id)
-      const { error: err2 } = await supabase.from('licitacoes').delete().eq('id', deleteTarget.id)
-      if (err1 || err2) {
-        console.error('Erro ao excluir:', err1 || err2)
+      if (err1) {
+        console.warn('Erro ao excluir:', err1)
         setDeleting(false)
         return
       }
-      window.location.reload()
+      const deletedId = deleteTarget.id
+      toast('Processo excluído com sucesso', 'success')
+      setProcessos((prev: Processo[]) => prev.filter(p => p.id !== deletedId))
+      setDeleteTarget(null)
+      setDeleting(false)
     } catch (err) {
-      console.error('Erro inesperado ao excluir:', err)
+      console.warn('Erro inesperado ao excluir:', err)
       setDeleting(false)
     }
   }
@@ -102,60 +76,124 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
     }
   }
 
+  const searchRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setModalProcesso(null)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   useEffect(() => {
-    if (modalRef.current) {
-      modalRef.current.scrollTop = 0
+    let cancelled = false
+    const supabase = createClient()
+    fetchAllSeiLinks(supabase).then(data => { if (!cancelled) setSeiLinks(data) })
+    supabase.rpc('get_etapa_distribuicao').then(({ data }: { data: { fase: string; qtd: number }[] | null }) => {
+      if (!cancelled && data) setEtapaData(data)
+    }).catch(() => {
+      if (cancelled) return
+      // Fallback: query directly
+      supabase.from('cronograma_atividades').select('fase, ordem, processo_id, status')
+        .then(({ data }: { data: { fase: string; ordem: number; processo_id: string; status: string }[] | null }) => {
+          if (cancelled || !data) return
+          const firstNonConcluido = new Map<string, string>()
+          const ordered = (data as { fase: string; ordem: number; processo_id: string; status: string }[]).sort((a, b) => a.ordem - b.ordem)
+          for (const row of ordered) {
+            if (!firstNonConcluido.has(row.processo_id) && row.status !== 'concluido') {
+              firstNonConcluido.set(row.processo_id, row.fase)
+            }
+          }
+          const counts: Record<string, number> = {}
+          for (const fase of firstNonConcluido.values()) {
+            counts[fase] = (counts[fase] || 0) + 1
+          }
+          if (!cancelled) setEtapaData(Object.entries(counts).map(([fase, qtd]) => ({ fase, qtd })))
+        })
+    })
+    // Fetch cronograma completion status — if all are concluido, clear alertas
+    supabase.from('cronograma_atividades').select('processo_id, status').then(({ data }: { data: { processo_id: string; status: string }[] | null }) => {
+      if (cancelled || !data) return
+      const stats = new Map<string, { total: number; concluido: number }>()
+      for (const a of data) {
+        const s = stats.get(a.processo_id) || { total: 0, concluido: 0 }
+        s.total++
+        if (a.status === 'concluido') s.concluido++
+        stats.set(a.processo_id, s)
+      }
+      const concluido: Record<string, boolean> = {}
+      for (const [id, s] of stats) concluido[id] = s.total === s.concluido
+      if (!cancelled) setProcessos(prev => prev.map(p => ({
+        ...p,
+        processo_atrasado: concluido[p.id] ? false : (p as Processo).processo_atrasado,
+      })))
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (!modalProcesso) return
+    const el = document.querySelector<HTMLElement>('[role="dialog"]')
+    el?.focus()
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return
+      const focusable = el?.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      if (!focusable || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
     }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [modalProcesso])
 
   const filtered = useMemo(() => {
     return processos.filter(p => {
-      if (search && !`${p.id_processo} ${p.objeto_resumido}`.toLowerCase().includes(search.toLowerCase())) return false
-      if (chartFilter) {
-        if (chartFilter.type === 'responsavel') {
-          const resp = p.responsaveis?.nome || 'N/I'
-          if (resp !== chartFilter.value) return false
-        }
-        if (chartFilter.type === 'modalidade') {
-          const mod = p.modalidades?.nome || 'N/I'
-          if (mod !== chartFilter.value) return false
-        }
-      }
-      if (statusFilter) {
-        const ag = getAging(p.data_entrega, p.processo_atrasado)
-        if (statusFilter === 'Atrasados' && ag.class !== 'aging-red') return false
-        if (statusFilter === 'No Prazo' && ag.class === 'aging-red') return false
-      }
+      if (debouncedSearch && !`${p.id_processo} ${p.objeto_resumido}`.toLowerCase().includes(debouncedSearch.toLowerCase())) return false
       if (modalidadeFilter && (p.modalidades?.nome || 'N/I') !== modalidadeFilter) return false
       if (responsavelFilter && (p.responsaveis?.nome || 'N/I') !== responsavelFilter) return false
+      if (statusFilter && (p.status_processo?.nome || '') !== statusFilter) return false
+      if (prioridadeFilter && (p.prioridade || 'N/I') !== prioridadeFilter) return false
+      if (faseFilter && (p.atividade_atual || '') !== faseFilter) return false
       return true
     }).sort((a, b) => {
       let cmp = 0
       if (sortField === 'id_processo') cmp = (a.id_processo || '').localeCompare(b.id_processo || '')
       else if (sortField === 'objeto_resumido') cmp = (a.objeto_resumido || '').localeCompare(b.objeto_resumido || '')
       else if (sortField === 'atividade_atual') cmp = (a.atividade_atual || '').localeCompare(b.atividade_atual || '')
+      else if (sortField === 'prioridade') cmp = (a.prioridade || '').localeCompare(b.prioridade || '')
       else if (sortField === 'data_entrega') cmp = ((a.data_entrega || '') > (b.data_entrega || '') ? 1 : -1)
       else if (sortField === 'valor_estimado') cmp = cleanNum(a.valor_estimado) - cleanNum(b.valor_estimado)
       return sortDir === 'asc' ? cmp : -cmp
     })
-  }, [processos, search, chartFilter, statusFilter, modalidadeFilter, responsavelFilter, sortField, sortDir])
+  }, [processos, debouncedSearch, modalidadeFilter, responsavelFilter, statusFilter, prioridadeFilter, faseFilter, sortField, sortDir])
+
+  const totalPages = Math.ceil(filtered.length / pageSize)
+  const showingFrom = (page - 1) * pageSize + 1
+  const showingTo = Math.min(page * pageSize, filtered.length)
+
+  const prevLenRef = useRef(filtered.length)
+  useEffect(() => {
+    if (filtered.length < prevLenRef.current && page > 1) setPage(1)
+    prevLenRef.current = filtered.length
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered.length, page])
 
   const kpis = useMemo(() => {
     const total = filtered.length
     const estimado = filtered.reduce((s, p) => s + cleanNum(p.valor_estimado), 0)
-    const homologado = filtered.reduce((s, p) => s + cleanNum(p.valor_homologado), 0)
     const economia = filtered.reduce((s, p) => {
+      const st = p.status_processo?.nome
+      if (st !== 'Concluído' && st !== 'Homologado') return s
+      const est = cleanNum(p.valor_estimado)
       const hom = cleanNum(p.valor_homologado)
-      if (hom > 0) return s + cleanNum(p.valor_estimado) - hom
-      return s
+      return s + est - hom
     }, 0)
     const atrasados = filtered.filter(p => getAging(p.data_entrega, p.processo_atrasado).class === 'aging-red').length
     return { total, estimado, economia, atrasados }
@@ -175,7 +213,18 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
       return counts
     }
 
-    const resp = countBy('responsavel')
+    const respRaw: Record<string, number> = {}
+    filtered
+      .filter(p => p.status_processo?.nome === 'Em andamento')
+      .forEach(p => {
+        const v = p.responsaveis?.nome || 'N/I'
+        respRaw[v] = (respRaw[v] || 0) + 1
+      })
+    const resp = Object.entries(respRaw).sort((a, b) => {
+      if (a[0] === 'N/I') return 1
+      if (b[0] === 'N/I') return -1
+      return b[1] - a[1]
+    })
     const mod = countBy('modalidade')
 
     const health = filtered.reduce(
@@ -192,7 +241,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
     return { resp, mod, health }
   }, [filtered])
 
-  const uniqueStatuses = useMemo(() => {
+  const uniqueResponsaveis = useMemo(() => {
     const set = new Set<string>()
     processos.forEach(p => {
       const resp = p.responsaveis?.nome
@@ -210,88 +259,77 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
     return [...set].sort()
   }, [processos])
 
-  function handleChartFilter(type: string, value: string) {
-    if (chartFilter?.type === type && chartFilter?.value === value) {
-      setChartFilter(null)
-    } else {
-      setChartFilter({ type, value })
-    }
-  }
+  const uniquePrioridades = ['Baixa', 'Média', 'Alta', 'Urgente']
 
   return (
     <div>
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-center gap-6 mb-10">
-        <div className="flex items-center gap-5">
-          <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight uppercase">Gestão de Processo</h1>
-          </div>
+      {/* Alert Banner */}
+      {kpis.atrasados > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 16px', borderRadius: 12, marginBottom: 20,
+          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+        }}>
+          <AlertTriangle size={18} style={{ color: '#fca5a5', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: '#fca5a5' }}>
+            <strong>{kpis.atrasados} processo{kpis.atrasados !== 1 ? 's' : ''} em atraso</strong> — verifique os prazos no gráfico abaixo
+          </span>
+          <span
+            onClick={() => router.push('/pmo-dashboard/processos')}
+            style={{ marginLeft: 'auto', color: '#60a5fa', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+          >Ver processos →</span>
         </div>
-        <div className="flex gap-3">
-          {canEdit && (
-            <button
-              onClick={() => router.push('/pmo-dashboard/processos/novo')}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer border-none"
-            >
-              <Plus size={14} />
-              Novo Processo
-            </button>
-          )}
-          <button onClick={() => setChartFilter(null)}
-            className="bg-slate-800/50 text-slate-300 px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-700 hover:bg-slate-700/50 transition cursor-pointer">
-            Resetar
-          </button>
-        </div>
-      </header>
+      )}
 
-      {/* KPI Cards */}
+      {/* KPI Cards — Economia first */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="kpi-card">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Processos Totais</p>
-          <h3 className="text-4xl font-extrabold">{kpis.total}</h3>
+        <div className="kpi-card" style={{ borderLeft: '4px solid #22c55e' }}>
+          <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Economia</p>
+          <h3 className="text-2xl font-extrabold text-emerald-400">{formatBRL(kpis.economia)}</h3>
+          <p className="kpi-sub">↑ sobre valor estimado · {filtered.filter(p => p.status_processo?.nome === 'Concluído').length} processos concluídos</p>
+        </div>
+        <div className="kpi-card" style={{ borderLeft: '4px solid #ef4444' }}>
+          <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Em Atraso</p>
+          <h3 className="text-4xl font-extrabold text-red-100">{kpis.atrasados}</h3>
+          <p className="kpi-sub">de {kpis.total} processos</p>
         </div>
         <div className="kpi-card">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Valor Estimado</p>
           <h3 className="text-2xl font-extrabold text-slate-100">{formatBRL(kpis.estimado)}</h3>
+          <p className="kpi-sub">Total da carteira</p>
         </div>
-        <div className="kpi-card border-l-4 border-l-emerald-500">
-          <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Economia</p>
-          <h3 className="text-2xl font-extrabold text-emerald-400">{formatBRL(kpis.economia)}</h3>
-        </div>
-        <div className="kpi-card border-l-4 border-l-red-500">
-          <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Em Atraso</p>
-          <h3 className="text-4xl font-extrabold text-red-100">{kpis.atrasados}</h3>
+        <div className="kpi-card">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Processos Totais</p>
+          <h3 className="text-4xl font-extrabold">{kpis.total}</h3>
+          <p className="kpi-sub">
+            {kpis.total - kpis.atrasados} no prazo · {kpis.atrasados} atrasados
+          </p>
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter Bar — simplified for executive view */}
       <div className="filter-bar">
         <input
+          ref={searchRef}
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar..."
+          placeholder="Buscar por ID ou objeto...  ⌘K"
           className="filter-input"
         />
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="filter-select">
-          <option value="">Prazo</option>
-          <option value="Atrasados">Atrasados</option>
-          <option value="No Prazo">No Prazo</option>
-        </select>
         <select value={modalidadeFilter} onChange={e => setModalidadeFilter(e.target.value)} className="filter-select">
-          <option value="">Modal.</option>
+          <option value="">Modalidade</option>
           {uniqueModalidades.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
         <select value={responsavelFilter} onChange={e => setResponsavelFilter(e.target.value)} className="filter-select">
-          <option value="">Resp.</option>
-          {uniqueStatuses.map(r => <option key={r} value={r}>{r}</option>)}
+          <option value="">Responsável</option>
+          {uniqueResponsaveis.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
-        <button onClick={() => { setSearch(''); setStatusFilter(''); setModalidadeFilter(''); setResponsavelFilter(''); setChartFilter(null) }}
+        <select value={prioridadeFilter} onChange={e => setPrioridadeFilter(e.target.value)} className="filter-select">
+          <option value="">Prioridade</option>
+          {uniquePrioridades.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <button onClick={() => { setSearch(''); setModalidadeFilter(''); setResponsavelFilter(''); setPrioridadeFilter(''); setStatusFilter(''); setFaseFilter('') }}
           className="bg-slate-700 text-white rounded-lg px-3 py-1.5 text-[10px] font-bold hover:bg-slate-600 transition">
           Limpar
         </button>
@@ -303,36 +341,56 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
         <div className="lg:col-span-2 glass-card overflow-hidden">
           <div className="px-4 py-3 border-b border-white/5 flex justify-between items-center">
             <h2 className="text-xs font-bold uppercase text-slate-400">Fluxo de Execução</h2>
-            <span className="text-[9px] font-bold bg-slate-800 px-2 py-0.5 rounded-full text-slate-500">
-              {filtered.length} processos
-            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span className="text-[9px] font-bold bg-slate-800 px-2 py-0.5 rounded-full text-slate-500">
+                {filtered.length} processos
+              </span>
+              {filtered.length > 0 && (
+                <button
+                  onClick={() => exportCSV(filtered.map(p => ({
+                    'ID Processo': p.id_processo || '',
+                    'Objeto': p.objeto_resumido || '',
+                    'Atividade Atual': p.atividade_atual || '',
+                    'Valor Estimado': p.valor_estimado,
+                    'Status': p.status_processo?.nome || '',
+                    'Responsável': p.responsaveis?.nome || '',
+                    'Data': p.data_entrega,
+                  })), 'processos_dashboard')}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-1 rounded text-[9px] font-bold transition cursor-pointer border-none flex items-center gap-1"
+                  title="Exportar CSV"
+                >
+                  <Download size={10} /> CSV
+                </button>
+              )}
+            </div>
           </div>
-          <div className="overflow-x-hidden overflow-y-auto max-h-[600px]">
+          <div className="overflow-x-auto">
             <table className="w-full text-left table-fixed">
               <thead className="sticky top-0 bg-[#1e293b] z-10 shadow-sm">
                 <tr className="text-[9px] font-black uppercase text-slate-500 border-b border-white/10 tracking-tighter">
-                  {(['id_processo', 'objeto_resumido', 'atividade_atual', 'data_entrega', 'valor_estimado'] as const).map(field => (
+                  {(['id_processo', 'objeto_resumido', 'atividade_atual', 'prioridade', 'data_entrega', 'valor_estimado'] as const).map(field => (
                     <th
                       key={field}
+                      scope="col"
                       onClick={() => toggleSort(field)}
                       className="cursor-pointer hover:text-slate-300 transition select-none"
                       style={{
-                        width: field === 'id_processo' ? '15%' : field === 'objeto_resumido' ? '25%' : field === 'atividade_atual' ? '20%' : field === 'data_entrega' ? '12%' : '13%',
+                        width: field === 'id_processo' ? '15%' : field === 'objeto_resumido' ? '22%' : field === 'atividade_atual' ? '18%' : field === 'prioridade' ? '8%' : field === 'data_entrega' ? '10%' : '12%',
                         padding: '12px 8px',
-                        textAlign: field === 'valor_estimado' ? 'right' : field === 'data_entrega' ? 'center' : 'left',
+                        textAlign: field === 'valor_estimado' ? 'right' : field === 'data_entrega' || field === 'prioridade' ? 'center' : 'left',
                       }}
                     >
-                      {field === 'id_processo' ? 'ID Processo' : field === 'objeto_resumido' ? 'Objeto / Serviço' : field === 'atividade_atual' ? 'Atividade Atual' : field === 'data_entrega' ? 'Data' : 'Estimado'}
+                      {field === 'id_processo' ? 'ID Processo' : field === 'objeto_resumido' ? 'Objeto / Serviço' : field === 'atividade_atual' ? 'Atividade Atual' : field === 'prioridade' ? 'Prior.' : field === 'data_entrega' ? 'Data' : 'Estimado'}
                       {sortField === field && (
                         <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>
                       )}
                     </th>
                   ))}
-                  {canEdit && <th className="w-[15%] px-2 py-3 text-center">Ações</th>}
+                  {canEdit && <th scope="col" className="w-[15%] px-2 py-3 text-center">Ações</th>}
                 </tr>
               </thead>
               <tbody className="text-[10px] divide-y divide-white/5">
-                  {filtered.map(p => {
+                  {filtered.slice((page - 1) * pageSize, page * pageSize).map(p => {
                   const ag = getAging(p.data_entrega, p.processo_atrasado)
                   return (
                     <tr
@@ -341,13 +399,26 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
                       className="hover:bg-white/5 transition cursor-pointer"
                     >
                       <td className="px-2 py-3 font-bold text-blue-400 truncate">
-                        {p.id_processo || '-'}
+                        <a href={seiLinks[p.id] || '#'} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: seiLinks[p.id] ? 'underline' : 'none' }}>{p.id_processo || '-'}</a>
                       </td>
                       <td className="px-2 py-3">
                         <div className="font-bold text-slate-100 truncate">{p.objeto_resumido || '-'}</div>
                       </td>
                       <td className="px-2 py-3">
                         <div className="text-slate-300 truncate">{p.atividade_atual || '-'}</div>
+                      </td>
+                      <td className="px-2 py-3 text-center">
+                        {p.prioridade ? (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6,
+                            background: p.prioridade === 'Urgente' ? 'rgba(239,68,68,0.2)' :
+                              p.prioridade === 'Alta' ? 'rgba(249,115,22,0.2)' :
+                              p.prioridade === 'Média' ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)',
+                            color: p.prioridade === 'Urgente' ? '#fca5a5' :
+                              p.prioridade === 'Alta' ? '#fdba74' :
+                              p.prioridade === 'Média' ? '#fde047' : '#86efac',
+                          }}>{p.prioridade}</span>
+                        ) : <span style={{ color: '#475569' }}>—</span>}
                       </td>
                       <td className="px-2 py-3 text-center">
                         <span className={`aging-badge ${ag.class}`}>{formatDate(p.data_entrega)}</span>
@@ -362,6 +433,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
                               onClick={() => router.push(`/pmo-dashboard/processos/${p.id}`)}
                               className="p-1.5 rounded-md text-blue-400 hover:bg-blue-500/20 transition cursor-pointer border-none bg-transparent"
                               title="Ver detalhes"
+                              aria-label="Ver detalhes do processo"
                             >
                               <ExternalLink size={14} />
                             </button>
@@ -369,6 +441,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
                               onClick={() => router.push(`/pmo-dashboard/processos/${p.id}/edit`)}
                               className="p-1.5 rounded-md text-amber-400 hover:bg-amber-500/20 transition cursor-pointer border-none bg-transparent"
                               title="Editar"
+                              aria-label="Editar processo"
                             >
                               <Edit size={14} />
                             </button>
@@ -377,6 +450,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
                                 onClick={() => setDeleteTarget(p)}
                                 className="p-1.5 rounded-md text-red-400 hover:bg-red-500/20 transition cursor-pointer border-none bg-transparent"
                                 title="Excluir"
+                                aria-label="Excluir processo"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -389,7 +463,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={canEdit ? 6 : 5} className="p-10 text-center opacity-30 uppercase font-black tracking-widest text-[10px]">
+                    <td colSpan={canEdit ? 7 : 6} className="p-10 text-center opacity-30 uppercase font-black tracking-widest text-[10px]">
                       Sem dados
                     </td>
                   </tr>
@@ -397,80 +471,121 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={filtered.length}
+            showingFrom={showingFrom}
+            showingTo={showingTo}
+            onPageChange={setPage}
+            compact
+          />
         </div>
 
         {/* Charts */}
         <div className="space-y-6">
-          {/* Responsáveis */}
+          {/* Distribuição por Responsável */}
           <div className="glass-card p-6">
-            <h2 className="text-[10px] font-bold uppercase text-indigo-400 mb-4 tracking-wider">Responsáveis</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h2 className="text-[10px] font-bold uppercase text-cyan-400 tracking-wider">Distribuição por Responsável</h2>
+              {responsavelFilter && (
+                <span
+                  onClick={() => { setResponsavelFilter(''); setStatusFilter(''); setFaseFilter('') }}
+                  style={{ color: '#60a5fa', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                >Limpar filtro ✕</span>
+              )}
+            </div>
             <div className="h-[220px]">
-              <Bar
-                data={{
-                  labels: Object.keys(chartData.resp).sort((a, b) => {
-                    if (a === 'N/I') return 1
-                    if (b === 'N/I') return -1
-                    return chartData.resp[b] - chartData.resp[a]
-                  }),
-                  datasets: [{
-                    data: Object.keys(chartData.resp).sort((a, b) => {
-                      if (a === 'N/I') return 1
-                      if (b === 'N/I') return -1
-                      return chartData.resp[b] - chartData.resp[a]
-                    }).map(l => chartData.resp[l]),
-                    backgroundColor: chartColors,
-                    borderRadius: 5,
-                  }]
-                }}
-                options={{
-                  indexAxis: 'y',
-                  maintainAspectRatio: false,
-                  onClick: (_e, activeEls) => {
-                    if (activeEls.length > 0) {
-                      const labels = Object.keys(chartData.resp).sort((a, b) => {
-                        if (a === 'N/I') return 1; if (b === 'N/I') return -1
-                        return chartData.resp[b] - chartData.resp[a]
-                      })
-                      handleChartFilter('responsavel', labels[activeEls[0].index])
-                    }
-                  },
-                  plugins: {
-                    legend: { display: false },
-                  },
-                  scales: {
-                    x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 8 } } },
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#475569', font: { size: 8 } } },
-                  },
-                }}
-              />
+              {chartData.resp.length > 0 ? (
+                <Bar
+                  data={{
+                    labels: chartData.resp.map(([name]) => name.toUpperCase()),
+                    datasets: [{
+                      data: chartData.resp.map(([, count]) => count),
+                      backgroundColor: chartData.resp.map(([name], i) => {
+                        const colors = ['#06b6d4', '#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e', '#ec4899', '#f97316', '#14b8a6', '#a855f7', '#eab308']
+                        const base = colors[i % colors.length]
+                        if (!responsavelFilter) return base
+                        return name === responsavelFilter ? base : 'rgba(100,116,139,0.25)'
+                      }),
+                      borderRadius: 5,
+                    }]
+                  }}
+                  options={{
+                    indexAxis: 'y',
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 8 } } },
+                      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 8 } } },
+                    },
+                    onClick: (_: unknown, elements: { index: number }[]) => {
+                      if (elements.length > 0) {
+                        const idx = elements[0].index
+                        const name = chartData.resp[idx][0]
+                        setStatusFilter('Em andamento')
+                        setResponsavelFilter(prev => prev === name ? '' : name)
+                      }
+                    },
+                  }}
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b', fontSize: 12 }}>
+                  Nenhum dado disponível
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Modalidades */}
+          {/* Distribuição por Etapa do Cronograma */}
           <div className="glass-card p-6">
-            <h2 className="text-[10px] font-bold uppercase text-blue-400 mb-4 tracking-wider">Modalidades</h2>
-            <div className="h-[220px] flex items-center justify-center">
-              <Doughnut
-                data={{
-                  labels: Object.keys(chartData.mod),
-                  datasets: [{
-                    data: Object.values(chartData.mod),
-                    backgroundColor: chartColors,
-                    borderRadius: 5,
-                  }]
-                }}
-                options={{
-                  maintainAspectRatio: false,
-                  onClick: (_e, activeEls) => {
-                    if (activeEls.length > 0) {
-                      handleChartFilter('modalidade', Object.keys(chartData.mod)[activeEls[0].index])
-                    }
-                  },
-                  plugins: {
-                    legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 9 } } },
-                  },
-                }}
-              />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h2 className="text-[10px] font-bold uppercase text-indigo-400 tracking-wider">Distribuição por Etapa</h2>
+              {faseFilter && (
+                <span
+                  onClick={() => setFaseFilter('')}
+                  style={{ color: '#60a5fa', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                >Limpar filtro ✕</span>
+              )}
+            </div>
+            <div className="h-[220px]">
+              {etapaData.length > 0 ? (
+                <Bar
+                  data={{
+                    labels: etapaData.map(e => e.fase.toUpperCase()),
+                    datasets: [{
+                      data: etapaData.map(e => e.qtd),
+                      backgroundColor: etapaData.map(e => {
+                        const colors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#6366f1', '#22c55e', '#ec4899']
+                        const idx = etapaData.indexOf(e)
+                        if (!faseFilter) return colors[idx % colors.length]
+                        return e.fase === faseFilter ? colors[idx % colors.length] : 'rgba(100,116,139,0.25)'
+                      }),
+                      borderRadius: 5,
+                    }]
+                  }}
+                  options={{
+                    indexAxis: 'y',
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 8 } } },
+                      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 8 } } },
+                    },
+                    onClick: (_: unknown, elements: { index: number }[]) => {
+                      if (elements.length > 0) {
+                        const idx = elements[0].index
+                        const fase = etapaData[idx].fase
+                        setFaseFilter(prev => prev === fase ? '' : fase)
+                      }
+                    },
+                  }}
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b', fontSize: 12 }}>
+                  Nenhum dado disponível
+                </div>
+              )}
             </div>
           </div>
 
@@ -478,25 +593,31 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
           <div className="glass-card p-6">
             <h2 className="text-[10px] font-bold uppercase text-emerald-400 mb-4 tracking-wider">Saúde dos Prazos</h2>
             <div className="h-[220px]">
-              <Bar
-                data={{
-                  labels: ['No Prazo', 'Alerta', 'Atrasado'],
-                  datasets: [{
-                    data: [chartData.health.g, chartData.health.y, chartData.health.r],
-                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-                    borderRadius: 5,
-                  }]
-                }}
-                options={{
-                  indexAxis: 'y',
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
-                  scales: {
-                    x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 8 } } },
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 9, weight: 'bold' } } },
-                  },
-                }}
-              />
+              {chartData.health.g + chartData.health.y + chartData.health.r > 0 ? (
+                <Bar
+                  data={{
+                    labels: ['No Prazo', 'Alerta', 'Atrasado'],
+                    datasets: [{
+                      data: [chartData.health.g, chartData.health.y, chartData.health.r],
+                      backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                      borderRadius: 5,
+                    }]
+                  }}
+                  options={{
+                    indexAxis: 'y',
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 8 } } },
+                      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 9, weight: 'bold' } } },
+                    },
+                  }}
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b', fontSize: 12 }}>
+                  Nenhum dado disponível
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -505,6 +626,7 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
       {/* Modal */}
       {modalProcesso && (
         <div
+          role="dialog" aria-modal="true" aria-label="Detalhes do Processo" aria-describedby="modal-desc"
           className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
           onClick={() => setModalProcesso(null)}
         >
@@ -513,13 +635,13 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
             onClick={e => e.stopPropagation()}
           >
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-y-auto" ref={modalRef}>
-              <div className="col-span-2 p-4 glass-card-inner">
+              <div className="col-span-2 p-4 glass-card-inner" id="modal-desc">
                 <p className="text-[9px] font-bold text-blue-400 uppercase mb-1">Objeto</p>
                 <p className="text-sm font-bold text-slate-100">{modalProcesso.objeto_resumido || '-'}</p>
               </div>
               <div className="p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-slate-500 mb-1">ID</p>
-                <p className="text-base font-black text-white">{modalProcesso.id_processo || '-'}</p>
+                <a href={seiLinks[modalProcesso.id] || '#'} target="_blank" rel="noopener noreferrer" style={{ color: '#f8fafc', textDecoration: seiLinks[modalProcesso.id] ? 'underline' : 'none' }}><p className="text-base font-black">{modalProcesso.id_processo || '-'}</p></a>
               </div>
               <div className="p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-slate-500 mb-1">Status</p>
@@ -689,6 +811,10 @@ export default function DashboardContent({ processos, modalidades, responsaveis,
         .aging-green {
           background-color: #22c55e;
           color: white;
+        }
+        .aging-gray {
+          background-color: #475569;
+          color: #cbd5e1;
         }
       `}</style>
     </div>

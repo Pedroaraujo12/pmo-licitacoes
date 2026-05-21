@@ -2,7 +2,3 @@
 name = "pmo-licitacoes"
 pages_build_output_dir = "out"
 compatibility_date = "2026-05-16"
-
-[env.production.vars]
-NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_GO7Aqg_eNO6hqUIl3rAzyg_GRuiIkWE"
-NEXT_PUBLIC_SUPABASE_URL = "https://qakrpkwmhlpynrphucfl.supabase.co"

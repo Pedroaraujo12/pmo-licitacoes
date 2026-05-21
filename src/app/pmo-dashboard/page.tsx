@@ -3,11 +3,9 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import DashboardContent from './dashboard-content'
-import type { Processo, Modalidade, Responsavel, Profile, StatusProcessoCronograma } from '@/types/database'
+import type { Processo, Profile } from '@/types/database'
 
 export default function DashboardPage() {
-  const [modalidades, setModalidades] = useState<Modalidade[]>([])
-  const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -18,10 +16,8 @@ export default function DashboardPage() {
     const supabase = createClient()
     async function load() {
       try {
-        const [procResult, m, r, userResult] = await Promise.all([
+        const [procResult, userResult] = await Promise.all([
           supabase.from('processos').select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)').order('data_entrada', { ascending: false }),
-          supabase.from('modalidades').select('*'),
-          supabase.from('responsaveis').select('*'),
           supabase.auth.getUser(),
         ])
 
@@ -32,9 +28,6 @@ export default function DashboardPage() {
           setLoading(false)
           return
         }
-
-        if (m.data) setModalidades(m.data)
-        if (r.data) setResponsaveis(r.data)
 
         const user = (userResult as { data: { user: { id?: string } | null } }).data?.user
         if (user?.id) {
@@ -71,8 +64,6 @@ export default function DashboardPage() {
   return (
     <DashboardContent
       processos={processos}
-      modalidades={modalidades}
-      responsaveis={responsaveis}
       userRole={profile?.role || null}
     />
   )

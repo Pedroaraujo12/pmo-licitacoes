@@ -1,23 +1,16 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Processo, StatusProcessoCronograma } from '@/types/database'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { useDebounce } from '@/hooks/useDebounce'
+import { fetchAllSeiLinks } from '@/lib/utils'
 import {
-  CheckCircle2, Clock, Circle, AlertTriangle, ArrowRight, Search,
+  CheckCircle2, Clock, Circle, ArrowRight, Search,
 } from 'lucide-react'
 
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < breakpoint)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [breakpoint])
-  return isMobile
-}
 
 function formatDate(d: string | null | undefined) {
   if (!d) return '-'
@@ -37,49 +30,91 @@ function statusBadge(status: string) {
 export default function CronogramaPage() {
   const router = useRouter()
   const [processos, setProcessos] = useState<(Processo & { status_cronograma?: StatusProcessoCronograma })[]>([])
+  const searchRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const [loading, setLoading] = useState(true)
+  const [seiLinks, setSeiLinks] = useState<Record<string, string>>({})
   const isMobile = useIsMobile()
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return processos
-    const q = search.toLowerCase()
+    if (!debouncedSearch.trim()) return processos
+    const q = debouncedSearch.toLowerCase()
     return processos.filter(p =>
       (p.id_processo?.toLowerCase() || '').includes(q) ||
       (p.objeto_resumido?.toLowerCase() || '').includes(q)
     )
-  }, [processos, search])
+  }, [processos, debouncedSearch])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
     const supabase = createClient()
     async function load() {
-      const { data: procs } = await supabase
-        .from('processos')
-        .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
-        .order('data_entrada', { ascending: false })
-      if (cancelled) return
-      if (!procs) { setLoading(false); return }
+      try {
+        const { data: procs } = await supabase
+          .from('processos')
+          .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
+          .order('data_entrada', { ascending: false })
+        if (cancelled) return
+        if (!procs) { setLoading(false); return }
 
-      const ids = procs.map((p: Processo) => p.id_processo).filter(Boolean) as string[]
+        const procsById = new Map<string, Processo>(procs.map((p: Processo) => [p.id, p]))
+        const { data: etapas } = await supabase
+          .from('cronograma_atividades')
+          .select('*')
+          .order('ordem', { ascending: true })
 
-      const { data: cronoData } = ids.length > 0
-        ? await supabase.from('vw_status_processo_cronograma').select('*').in('id_processo', ids)
-        : { data: null }
+        if (cancelled) return
 
-      if (cancelled) return
-
-      const cronoMap: Record<string, StatusProcessoCronograma> = {}
-      if (cronoData) {
-        for (const c of cronoData as StatusProcessoCronograma[]) {
-          if (c.id_processo) cronoMap[c.id_processo] = c
+        const cronoMap: Record<string, StatusProcessoCronograma> = {}
+        if (etapas) {
+        const grouped: Record<string, { etapaConcluida: number; etapaAtrasada: number; total: number; ultimaFase: string; }> = {}
+        for (const e of etapas) {
+          const key = e.processo_id
+          if (!grouped[key]) grouped[key] = { etapaConcluida: 0, etapaAtrasada: 0, total: 0, ultimaFase: '' }
+          grouped[key].total++
+          if (e.status === 'concluido') grouped[key].etapaConcluida++
+          const overdue = e.status !== 'concluido' && e.data_fim && new Date(e.data_fim) < new Date()
+          if (overdue) grouped[key].etapaAtrasada++
+          if (e.status !== 'concluido') grouped[key].ultimaFase = e.fase
+        }
+        for (const [procId, g] of Object.entries(grouped)) {
+          const proc = procsById.get(procId)
+          const dataEntrega = proc?.data_entrega
+          const atrasadoPorData = dataEntrega ? new Date(dataEntrega) < new Date() : false
+          const pct = g.total > 0 ? Math.round((g.etapaConcluida / g.total) * 100) : 0
+          cronoMap[procId] = {
+            id_processo: procId,
+            processo_atrasado: g.etapaConcluida < g.total && (atrasadoPorData || g.etapaAtrasada > 0),
+            total_etapas: g.total,
+            etapas_concluidas: g.etapaConcluida,
+            etapas_atrasadas: g.etapaAtrasada,
+            progresso_calculado: pct,
+            atividade_atual: g.ultimaFase || null,
+            data_fim_prevista_total: dataEntrega || null,
+          } as StatusProcessoCronograma
         }
       }
 
-      setProcessos(procs.map((p: Processo) => ({ ...p, status_cronograma: cronoMap[p.id_processo || ''] })))
+      setProcessos(procs.map((p: Processo) => ({ ...p, status_cronograma: cronoMap[p.id] })))
       setLoading(false)
+      } catch {
+        if (!cancelled) setLoading(false)
+      }
     }
     load()
+    fetchAllSeiLinks(supabase).then(setSeiLinks)
     return () => { cancelled = true }
   }, [])
 
@@ -100,10 +135,11 @@ export default function CronogramaPage() {
       }}>
         <Search size={16} color="#64748b" />
         <input
+          ref={searchRef}
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por ID ou objeto..."
+          placeholder="Buscar por ID ou objeto...  ⌘K"
           style={{
             flex: 1, padding: '10px 0', border: 'none', background: 'transparent',
             color: '#f1f5f9', fontSize: 14, outline: 'none', width: '100%',
@@ -150,12 +186,12 @@ export default function CronogramaPage() {
                     {p.objeto_resumido || 'Sem objeto'}
                   </div>
                   <div style={{ color: '#64748b', fontSize: 12, marginBottom: 4 }}>
-                    {p.id_processo || 'Sem ID'}{p.modalidades?.nome ? ` · ${p.modalidades.nome}` : ''}
+                    <a href={seiLinks[p.id] || '#'} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: seiLinks[p.id] ? 'underline' : 'none' }}>{p.id_processo || 'Sem ID'}</a>{p.modalidades?.nome ? ` · ${p.modalidades.nome}` : ''}
                   </div>
                   <div style={{ color: '#94a3b8', fontSize: 13 }}>
                     {p.data_entrada ? `Entrada: ${formatDate(p.data_entrada)}` : ''}
-                    {sc?.total_etapas ? ` · ${sc.etapas_concluidas}/${sc.total_etapas} etapas` : ' · Sem cronograma'}
-                    {sc?.progresso_calculado ? ` · ${sc.progresso_calculado}%` : ''}
+                    {sc ? ` · ${sc.etapas_concluidas}/${sc.total_etapas} etapas` : ' · Sem cronograma'}
+                    {sc?.progresso_calculado !== undefined ? ` · ${sc.progresso_calculado}%` : ''}
                     {sc?.etapas_atrasadas ? ` · ${sc.etapas_atrasadas} atrasada(s)` : ''}
                   </div>
                   {sc?.atividade_atual && (

@@ -4,17 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
-
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < breakpoint)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [breakpoint])
-  return isMobile
-}
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { upsertSeiLink } from '@/lib/utils'
 
 export default function NovoProcessoPage() {
   const router = useRouter()
@@ -34,7 +25,25 @@ export default function NovoProcessoPage() {
   const [demandantes, setDemandantes] = useState<Demandante[]>([])
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
   const [statusList, setStatusList] = useState<StatusProcesso[]>([])
-  const [atividadesAtuais, setAtividadesAtuais] = useState<string[]>([])
+  const atividadesAtuais = [
+    'Análise do Termo de Referência e anexos',
+    'Pesquisa de Preços e levantamento do custo estimado da Contratação',
+    'Relatório de Pesquisa Preços',
+    'Disponibilidade orçamentária',
+    'Designação da Comissão de Seleção',
+    'Elaboração Da Minuta de Edital e Anexos. Envio à UJUR/AGSUS',
+    'Análise jurídica e Emissão de Parecer',
+    'Adequações e atendimento ao Parecer Jurídico quanto aos aspectos técnicos do Edital e Anexos e Autorização de Governança publicação do Edital',
+    'Publicação do Edital (prazos legais: 3 dias úteis - Cotação de Preços,  8 dias úteis - Pregão bens e materiais, 10 dias úteis - Pregão serviços e 15 dias úteis concorrência)',
+    'Abertura e Fase de Lances',
+    'Fase de Julgamento das Propostas, Aceitação e Habilitação',
+    'Envio da proposta e documentação de qualificação técnica para análise da área demandante',
+    'Resposta da Área demandante',
+    'Prazo recursal (3 DIAS ÚTEIS)',
+    'Prazo contrarrazões (3 DIAS ÚTEIS)',
+    'Decisão quanto ao recurso (5 dias úteis)',
+    'Envio do Recurso ao Jurídico e Ratificação autoridade competente da decisão do pregoeiro',
+  ]
 
   useEffect(() => {
     Promise.all([
@@ -43,32 +52,16 @@ export default function NovoProcessoPage() {
       getSupabase().from('demandantes').select('*'),
       getSupabase().from('responsaveis').select('*'),
       getSupabase().from('status_processo').select('*'),
-      getSupabase().from('processos').select('atividade_atual').not('atividade_atual', 'is', null),
-    ]).then(([c, m, d, r, s, a]) => {
+    ]).then(([c, m, d, r, s]) => {
       if (c.data) setCoordenacoes(c.data)
       if (m.data) setModalidades(m.data)
       if (d.data) setDemandantes(d.data)
       if (r.data) setResponsaveis(r.data)
       if (s.data) setStatusList(s.data)
-      if (a.data) {
-        const vals = [...new Set(a.data.map((x: { atividade_atual: string }) => x.atividade_atual).filter(Boolean))].sort()
-        setAtividadesAtuais(vals as string[])
-      }
     }).catch((err: unknown) => {
       console.error('Erro ao carregar dados do formulário:', err)
     })
   }, [])
-
-  function formatIdProcesso(raw: string): string {
-    const digits = raw.replace(/[^0-9]/g, '')
-    let parts: string[] = []
-    if (digits.length <= 6) {
-      parts = ['AGSUS', digits.padEnd(6, '0'), new Date().getFullYear().toString(), '00']
-    } else {
-      parts = ['AGSUS', digits.slice(0, 6), digits.slice(6, 10) || new Date().getFullYear().toString(), digits.slice(10, 12) || '00']
-    }
-    return `${parts[0]}.${parts[1]}/${parts[2]}-${parts[3]}`
-  }
 
   function handleIdInput(e: React.FormEvent<HTMLInputElement>) {
     const raw = (e.target as HTMLInputElement).value
@@ -84,8 +77,6 @@ export default function NovoProcessoPage() {
         match[6],
       ]
       ;(e.target as HTMLInputElement).value = parts.join('')
-    } else {
-      ;(e.target as HTMLInputElement).value = ''
     }
   }
 
@@ -99,6 +90,12 @@ export default function NovoProcessoPage() {
       const fd = new FormData(form)
       const idProc = (fd.get('id_processo') as string || '').trim()
 
+      if (!fd.get('responsavel_id')) {
+        setError('Responsável é obrigatório.')
+        setLoading(false)
+        return
+      }
+
       if (idProc && !/^AGSUS\.\d{6}\/\d{4}-\d{2}$/.test(idProc)) {
         setError('ID Processo deve seguir o formato AGSUS.000000/2026-00 (6 dígitos + ano + 2 dígitos)')
         setLoading(false)
@@ -110,6 +107,7 @@ export default function NovoProcessoPage() {
       for (const [key, value] of fd.entries()) {
         const str = value as string
         if (!str) continue
+        if (key === 'link_sei') continue
         if (['qtd_itens', 'progresso', 'valor_estimado', 'valor_homologado'].includes(key)) {
           payload[key] = Number(str)
         } else if (['data_entrada', 'data_atividade', 'data_entrega'].includes(key)) {
@@ -126,11 +124,16 @@ export default function NovoProcessoPage() {
       const { data: { user } } = await getSupabase().auth.getUser()
       if (user) payload.created_by = user.id
 
-      const { error: err } = await getSupabase().from('processos').insert(payload)
+      const { data: inserted, error: err } = await getSupabase().from('processos').insert(payload).select('id')
       if (err) {
         setError(err.message)
         setLoading(false)
         return
+      }
+
+      const linkSei = fd.get('link_sei') as string
+      if (linkSei?.trim() && inserted?.[0]?.id) {
+        await upsertSeiLink(getSupabase(), inserted[0].id, linkSei.trim())
       }
 
       router.push('/pmo-dashboard')
@@ -177,7 +180,7 @@ export default function NovoProcessoPage() {
     return (
       <div>
         <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
-        <textarea name={name} defaultValue="" rows={3} style={{ ...baseInput, resize: 'vertical' }} />
+        <textarea name={name} defaultValue="" rows={3} required style={{ ...baseInput, resize: 'vertical' }} />
       </div>
     )
   }
@@ -218,7 +221,16 @@ export default function NovoProcessoPage() {
           {renderSelect('responsavel_id', 'Responsável', responsaveis)}
           {renderSelect('demandante_id', 'Demandante', demandantes)}
           {renderSelect('modalidade_id', 'Modalidade', modalidades)}
-          {renderInput('prioridade', 'Prioridade')}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prioridade</label>
+            <select name="prioridade" defaultValue="" style={{ ...baseInput, cursor: 'pointer' }}>
+              <option value="">Selecione...</option>
+              <option value="Baixa">Baixa</option>
+              <option value="Média">Média</option>
+              <option value="Alta">Alta</option>
+              <option value="Urgente">Urgente</option>
+            </select>
+          </div>
           {renderInput('data_atividade', 'Data Atividade', 'date')}
           {renderInput('progresso', 'Progresso (%)', 'number')}
           {renderInput('data_entrega', 'Data Entrega', 'date')}
@@ -239,7 +251,12 @@ export default function NovoProcessoPage() {
           {renderTextarea('observacoes', 'Observações')}
         </div>
         <div style={{ marginBottom: 24 }}>
-          {renderInput('drive', 'Drive')}
+          {renderInput('drive', 'Drive (Google Docs)')}
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>Link para pasta/arquivo no Google Drive com os documentos do processo</p>
+        </div>
+        <div style={{ marginBottom: 24 }}>
+          {renderInput('link_sei', 'Link SEI (Processo Administrativo)')}
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>Link para o processo no SEI (Sistema Eletrônico de Informações)</p>
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

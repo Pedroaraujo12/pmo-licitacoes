@@ -9,10 +9,12 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get('code')
-    const next = new URLSearchParams(window.location.search).get('next') || '/pmo-dashboard'
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const next = params.get('next') || '/pmo-dashboard'
 
     if (!code) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('Código de autenticação não encontrado')
       return
     }

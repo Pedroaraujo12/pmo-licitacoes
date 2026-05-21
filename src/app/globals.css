@@ -50,3 +50,20 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+.period-btn {
+  padding: 4px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.period-btn:hover {
+  background: rgba(59,130,246,0.15);
+  color: #60a5fa;
+}

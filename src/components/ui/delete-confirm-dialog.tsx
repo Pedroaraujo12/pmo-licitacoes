@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Trash2, X } from 'lucide-react'
 
 interface Props {
@@ -17,6 +18,12 @@ export default function DeleteConfirmDialog({
   titulo = 'Excluir Processo',
   mensagem = 'Tem certeza que deseja excluir este processo? Esta ação é irreversível.',
 }: Props) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   if (!open) return null
 
   return (

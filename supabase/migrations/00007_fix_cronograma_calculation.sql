@@ -30,20 +30,20 @@ BEGIN
         (1, 3,  'Planejamento', 'Análise do Termo de Referência e anexos', 'UAC'),
         (2, 5,  'Produção',     'Pesquisa de Preços e levantamento do custo estimado da Contratação', 'UAC'),
         (3, 1,  'Produção',     'Relatório de Pesquisa Preços', 'UAC'),
-        (4, 2,  'Análise',      'Disponibilidade orçamentária', 'UFOC'),
+        (4, 0,  'Análise',      'Disponibilidade orçamentária', 'UFOC'),
         (5, 1,  'Revisão',      'Designação da Comissão de Seleção', 'UAC'),
         (6, 5,  'Produção',     'Elaboração Da Minuta de Edital e Anexos. Envio à UJUR/AGSUS', 'UAC'),
         (7, 5,  'Análise',      'Análise jurídica e Emissão de Parecer', 'UJUR'),
-        (8, 1,  'Produção',     'Adequações e atendimento ao Parecer Jurídico', 'NAAGE'),
-        (9, 8,  'Produção',     'Publicação do Edital', 'UAC'),
+        (8, 1,  'Produção',     'Adequações e atendimento ao Parecer Jurídico quanto aos aspectos técnicos do Edital e Anexos e Autorização de Governança publicação do Edital', 'NAAGE'),
+        (9, 8,  'Produção',     'Publicação do Edital (prazos legais: 3 dias úteis - Cotação de Preços,  8 dias úteis - Pregão bens e materiais, 10 dias úteis - Pregão serviços e 15 dias úteis concorrência)', 'UAC'),
         (10, 1, 'Execução',     'Abertura e Fase de Lances', 'UAC'),
-        (11, 8, 'Execução',     'Fase de Julgamento das Propostas', 'UAC'),
-        (12, 1, 'Execução',     'Envio da proposta para análise da área demandante', 'UAC'),
+        (11, 8, 'Execução',     'Fase de Julgamento das Propostas, Aceitação e Habilitação', 'UAC'),
+        (12, 1, 'Execução',     'Envio da proposta e documentação de qualificação técnica para análise da área demandante', 'UAC'),
         (13, 1, 'Análise',      'Resposta da Área demandante', 'NAAGE'),
-        (14, 3, 'Análise',      'Prazo recursal', 'UAC'),
-        (15, 3, 'Aprovação',    'Prazo contrarrazões', 'UAC'),
-        (16, 5, 'Aprovação',    'Decisão quanto ao recurso', 'UAC'),
-        (17, 2, 'Aprovação',    'Envio do Recurso ao Jurídico e Ratificação', 'DIOP')
+        (14, 3, 'Análise',      'Prazo recursal (3 DIAS ÚTEIS)', 'UAC'),
+        (15, 3, 'Aprovação',    'Prazo contrarrazões (3 DIAS ÚTEIS)', 'UAC'),
+        (16, 5, 'Aprovação',    'Decisão quanto ao recurso (5 dias úteis)', 'UAC'),
+        (17, 2, 'Aprovação',    'Envio do Recurso ao Jurídico e Ratificação autoridade competente da decisão do pregoeiro', 'DIOP')
       ) AS t(ordem, dias, fase, descricao, setor) ORDER BY t.ordem
     LOOP
       IF v_etapa.ordem = 1 THEN v_data_atual := p_data_inicio;

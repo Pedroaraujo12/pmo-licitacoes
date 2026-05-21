@@ -36,6 +36,9 @@ yarn-error.log*
 .env.*.local
 # .env.production é necessário para o build no Cloudflare Pages
 
+# cloudflare dev vars
+.dev.vars
+
 # vercel
 .vercel
 

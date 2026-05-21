@@ -6,6 +6,7 @@ export interface Profile {
   avatar_url: string | null
   role: UserRole
   created_at: string
+  email?: string | null
 }
 
 export interface Processo {
@@ -120,7 +121,55 @@ export interface CronogramaAtividade {
   responsavel_id: string | null
   data_inicio_real: string | null
   data_fim_real: string | null
+  observacao: string | null
   created_at: string
+  tipo_prazo?: 'fixo' | 'variavel_por_modalidade' | 'indeterminado'
+  regra_prazo?: Record<string, unknown> | null
+  tolerancia_atraso_dias?: number
+  overridden?: boolean
+  data_inicio_original?: string | null
+  data_fim_original?: string | null
+  justificativa_override?: string | null
+  dias_uteis_efetivos?: number | null
+}
+
+export interface ModalidadeCronogramaBase {
+  id: string
+  modalidade_id: string
+  ordem: number
+  fase: string
+  descricao: string
+  setor: string
+  dias_uteis: number
+  tipo_prazo: 'fixo' | 'variavel_por_modalidade' | 'indeterminado'
+  regra_prazo: Record<string, unknown> | null
+  tolerancia_atraso_dias: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CronogramaOverrideLog {
+  id: string
+  processo_id: string
+  cronograma_atividade_id: string
+  campo_alterado: string
+  valor_anterior: Record<string, unknown>
+  valor_novo: Record<string, unknown>
+  justificativa: string
+  alterado_por: string
+  created_at: string
+}
+
+export interface VencimentoProximo {
+  processo_id: string
+  id_processo: string | null
+  atividade_id: string
+  atividade: string
+  fase: string
+  data_fim: string | null
+  dias_restantes: number | null
+  ordem: number
+  alerta: 'atrasado' | 'proximo_vencimento' | 'normal'
 }
 
 export interface StatusProcessoCronograma {
