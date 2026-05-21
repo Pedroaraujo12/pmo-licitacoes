@@ -1,6 +1,14 @@
 # Cloudflare Pages SPA-style redirects for dynamic routes
 # Order matters: more specific rules first
-# Explicitly exclude static routes from the wildcard catch-all
+
+# Auth callback
+/auth/callback /auth/callback 200
+
+# Exact static routes — prevent wildcard from capturing them
 /pmo-dashboard/processos/novo /pmo-dashboard/processos/novo 200
+/pmo-dashboard/processos/placeholder /pmo-dashboard/processos/placeholder 200
+/pmo-dashboard/processos/placeholder/edit /pmo-dashboard/processos/placeholder/edit 200
+
+# Dynamic routes — proxy to placeholder files (rewrite, not redirect)
 /pmo-dashboard/processos/*/edit /pmo-dashboard/processos/placeholder/edit 200
 /pmo-dashboard/processos/* /pmo-dashboard/processos/placeholder 200

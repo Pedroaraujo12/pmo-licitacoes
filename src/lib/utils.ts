@@ -65,14 +65,21 @@ export async function fetchSeiLink(supabase: SupabaseClient, processoId: string)
   return data?.observacao || null
 }
 
+let seiLinksCache: { data: Record<string, string>; ts: number } | null = null
+const CACHE_TTL = 60000
+
 export async function fetchAllSeiLinks(supabase: SupabaseClient): Promise<Record<string, string>> {
+  if (seiLinksCache && Date.now() - seiLinksCache.ts < CACHE_TTL) return seiLinksCache.data
   const { data } = await supabase.from('atividades').select('processo_id, observacao').eq('atividade', SEI_LINK_ATIVIDADE)
   const map: Record<string, string> = {}
   for (const row of data || []) {
     if (row.observacao) map[row.processo_id] = row.observacao
   }
+  seiLinksCache = { data: map, ts: Date.now() }
   return map
 }
+
+export function clearSeiLinksCache() { seiLinksCache = null }
 
 export function exportCSV(data: Record<string, unknown>[], filename = 'export') {
   if (data.length === 0) return

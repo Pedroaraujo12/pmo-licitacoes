@@ -2,15 +2,16 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/lib/auth-context'
 import GestaoProcessos from './gestao-processos'
-import type { Processo, Modalidade, Responsavel, Profile } from '@/types/database'
+import type { Processo, Modalidade, Responsavel } from '@/types/database'
 
 export default function ProcessosPage() {
+  const { profile, loading: authLoading } = useAuth()
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [modalidades, setModalidades] = useState<Modalidade[]>([])
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [processos, setProcessos] = useState<Processo[]>([])
@@ -21,13 +22,13 @@ export default function ProcessosPage() {
   }
 
   useEffect(() => {
+    if (authLoading) return
     let cancelled = false
     async function load() {
       try {
         const supabase = getSupabase()
 
-        const [userResult, m, r, procResult] = await Promise.all([
-          supabase.auth.getUser(),
+        const [m, r, procResult] = await Promise.all([
           supabase.from('modalidades').select('*'),
           supabase.from('responsaveis').select('*'),
           supabase
@@ -44,19 +45,13 @@ export default function ProcessosPage() {
           return
         }
 
-        const user = (userResult as { data: { user: { id?: string } | null } }).data?.user
-        if (user?.id) {
-          const { data: profileData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-          if (profileData && !cancelled) setProfile(profileData as Profile)
-        }
-
         if (m.data) setModalidades(m.data)
         if (r.data) setResponsaveis(r.data)
         setProcessos(procResult.data as Processo[] || [])
         setLoading(false)
       } catch (err) {
         if (!cancelled) {
-          console.error('Erro inesperado:', err)
+          console.warn('Erro inesperado:', err)
           setError((err as Error)?.message || 'Erro de conexão')
           setLoading(false)
         }
@@ -64,14 +59,14 @@ export default function ProcessosPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [reloadKey])
+  }, [authLoading, reloadKey])
 
   function handleDataChange() {
     setLoading(true)
     setReloadKey(k => k + 1)
   }
 
-  if (loading) return (
+  if (authLoading || loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
       <div className="loading-spinner" />
     </div>
