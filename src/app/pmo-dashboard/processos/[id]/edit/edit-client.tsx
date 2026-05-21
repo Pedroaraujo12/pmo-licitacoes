@@ -77,12 +77,17 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
           if (sei) f.link_sei = sei
           setForm(f)
         } else if (typeof window !== 'undefined') {
-          const m = window.location.pathname.match(/\/processos\/([a-f0-9-]+)/)
-          if (m && m[1] !== id) {
-            setId(m[1])
+          const m = window.location.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)
+          if (m && m[0] !== id) {
+            setId(m[0])
             return
           }
-          // Check if this is a legacy record (no longer supported)
+          const sp = new URLSearchParams(window.location.search)
+          const idFromSearch = sp.get('id')
+          if (idFromSearch && idFromSearch !== id) {
+            setId(idFromSearch)
+            return
+          }
           setNotFound(true)
           setError('Processo não encontrado.')
         } else {

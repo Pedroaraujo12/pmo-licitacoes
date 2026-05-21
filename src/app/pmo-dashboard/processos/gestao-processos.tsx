@@ -565,7 +565,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
                           </button>
                           {canEdit && (
                             <button
-                              onClick={() => router.push(`/pmo-dashboard/processos/${p.id}/edit`)}
+                              onClick={() => router.push(`/pmo-dashboard/processos/editar?id=${p.id}`)}
                               className="p-1.5 rounded-md text-amber-400 hover:bg-amber-500/20 transition cursor-pointer border-none bg-transparent"
                               title="Editar"
                               aria-label="Editar processo"

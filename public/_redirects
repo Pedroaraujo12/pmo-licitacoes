@@ -2,4 +2,5 @@
 /pmo-dashboard/processos/novo /pmo-dashboard/processos/novo 200
 /pmo-dashboard/processos/placeholder /pmo-dashboard/processos/placeholder 200
 /pmo-dashboard/processos/placeholder/edit /pmo-dashboard/processos/placeholder/edit 200
+/pmo-dashboard/processos/editar /pmo-dashboard/processos/editar 200
 /pmo-dashboard/processos/* /pmo-dashboard/processos/placeholder 200

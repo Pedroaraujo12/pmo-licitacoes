@@ -171,7 +171,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
           {canEdit && (
             <button
-              onClick={() => router.push(`/pmo-dashboard/processos/${id}/edit`)}
+              onClick={() => router.push(`/pmo-dashboard/processos/editar?id=${id}`)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none bg-amber-600 hover:bg-amber-500 text-white"
               style={{ flex: isMobile ? 1 : undefined }}
             >

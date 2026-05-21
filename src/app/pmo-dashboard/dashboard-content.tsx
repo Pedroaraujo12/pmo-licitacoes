@@ -438,7 +438,7 @@ export default function DashboardContent({ processos: initialProcessos, userRole
                               <ExternalLink size={14} />
                             </button>
                             <button
-                              onClick={() => router.push(`/pmo-dashboard/processos/${p.id}/edit`)}
+                              onClick={() => router.push(`/pmo-dashboard/processos/editar?id=${p.id}`)}
                               className="p-1.5 rounded-md text-amber-400 hover:bg-amber-500/20 transition cursor-pointer border-none bg-transparent"
                               title="Editar"
                               aria-label="Editar processo"
@@ -694,7 +694,7 @@ export default function DashboardContent({ processos: initialProcessos, userRole
               </button>
               {canEdit && (
                 <button
-                  onClick={() => router.push(`/pmo-dashboard/processos/${modalProcesso.id}/edit`)}
+                  onClick={() => router.push(`/pmo-dashboard/processos/editar?id=${modalProcesso.id}`)}
                   className="bg-amber-600 hover:bg-amber-500 text-white px-5 py-2 rounded-lg text-[10px] font-bold transition cursor-pointer border-none flex items-center gap-1.5"
                 >
                   <Edit size={12} />
