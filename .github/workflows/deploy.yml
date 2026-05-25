@@ -33,6 +33,9 @@ jobs:
       - name: Patch Turbopack runtime for static export
         run: python3 scripts/patch-turbopack-runtime.py
 
+      - name: Fix bootstrap script ordering for HTTPS/HTTP/2
+        run: python3 scripts/fix-r-script-order.py
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

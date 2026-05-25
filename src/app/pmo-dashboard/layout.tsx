@@ -75,11 +75,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const ac = new AbortController()
+    const timeoutId = setTimeout(() => {
+      if (checkingAuth) {
+        router.replace('/login')
+      }
+    }, 10000)
     ;(async () => {
       try {
         const supabase = getSupabase()
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { router.replace('/login'); return }
+        if (!user) { clearTimeout(timeoutId); router.replace('/login'); return }
         if (ac.signal.aborted) return
 
         const { data: profileData, error: profileError } = await supabase.from('profiles')
@@ -117,7 +122,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
       setCheckingAuth(false)
     })()
-    return () => ac.abort()
+    return () => { ac.abort(); clearTimeout(timeoutId) }
   }, []) /* eslint-disable-line react-hooks/exhaustive-deps */
 
   async function handleLogout() {
