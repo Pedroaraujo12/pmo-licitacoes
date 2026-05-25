@@ -47,10 +47,37 @@ def patch_runtime():
     result = subprocess.run(['node', '--check', runtime_file], capture_output=True, text=True, timeout=5)
     if result.returncode == 0:
         print("JavaScript syntax check PASSED")
-        return True
     else:
         print(f"Syntax check FAILED: {result.stderr[:200]}")
         return False
+
+    return patch_get_asset_prefix(chunks_dir)
+
+def patch_get_asset_prefix(chunks_dir):
+    """
+    Patch getAssetPrefix to not rely on document.currentScript, which is null
+    when the factory runs asynchronously (via setTimeout retry in HTTP/2 mode).
+    """
+    chunk_files = glob.glob(os.path.join(chunks_dir, '*.js'))
+    patched = False
+
+    for chunk_file in chunk_files:
+        with open(chunk_file) as f:
+            content = f.read()
+
+        # Pattern: function l() { let e = document.currentScript; if (!(e instanceof HTMLScriptElement)) throw ...
+        # Replace: throw with return "" (fallback for when document.currentScript is null)
+        old = 'function l(){let e=document.currentScript;if(!(e instanceof HTMLScriptElement))throw Object.defineProperty(new'
+        new = 'function l(){let e=document.currentScript;if(!(e instanceof HTMLScriptElement))return"";throw Object.defineProperty(new'
+
+        if old in content:
+            content = content.replace(old, new)
+            with open(chunk_file, 'w') as f:
+                f.write(content)
+            print(f"  Patched getAssetPrefix in: {os.path.basename(chunk_file)}")
+            patched = True
+
+    return patched
 
 if __name__ == '__main__':
     patch_runtime()

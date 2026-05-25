@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Post-build script: move the _R_ bootstrap chunk to execute last.
+"""Post-build script: reorder scripts and remove async to fix HTTPS/HTTP/2 race.
 
-In HTTP/2, async scripts load in parallel. If the _R_ chunk (smaller)
-finishes before its dependency chunks (larger), module resolution fails
-because required modules aren't registered yet.
+Problem: In HTTP/2 (HTTPS), the tiny turbopack runtime (~10KB) can finish
+downloading before larger module chunks (~232KB). When this happens, the
+runtime's IIFE processes TURBOPACK entries and executes module 94553
+(bootstrap). Module 94553 calls getAssetPrefix() which relies on
+document.currentScript — but on retry (via setTimeout), document.currentScript
+is null, causing a fatal loop that never hydrates React.
 
-Fix: place the _R_ script tag last (before inline scripts) and remove
-its async attribute, so it executes only after all other async scripts.
+Fix: remove async from all external scripts, keeping the turbopack runtime as
+the last script, so it executes only after all module factories are registered.
+The initial synchronous execution inside the IIFE ensures document.currentScript
+is available.
 """
 
 import re
@@ -19,57 +24,68 @@ def fix_html(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         html = f.read()
 
-    # Find all external script tags
-    script_pattern = re.compile(r'\s*<script( src="([^"]*)")([^>]*)></script>\n?')
+    # Remove async="" from ALL external script tags
+    html = re.sub(r' async=""', '', html)
+
+    # Find all external script tags (they may still have other attrs)
+    script_pattern = re.compile(r'<script src="([^"]*)"([^>]*)></script>')
 
     all_scripts = list(script_pattern.finditer(html))
     if not all_scripts:
         return False
 
-    # Identify the _R_ script (has id="_R_" or is the bootstrap entry)
-    r_script = None
-    other_scripts = []
+    # Identify scripts: the runtime (turbopack) and the inline __next_f scripts
+    runtime_src = None
+    module_scripts = []
+    inline_marker = '<script>(self.__next_f'
 
     for m in all_scripts:
         tag = m.group(0)
-        src = m.group(2)
-        attrs = m.group(3)
-        is_r = 'id="_R_"' in tag or '14q-' in (src or '')
+        src = m.group(1)
+        attrs = m.group(2)
+        name = src.split('/')[-1] if src else ''
 
-        if is_r:
-            r_script = (m.start(), m.end(), tag, src, attrs)
-        else:
-            other_scripts.append((m.start(), m.end(), tag, src, attrs))
+        is_runtime = 'turbopack-' in name
+        if is_runtime:
+            runtime_src = src
 
-    if not r_script:
-        print(f'  No _R_ script found in {filepath}')
+    if not runtime_src:
+        print(f'  No turbopack runtime script found in {filepath}')
         return False
 
-    # Remove ALL instances of _R_ script from html
-    src = r_script[3]
-    # Remove both the original async version and any duplicates
-    new_html = re.sub(
-        rf'\s*<script[^>]*src="[^"]*14q-[^"]*"[^>]*></script>\n?',
-        '',
-        html
-    )
+    # Reorder: remove all external scripts, then add module scripts first,
+    # then the turbopack runtime last (before inline scripts)
+    # Remove all external script tags from the HTML
+    new_html = re.sub(r'<script src="[^"]*"([^>]*)></script>\s*', '', html)
 
-    # Find the insertion point: before the first inline script or before </body>
-    inline_pos = new_html.find('<script>(self.__next_f')
-    if inline_pos >= 0:
-        prefix = new_html[:inline_pos]
-        suffix = new_html[inline_pos:]
+    # Rebuild script section: module scripts first, then runtime, then inline
+    script_lines = []
+    for m in all_scripts:
+        src = m.group(1)
+        name = src.split('/')[-1]
+        is_runtime = 'turbopack-' in name
+        if is_runtime:
+            continue  # we'll add at the end
+        script_lines.append(f'<script src="{src}"></script>')
+
+    # Add runtime last (before inline scripts)
+    script_lines.append(f'<script src="{runtime_src}"></script>')
+
+    # Find where to insert the scripts: before the first inline <script> or </body>
+    inline_pos = new_html.find(inline_marker)
+    if inline_pos < 0:
+        inline_pos = new_html.find('</body>')
+        marker_len = 0
     else:
-        body_close = new_html.find('</body>')
-        if body_close >= 0:
-            prefix = new_html[:body_close]
-            suffix = new_html[body_close:]
-        else:
-            prefix = new_html
-            suffix = ''
+        marker_len = 0  # we insert before the inline
 
-    modified_tag = f'<script src="{src}"></script>\n'
-    new_html = prefix + modified_tag + suffix
+    prefix = new_html[:inline_pos]
+    suffix = new_html[inline_pos:]
+
+    new_html = prefix + '\n' + '\n'.join(script_lines) + '\n' + suffix
+
+    # Clean up any double newlines
+    new_html = new_html.replace('\n\n\n', '\n').replace('\n\n', '\n')
 
     if new_html != html:
         with open(filepath, 'w', encoding='utf-8') as f:
