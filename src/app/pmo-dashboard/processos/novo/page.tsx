@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { upsertSeiLink } from '@/lib/utils'
+import { PT_BR } from '@/lib/pt-br'
 
 export default function NovoProcessoPage() {
   const router = useRouter()
@@ -47,11 +48,11 @@ export default function NovoProcessoPage() {
 
   useEffect(() => {
     Promise.all([
-      getSupabase().from('coordenacoes').select('*'),
-      getSupabase().from('modalidades').select('*'),
-      getSupabase().from('demandantes').select('*'),
-      getSupabase().from('responsaveis').select('*'),
-      getSupabase().from('status_processo').select('*'),
+      getSupabase().from('coordenacoes').select('*').limit(100),
+      getSupabase().from('modalidades').select('*').limit(100),
+      getSupabase().from('demandantes').select('*').limit(100),
+      getSupabase().from('responsaveis').select('*').limit(100),
+      getSupabase().from('status_processo').select('*').limit(100),
     ]).then(([c, m, d, r, s]) => {
       if (c.data) setCoordenacoes(c.data)
       if (m.data) setModalidades(m.data)
@@ -251,8 +252,8 @@ export default function NovoProcessoPage() {
           {renderTextarea('observacoes', 'Observações')}
         </div>
         <div style={{ marginBottom: 24 }}>
-          {renderInput('drive', 'Drive (Google Docs)')}
-          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>Link para pasta/arquivo no Google Drive com os documentos do processo</p>
+          {renderInput('drive', PT_BR.googleDrive)}
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>{PT_BR.googleDrive}</p>
         </div>
         <div style={{ marginBottom: 24 }}>
           {renderInput('link_sei', 'Link SEI (Processo Administrativo)')}

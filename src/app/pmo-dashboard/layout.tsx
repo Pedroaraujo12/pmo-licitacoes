@@ -1,19 +1,40 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { ToastProvider } from '@/components/ui/toast'
+import { WebVitals } from '@/components/ui/web-vitals'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 import {
-  LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X,
+  LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X, FileEdit, Contact2, StickyNote, Sun, FileSignature,
 } from 'lucide-react'
+
+const DEFAULT_ALERTS = {
+  processos_atrasados: 0,
+  proximos_vencimentos: 0,
+  contratos_alertas: 0,
+  sem_colaborador: false,
+}
+
+function normalizeRole(role: unknown): Profile['role'] {
+  return role === 'admin' || role === 'gestor' || role === 'consultor' || role === 'visualizador'
+    ? role
+    : 'visualizador'
+}
 
 const navItems = [
   { href: '/pmo-dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pmo-dashboard/processos', label: 'Processos', icon: FileText },
+  { href: '/pmo-dashboard/contratos', label: 'Contratos', icon: FileSignature },
   { href: '/pmo-dashboard/cronograma', label: 'Cronograma', icon: Calendar },
+  { href: '/pmo-dashboard/documentos', label: 'Documentos', icon: FileEdit },
+  { href: '/pmo-dashboard/colaboradores', label: 'Colaboradores', icon: Contact2 },
+  { href: '/pmo-dashboard/notas', label: 'Notas', icon: StickyNote },
+  { href: '/pmo-dashboard/notas/hoje', label: 'Painel do Dia', icon: Sun },
   { href: '/pmo-dashboard/usuarios', label: 'Usuários', icon: Users },
 ]
 
@@ -32,72 +53,70 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       window.removeEventListener('unhandledrejection', handleRejection)
     }
   }, [])
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [atrasadosCount, setAtrasadosCount] = useState(0)
-  const [proximosVencimentos, setProximosVencimentos] = useState(0)
+  const [layoutAlerts, setLayoutAlerts] = useState<{
+    processos_atrasados: number
+    proximos_vencimentos: number
+    contratos_alertas: number
+    sem_colaborador: boolean
+  }>(DEFAULT_ALERTS)
   const isMobile = useIsMobile()
   const sidebarOpen = isMobile ? mobileOpen : !desktopCollapsed
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
-  function getSupabase() {
+  const getSupabase = useCallback(() => {
     if (!supabaseRef.current) supabaseRef.current = createClient()
     return supabaseRef.current
-  }
+  }, [])
   const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
-    const supabase = getSupabase()
     const ac = new AbortController()
+    ;(async () => {
+      try {
+        const supabase = getSupabase()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.replace('/login'); return }
+        if (ac.signal.aborted) return
 
-    supabase.auth.getUser()
-      .then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
-        if (!user) {
-          router.push('/login')
-          return
-        }
-        supabase.from('profiles').select('*').eq('id', user.id).single()
-          .then(({ data }: { data: unknown }) => { if (data) setProfile(data as Profile) })
-          .catch(() => {})
-
-        supabase.from('processos').select('id, data_entrega').then(({ data: procs }: { data: { id: string; data_entrega: string | null }[] | null }) => {
-          if (!procs) return
-          supabase.from('cronograma_atividades').select('processo_id, status, data_fim').then(({ data: crono }: { data: { processo_id: string; status: string; data_fim: string | null }[] | null }) => {
-            if (!crono) return
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-
-            const stats = new Map<string, { total: number; concluido: number }>()
-            for (const a of crono) {
-              const s = stats.get(a.processo_id) || { total: 0, concluido: 0 }
-              s.total++
-              if (a.status === 'concluido') s.concluido++
-              stats.set(a.processo_id, s)
-            }
-            const concluido: Record<string, boolean> = {}
-            for (const [id, s] of stats) concluido[id] = s.total === s.concluido
-
-            const count = procs.filter(p => {
-              if (concluido[p.id]) return false
-              if (!p.data_entrega) return false
-              const d = new Date(p.data_entrega)
-              return !isNaN(d.getTime()) && d < today
-            }).length
-            setAtrasadosCount(count)
-
-            const venc = crono.filter(a => {
-              if (a.status === 'concluido' || !a.data_fim) return false
-              const fim = new Date(a.data_fim)
-              const diff = Math.ceil((fim.getTime() - today.getTime()) / 86400000)
-              return diff >= 0 && diff <= 3
-            }).length
-            setProximosVencimentos(venc)
+        const { data: profileData, error: profileError } = await supabase.from('profiles')
+          .select('id, name, email, role, avatar_url, created_at, updated_at')
+          .eq('id', user.id).maybeSingle()
+        if (profileData) {
+          setProfile(profileData as Profile)
+        } else {
+          if (profileError) console.warn('Profile load error:', profileError)
+          setProfile({
+            id: user.id,
+            name: user.user_metadata?.name || user.email || 'Usuário',
+            email: user.email,
+            role: normalizeRole(user.user_metadata?.role),
+            avatar_url: null,
+            created_at: user.created_at || new Date().toISOString(),
           })
-        })
-      })
-      .catch(() => router.push('/login'))
+        }
 
+        const { data: alerts, error: alertsError } = await supabase.rpc('get_layout_alerts', { p_user_id: user.id })
+        if (alertsError) console.warn('Layout alerts unavailable:', alertsError)
+        if (alerts) {
+          setLayoutAlerts(alerts as {
+            processos_atrasados: number
+            proximos_vencimentos: number
+            contratos_alertas: number
+            sem_colaborador: boolean
+          })
+        }
+      } catch (err) {
+        console.error('Dashboard layout init error:', err)
+        await getSupabase().auth.signOut()
+        router.replace('/login')
+        return
+      }
+      setCheckingAuth(false)
+    })()
     return () => ac.abort()
   }, []) /* eslint-disable-line react-hooks/exhaustive-deps */
 
@@ -106,8 +125,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/login')
   }
 
+  if (checkingAuth) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="loading-spinner" />
+      </div>
+    )
+  }
+
+  const alertas = layoutAlerts
+
   return (
     <div style={{ minHeight: '100vh', background: '#020617' }}>
+      <WebVitals />
       {isMobile && sidebarOpen && (
         <div onClick={() => setMobileOpen(false)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 49 }} />
@@ -148,11 +178,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }} title={!sidebarOpen ? item.label : undefined}>
                 <Icon size={18} />
                 {sidebarOpen && <span>{item.label}</span>}
-                {sidebarOpen && item.label === 'Processos' && atrasadosCount > 0 && (
-                  <span style={{ marginLeft: 'auto', background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, lineHeight: '1.4' }}>{atrasadosCount}</span>
+                {sidebarOpen && item.label === 'Processos' && alertas.processos_atrasados > 0 && (
+                  <span style={{ marginLeft: 'auto', background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, lineHeight: '1.4' }}>{alertas.processos_atrasados}</span>
                 )}
-                {sidebarOpen && item.label === 'Cronograma' && proximosVencimentos > 0 && (
-                  <span style={{ marginLeft: 'auto', background: '#eab308', color: '#000', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, lineHeight: '1.4' }}>{proximosVencimentos}</span>
+                {sidebarOpen && item.label === 'Cronograma' && alertas.proximos_vencimentos > 0 && (
+                  <span style={{ marginLeft: 'auto', background: '#eab308', color: '#000', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, lineHeight: '1.4' }}>{alertas.proximos_vencimentos}</span>
+                )}
+                {sidebarOpen && item.label === 'Contratos' && alertas.contratos_alertas > 0 && (
+                  <span style={{ marginLeft: 'auto', background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, lineHeight: '1.4' }}>{alertas.contratos_alertas}</span>
                 )}
               </a>
             )
@@ -187,7 +220,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64), padding: isMobile ? 16 : 24,
         paddingBottom: isMobile ? 80 : 24, transition: 'margin-left 0.2s', minHeight: '100vh',
       }}>
-        <ToastProvider>{children}</ToastProvider>
+        {alertas.sem_colaborador && (
+          <div style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)',
+            borderRadius: 12, padding: '10px 16px', marginBottom: 16, color: '#f59e0b', fontSize: 13,
+            display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+            <span>Sua conta ainda não está vinculada a um colaborador.</span>
+            <Link href="/pmo-dashboard/colaboradores"
+              style={{ color: '#f59e0b', fontWeight: 600, textDecoration: 'underline', fontSize: 12 }}>
+              Vincular agora
+            </Link>
+          </div>
+        )}
+        <ToastProvider>
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </ToastProvider>
       </main>
     </div>
   )

@@ -5,6 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { Shield, ShieldAlert, Eye, UserCheck, Plus, X, Pencil, Trash2 } from 'lucide-react'
+import { formatDateBR } from '@/lib/utils'
+import { PT_BR } from '@/lib/pt-br'
+import { translateAuthError } from '@/lib/auth-errors'
 
 const roleIcons: Record<string, React.ReactNode> = {
   admin: <ShieldAlert size={16} />,
@@ -49,23 +52,22 @@ export default function UsuariosPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   async function loadProfiles() {
-    const supabase = getSupabase()
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-    if (!data) return
-    const dataWithEmails = await Promise.all((data as Profile[]).map(async (p) => {
-      if (p.email) return p
-      const { data: emailData } = await supabase.rpc('get_user_email', { user_id: p.id }).maybeSingle()
-      if (emailData) return { ...p, email: emailData as unknown as string }
-      return p
-    }))
-    setProfiles(dataWithEmails)
+    const { data, error } = await getSupabase().rpc('list_users_with_email')
+    if (error) {
+      console.warn('Erro ao listar usuários:', error.message)
+    }
+    if (data) {
+      setProfiles(data as unknown as Profile[])
+    }
   }
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await getSupabase().auth.getUser()
       if (user) {
-        const { data: prof } = await getSupabase().from('profiles').select('*').eq('id', user.id).single()
+        const { data: prof } = await getSupabase().from('profiles')
+          .select('id, name, email, role, avatar_url, created_at, updated_at')
+          .eq('id', user.id).single()
         if (prof) setCurrentUserRole(prof.role)
       }
       await loadProfiles()
@@ -95,29 +97,6 @@ export default function UsuariosPage() {
       const supabase = getSupabase()
       const { data: { session } } = await supabase.auth.getSession()
 
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: createEmail,
-          password: createPassword,
-          name: createName,
-          role: createRole,
-        }),
-      })
-
-      if (res.ok) {
-        setShowCreate(false)
-        setCreateName('')
-        setCreateEmail('')
-        setCreatePassword('')
-        setCreateRole('visualizador')
-        await loadProfiles()
-        setCreateLoading(false)
-        return
-      }
-
-      // Fallback: use signUp() if API route unavailable
       const { error: signUpError } = await supabase.auth.signUp({
         email: createEmail,
         password: createPassword,
@@ -125,7 +104,7 @@ export default function UsuariosPage() {
       })
 
       if (signUpError) {
-        setCreateError(signUpError.message)
+        setCreateError(translateAuthError(signUpError.message))
         setCreateLoading(false)
         return
       }
@@ -156,7 +135,7 @@ export default function UsuariosPage() {
       .eq('id', editUser.id)
 
     if (error) {
-      setEditError(error.message)
+      setEditError(translateAuthError(error.message))
     } else {
       setProfiles(prev => prev.map(p => p.id === editUser.id ? { ...p, name: editName, role: editRole as Profile['role'] } : p))
       setEditUser(null)
@@ -172,7 +151,7 @@ export default function UsuariosPage() {
 
     if (error) {
       console.error('Delete error:', error)
-      setDeleteError(error.message)
+      setDeleteError(translateAuthError(error.message))
       setDeleteLoading(false)
       return
     }
@@ -264,11 +243,11 @@ export default function UsuariosPage() {
 
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nome</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{PT_BR.labels.name}</label>
                 <input type="text" value={createName} onChange={e => setCreateName(e.target.value)} required style={baseStyle} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{PT_BR.labels.email}</label>
                 <input type="email" value={createEmail} onChange={e => setCreateEmail(e.target.value)} required style={baseStyle} />
               </div>
               <div>
@@ -276,7 +255,7 @@ export default function UsuariosPage() {
                 <input type="password" value={createPassword} onChange={e => setCreatePassword(e.target.value)} required minLength={6} style={baseStyle} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nível de Acesso</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{PT_BR.labels.accessLevel}</label>
                 <select value={createRole} onChange={e => setCreateRole(e.target.value)} style={{ ...baseStyle, cursor: 'pointer' }}>
                   <option value="visualizador">Visualizador</option>
                   <option value="consultor">Consultor</option>
@@ -333,7 +312,7 @@ export default function UsuariosPage() {
                 <input type="text" value={editName} onChange={e => setEditName(e.target.value)} required style={baseStyle} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nível de Acesso</label>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{PT_BR.labels.accessLevel}</label>
                 <select value={editRole} onChange={e => setEditRole(e.target.value)} style={{ ...baseStyle, cursor: 'pointer' }}>
                   <option value="visualizador">Visualizador</option>
                   <option value="consultor">Consultor</option>
@@ -394,9 +373,9 @@ export default function UsuariosPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: isMobile ? 600 : 'auto' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <th style={thStyle}>Nome</th>
-              <th style={thStyle}>Email</th>
-              <th style={thStyle}>Nível de Acesso</th>
+              <th style={thStyle}>{PT_BR.labels.name}</th>
+              <th style={thStyle}>{PT_BR.labels.email}</th>
+              <th style={thStyle}>{PT_BR.labels.accessLevel}</th>
               <th style={thStyle}>Criado em</th>
               {isAdmin && <th style={thStyle}>Ações</th>}
             </tr>
@@ -421,7 +400,7 @@ export default function UsuariosPage() {
                   </span>
                 </td>
                 <td style={{ ...tdStyle, color: '#64748b' }}>
-                  {new Date(p.created_at).toLocaleDateString('pt-BR')}
+                  {formatDateBR(p.created_at)}
                 </td>
                 {isAdmin && (
                   <td style={tdStyle}>
@@ -459,10 +438,10 @@ export default function UsuariosPage() {
         gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))',
         gap: 12, marginTop: 24,
       }}>
-        <RoleCard icon={<ShieldAlert size={18} />} role="Admin" desc="Acesso total ao sistema" color="#dc2626" />
-        <RoleCard icon={<Shield size={18} />} role="Gestor" desc="CRUD de processos + gerenciar responsáveis" color="#2563eb" />
-        <RoleCard icon={<UserCheck size={18} />} role="Consultor" desc="CRUD de processos" color="#f59e0b" />
-        <RoleCard icon={<Eye size={18} />} role="Visualizador" desc="Apenas leitura" color="#6b7280" />
+        <RoleCard icon={<ShieldAlert size={18} />} role="Admin" desc={PT_BR.roles.admin} color="#dc2626" />
+        <RoleCard icon={<Shield size={18} />} role="Gestor" desc={PT_BR.roles.gestor} color="#2563eb" />
+        <RoleCard icon={<UserCheck size={18} />} role="Consultor" desc={PT_BR.roles.consultor} color="#f59e0b" />
+        <RoleCard icon={<Eye size={18} />} role="Visualizador" desc={PT_BR.roles.visualizador} color="#6b7280" />
       </div>
     </div>
   )

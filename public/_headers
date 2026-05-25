@@ -1,5 +1,17 @@
-# Disable caching to force fresh content from every deployment
-/*
+# Assets versionados — cache imutável de 1 ano
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
+
+# Páginas autenticadas — sem cache
+/pmo-dashboard
+  Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/pmo-dashboard/*
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
   Pragma: no-cache
   Expires: 0

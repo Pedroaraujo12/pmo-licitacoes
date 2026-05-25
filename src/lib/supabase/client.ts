@@ -1,20 +1,17 @@
-import { createBrowserClient } from '@supabase/ssr'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js'
 
-export function createClient() {
+let browserClient: SupabaseClient | null = null
+
+export function createClient(): SupabaseClient {
   if (typeof window === 'undefined') {
-    return null as unknown as ReturnType<typeof createBrowserClient>
+    return null as unknown as SupabaseClient
   }
-  try {
-    return createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-  } catch (e) {
-    console.warn('createBrowserClient failed, using fallback:', e)
-    return createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  if (!browserClient) {
+    browserClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: true, autoRefreshToken: true, skipAutoInitialize: true } }
     )
   }
+  return browserClient
 }

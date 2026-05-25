@@ -1,19 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-
 export default function DashboardError({
   error,
-  reset,
+  reset: resetFn,
 }: {
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  const [errMsg, setErrMsg] = useState('')
-
-  useEffect(() => {
-    setErrMsg(error.message || 'Erro desconhecido')
-  }, [error])
+  const errMsg = error.message || 'Erro desconhecido'
 
   return (
     <div style={{
@@ -45,7 +39,7 @@ export default function DashboardError({
         </pre>
       )}
       <div style={{ display: 'flex', gap: 12 }}>
-        <button onClick={reset}
+        <button onClick={resetFn}
           style={{
             padding: '10px 24px', background: '#2563eb', color: '#fff',
             border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { upsertSeiLink, fetchSeiLink } from '@/lib/utils'
+import { PT_BR } from '@/lib/pt-br'
 
 export default function EditProcessoClient({ params }: { params: Promise<{ id: string }> }) {
   const paramsId = use(params).id
@@ -55,11 +56,11 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
       try {
         const [proc, c, m, d, r, s] = await Promise.all([
           getSupabase().from('processos').select('*').eq('id', id).single(),
-          getSupabase().from('coordenacoes').select('*'),
-          getSupabase().from('modalidades').select('*'),
-          getSupabase().from('demandantes').select('*'),
-          getSupabase().from('responsaveis').select('*'),
-          getSupabase().from('status_processo').select('*'),
+          getSupabase().from('coordenacoes').select('*').limit(100),
+          getSupabase().from('modalidades').select('*').limit(100),
+          getSupabase().from('demandantes').select('*').limit(100),
+          getSupabase().from('responsaveis').select('*').limit(100),
+          getSupabase().from('status_processo').select('*').limit(100),
         ])
 
         if (c.data) setCoordenacoes(c.data)
@@ -279,14 +280,14 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
         </div>
 
         <div style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Drive (Google Docs)</label>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{PT_BR.googleDrive}</label>
           <input
             value={form.drive || ''}
             onChange={e => setForm(fm => ({ ...fm, drive: e.target.value }))}
             placeholder="https://drive.google.com/..."
             style={baseInput}
           />
-          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>Link para pasta/arquivo no Google Drive com os documentos do processo</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>{PT_BR.googleDrive}</p>
         </div>
         <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Link SEI (Processo Administrativo)</label>

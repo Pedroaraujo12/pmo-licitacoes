@@ -8,6 +8,7 @@ import DeleteConfirmDialog from '@/components/ui/delete-confirm-dialog'
 import Pagination from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/toast'
 import { cleanNum, formatDate, getAging, formatBRL, exportCSV, fetchAllSeiLinks } from '@/lib/utils'
+import { PT_BR } from '@/lib/pt-br'
 import { useDebounce } from '@/hooks/useDebounce'
 import type { Processo, Modalidade, Responsavel } from '@/types/database'
 
@@ -82,21 +83,6 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
 
   useEffect(() => {
     fetchAllSeiLinks(supabase).then(setSeiLinks)
-    supabase.from('cronograma_atividades').select('processo_id, status').then(({ data }: { data: { processo_id: string; status: string }[] | null }) => {
-      if (!data) return
-      const stats = new Map<string, { total: number; concluido: number }>()
-      for (const a of data) {
-        const s = stats.get(a.processo_id) || { total: 0, concluido: 0 }
-        s.total++
-        if (a.status === 'concluido') s.concluido++
-        stats.set(a.processo_id, s)
-      }
-      const concluido: Record<string, boolean> = {}
-      for (const [id, s] of stats) concluido[id] = s.total === s.concluido
-      if (setProcessos) {
-        setProcessos(processos.map(p => ({ ...p, processo_atrasado: concluido[p.id] ? false : p.processo_atrasado })))
-      }
-    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -400,16 +386,16 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
             style={{ width: 130, fontSize: 10 }}
           />
           <button onClick={() => { const d = new Date(); setDateStart(d.toISOString().split('T')[0]); setDateEnd(d.toISOString().split('T')[0]); setPage(1) }}
-            className="period-btn">Hoje</button>
+            className="period-btn">{PT_BR.filters.today}</button>
           <button onClick={() => { const d = new Date(); const s = new Date(d); s.setDate(d.getDate()-7); setDateStart(s.toISOString().split('T')[0]); setDateEnd(d.toISOString().split('T')[0]); setPage(1) }}
-            className="period-btn">7d</button>
+            className="period-btn">{PT_BR.filters.days7}</button>
           <button onClick={() => { const d = new Date(); const s = new Date(d); s.setMonth(d.getMonth()-1); setDateStart(s.toISOString().split('T')[0]); setDateEnd(d.toISOString().split('T')[0]); setPage(1) }}
-            className="period-btn">30d</button>
+            className="period-btn">{PT_BR.filters.days30}</button>
           <button onClick={() => { const d = new Date(); const s = new Date(d.getFullYear(),0,1); setDateStart(s.toISOString().split('T')[0]); setDateEnd(d.toISOString().split('T')[0]); setPage(1) }}
-            className="period-btn">Ano</button>
+            className="period-btn">{PT_BR.filters.year}</button>
         </div>
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }} className="filter-select">
-          <option value="">Status</option>
+          <option value="">{PT_BR.filters.allStatus}</option>
           {statusNames.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={coordenacaoFilter} onChange={e => { setCoordenacaoFilter(e.target.value); setPage(1) }} className="filter-select">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { translateAuthError } from '@/lib/auth-errors'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -22,7 +23,7 @@ export default function AuthCallbackPage() {
     const supabase = createClient()
     supabase.auth.exchangeCodeForSession(code).then(({ error }: { error: { message: string } | null }) => {
       if (error) {
-        setError(error.message)
+        setError(translateAuthError(error.message))
       } else {
         router.replace(next)
       }

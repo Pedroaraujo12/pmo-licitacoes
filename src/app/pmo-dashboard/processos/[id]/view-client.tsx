@@ -4,19 +4,16 @@ import { useEffect, useState, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Processo, Atividade, CronogramaAtividade } from '@/types/database'
-import { ArrowLeft, Edit, Trash2, ExternalLink, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, ExternalLink, AlertTriangle, FileText, FileSignature } from 'lucide-react'
 import DeleteConfirmDialog from '@/components/ui/delete-confirm-dialog'
 import CronogramaDinamico from '@/components/ui/cronograma-dinamico'
-import { formatBRL } from '@/lib/utils'
+import GerarDocumentoModal from '@/components/ui/documentos/gerar-documento-modal'
+import { formatBRL, formatDate } from '@/lib/utils'
+import { listGeneratedDocuments } from '@/lib/documentos'
+import type { DocumentGenerated } from '@/types/documentos'
 import { useToast } from '@/components/ui/toast'
 import { useIsMobile } from '@/hooks/useIsMobile'
-
-function formatDate(d: string | null | undefined) {
-  if (!d) return '-'
-  const date = new Date(d)
-  if (isNaN(date.getTime())) return d
-  return date.toLocaleDateString('pt-BR')
-}
+import RelatedNotes from '@/components/ui/notes/related-notes'
 
 function isOverdue(etapa: CronogramaAtividade) {
   if (etapa.status === 'concluido') return false
@@ -37,6 +34,10 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
   const [profile, setProfile] = useState<{ role: string } | null>(null)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const isMobile = useIsMobile()
+  const [showDocModal, setShowDocModal] = useState(false)
+  const [documentos, setDocumentos] = useState<DocumentGenerated[]>([])
+  const [responsavelColaborador, setResponsavelColaborador] = useState<{ id: string; nome_completo: string; cargo: string | null; unidade: string | null; email_institucional: string | null; telefone_institucional: string | null } | null>(null)
+  const [contratoVinculado, setContratoVinculado] = useState<{ id: string; numero_contrato: string; contratada_nome: string; status: string; valor_atual: number } | null>(null)
 
   function getSupabase() {
     if (!supabaseRef.current) supabaseRef.current = createClient()
@@ -65,11 +66,33 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
       if (proc) {
         setProcesso(proc)
 
+        // Fetch colaborador info for responsável if linked
+        try {
+          const { data: resp } = await supabase
+            .from('responsaveis')
+            .select('colaborador_id')
+            .eq('id', proc.responsavel_id)
+            .maybeSingle()
+          if (resp?.colaborador_id) {
+            const { data: colab } = await supabase
+              .from('colaboradores')
+              .select('id, nome_completo, cargo, unidade, email_institucional, telefone_institucional')
+              .eq('id', resp.colaborador_id)
+              .single()
+            setResponsavelColaborador(colab as { id: string; nome_completo: string; cargo: string | null; unidade: string | null; email_institucional: string | null; telefone_institucional: string | null })
+          } else {
+            setResponsavelColaborador(null)
+          }
+        } catch {
+          setResponsavelColaborador(null)
+        }
+
         const { data: crono } = await supabase
           .from('cronograma_atividades')
           .select('*')
           .eq('processo_id', id)
           .order('ordem', { ascending: true })
+          .limit(200)
         setCronograma(crono || [])
       }
       const { data: atv } = await supabase
@@ -77,7 +100,10 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         .select('*')
         .eq('processo_id', id)
         .order('created_at', { ascending: false })
+        .limit(200)
       setAtividades(atv || [])
+      const { data: docs } = await listGeneratedDocuments(supabase, id)
+      if (docs) setDocumentos(docs)
       const seiLink = (atv || []).find((a: { atividade: string }) => a.atividade === '__SEI_LINK__')
       setLinkSei(seiLink?.observacao || null)
       const { data: { user } } = await supabase.auth.getUser()
@@ -85,6 +111,18 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
         setProfile(prof)
       }
+
+      // Carregar contrato vinculado
+      const { data: contratoData } = await supabase
+        .from('contratos')
+        .select('id, numero_contrato, contratada_nome, status, valor_atual')
+        .eq('processo_id', id)
+        .maybeSingle()
+      if (contratoData) {
+        const c = contratoData as { id: string; numero_contrato: string; contratada_nome: string; status: string; valor_atual: number }
+        setContratoVinculado(c)
+      }
+
       setLoading(false)
     }
     load()
@@ -169,6 +207,13 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
+          <button
+            onClick={() => setShowDocModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none bg-cyan-600 hover:bg-cyan-500 text-white"
+            style={{ flex: isMobile ? 1 : undefined }}
+          >
+            <FileText size={14} /> Gerar Documento
+          </button>
           {canEdit && (
             <button
               onClick={() => router.push(`/pmo-dashboard/processos/editar?id=${id}`)}
@@ -210,7 +255,22 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Responsável</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.responsaveis?.nome || '-'}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {processo.responsaveis?.nome || '-'}
+            {responsavelColaborador && (
+              <button onClick={() => router.push(`/pmo-dashboard/colaboradores/${responsavelColaborador.id}`)}
+                style={{ fontSize: 11, color: '#60a5fa', background: 'rgba(96,165,250,0.1)', border: 'none',
+                  borderRadius: 6, padding: '2px 8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                Ver ficha
+              </button>
+            )}
+          </div>
+          {responsavelColaborador && (
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+              {responsavelColaborador.cargo && <span>{responsavelColaborador.cargo} · </span>}
+              {responsavelColaborador.unidade && <span>{responsavelColaborador.unidade}</span>}
+            </div>
+          )}
         </div>
         <div style={fieldStyle}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modalidade</div>
@@ -254,6 +314,50 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
+      {/* Contratação */}
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <FileSignature size={14} /> Contratação
+          </h3>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {contratoVinculado ? (
+              <button onClick={() => router.push(`/pmo-dashboard/contratos/${contratoVinculado.id}`)}
+                className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition border-none">
+                Ver Contrato
+              </button>
+            ) : (
+              <button onClick={() => router.push(`/pmo-dashboard/contratos/novo?processo_id=${id}`)}
+                className="cursor-pointer bg-violet-600 hover:bg-violet-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition border-none">
+                Criar Contrato
+              </button>
+            )}
+          </div>
+        </div>
+        {contratoVinculado ? (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12 }}>
+            <div style={fieldStyle}>
+              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Nº Contrato</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{contratoVinculado.numero_contrato}</div>
+            </div>
+            <div style={fieldStyle}>
+              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Contratada</div>
+              <div style={{ fontSize: 13, color: '#f1f5f9' }}>{contratoVinculado.contratada_nome}</div>
+            </div>
+            <div style={fieldStyle}>
+              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Valor</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#22c55e' }}>{formatBRL(contratoVinculado.valor_atual)}</div>
+            </div>
+            <div style={fieldStyle}>
+              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Status</div>
+              <div style={{ fontSize: 13, color: '#f1f5f9' }}>{contratoVinculado.status}</div>
+            </div>
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Nenhum contrato vinculado a este processo.</p>
+        )}
+      </div>
+
       {/* Barra de alerta de atraso */}
       {etapasAtrasadas > 0 && (
         <div style={{
@@ -280,6 +384,26 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         <div style={cardStyle}>
           <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Observações</h3>
           <p style={{ fontSize: 13, color: '#cbd5e1', margin: 0 }}>{processo.observacoes}</p>
+        </div>
+      )}
+
+      {/* Documentos Gerados */}
+      {documentos.length > 0 && (
+        <div style={cardStyle}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <FileText size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} /> Documentos Gerados
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {documentos.map(d => (
+              <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(30,41,59,0.5)', borderRadius: 8 }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#f1f5f9' }}>{d.titulo_documento}</span>
+                  <span style={{ fontSize: 11, color: '#64748b', marginLeft: 8 }}>{d.created_at ? formatDate(d.created_at) : ''}</span>
+                </div>
+                <span style={{ fontSize: 11, color: '#60a5fa' }}>v{d.template_versions?.version_number || '—'}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -363,6 +487,17 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
         )}
       </div>
 
+      {/* Anotações Relacionadas */}
+      <RelatedNotes processoId={id} />
+
+      <GerarDocumentoModal
+        open={showDocModal}
+        onClose={() => setShowDocModal(false)}
+        processoId={id}
+        onGenerated={(doc) => {
+          setDocumentos(prev => [doc as unknown as DocumentGenerated, ...prev])
+        }}
+      />
       <DeleteConfirmDialog
         open={deleteTarget}
         onClose={() => { setDeleteTarget(false); setDeleting(false) }}

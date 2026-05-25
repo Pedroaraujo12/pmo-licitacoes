@@ -7,7 +7,7 @@ export async function generateStaticParams() {
     if (supabaseUrl && supabaseKey) {
       const { createClient } = await import('@supabase/supabase-js')
       const supabase = createClient(supabaseUrl, supabaseKey)
-      const { data } = await supabase.from('processos').select('id')
+      const { data } = await supabase.from('processos').select('id').limit(1000)
       if (data && data.length > 0) {
         return data.map(p => ({ id: p.id }))
       }

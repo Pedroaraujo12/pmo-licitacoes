@@ -12,11 +12,16 @@ export function formatBRL(v: unknown) {
   return cleanNum(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
+export function formatDateBR(dateString: string | null | undefined): string {
+  if (!dateString || dateString === 'None') return '-'
+  const [year, month, day] = dateString.split('T')[0].split('-').map(Number)
+  if (!year || !month || !day) return dateString
+  return new Date(year, month - 1, day).toLocaleDateString('pt-BR')
+}
+
 export function formatDate(d: string | null | undefined) {
   if (!d || d === 'None') return '-'
-  const date = new Date(d)
-  if (isNaN(date.getTime())) return d
-  return date.toLocaleDateString('pt-BR')
+  return formatDateBR(d)
 }
 
 export function getAging(dateStr: string | null | undefined, processo_atrasado?: boolean) {
@@ -33,7 +38,7 @@ export function getAging(dateStr: string | null | undefined, processo_atrasado?:
     }
   }
   if (processo_atrasado === true) return { label: 'Atrasado', class: 'aging-red' }
-  return { label: 'N/A', class: 'aging-gray' }
+  return { label: 'Não aplicável', class: 'aging-gray' }
 }
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -70,7 +75,7 @@ const CACHE_TTL = 60000
 
 export async function fetchAllSeiLinks(supabase: SupabaseClient): Promise<Record<string, string>> {
   if (seiLinksCache && Date.now() - seiLinksCache.ts < CACHE_TTL) return seiLinksCache.data
-  const { data } = await supabase.from('atividades').select('processo_id, observacao').eq('atividade', SEI_LINK_ATIVIDADE)
+  const { data } = await supabase.from('atividades').select('processo_id, observacao').eq('atividade', SEI_LINK_ATIVIDADE).limit(500)
   const map: Record<string, string> = {}
   for (const row of data || []) {
     if (row.observacao) map[row.processo_id] = row.observacao
@@ -81,19 +86,30 @@ export async function fetchAllSeiLinks(supabase: SupabaseClient): Promise<Record
 
 export function clearSeiLinksCache() { seiLinksCache = null }
 
+function csvEscape(value: unknown): string {
+  const s = value == null ? '' : String(value)
+  return `"${s.replace(/"/g, '""')}"`
+}
+
+function formatDateForFile(): string {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
 export function exportCSV(data: Record<string, unknown>[], filename = 'export') {
   if (data.length === 0) return
-  const headers = Object.keys(data[0])
-  const rows = data.map(row => headers.map(h => {
-    const val = row[h]
-    return `"${val === null || val === undefined ? '' : String(val)}"`
-  }))
-  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+  const delimiter = ';'
+  const headers = Object.keys(data)
+  const rows = data.map(row =>
+    headers.map(h => csvEscape(row[h])).join(delimiter)
+  )
+  const csv = [headers.join(delimiter), ...rows].join('\n')
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`
+  a.download = `${filename}_${formatDateForFile()}.csv`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

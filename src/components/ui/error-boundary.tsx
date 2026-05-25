@@ -5,33 +5,33 @@ import { Component } from 'react'
 interface Props {
   children: React.ReactNode
   fallback?: React.ReactNode
+  onError?: (error: Error) => void
 }
 
 interface State {
   hasError: boolean
-  error?: Error
 }
 
-export default class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false }
+export class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props)
+    this.state = { hasError: false }
+  }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn('[ErrorBoundary]', error.message)
+    this.props.onError?.(error)
   }
 
   render() {
     if (this.state.hasError) {
       return this.props.fallback || (
-        <div style={{ padding: 40, textAlign: 'center', color: '#ef4444' }}>
-          <p style={{ fontWeight: 600, marginBottom: 8 }}>Algo deu errado</p>
-          <p style={{ fontSize: 13, color: '#64748b' }}>{this.state.error?.message}</p>
-          <button
-            onClick={() => this.setState({ hasError: false, error: undefined })}
-            style={{
-              marginTop: 16, padding: '8px 20px', background: '#2563eb', color: '#fff',
-              border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13,
-            }}
-          >Tentar novamente</button>
+        <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+          Erro ao carregar este componente.
         </div>
       )
     }

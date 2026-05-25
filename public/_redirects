@@ -1,6 +1,43 @@
 # Cloudflare Pages SPA-style redirects for dynamic routes
+# Processos — específicas primeiro (maior prioridade)
 /pmo-dashboard/processos/novo /pmo-dashboard/processos/novo 200
 /pmo-dashboard/processos/placeholder /pmo-dashboard/processos/placeholder 200
 /pmo-dashboard/processos/placeholder/edit /pmo-dashboard/processos/placeholder/edit 200
 /pmo-dashboard/processos/editar /pmo-dashboard/processos/editar 200
+/pmo-dashboard/processos/*/edit /pmo-dashboard/processos/placeholder/edit 200
 /pmo-dashboard/processos/* /pmo-dashboard/processos/placeholder 200
+# Documentos
+/pmo-dashboard/documentos/novo /pmo-dashboard/documentos/novo 200
+/pmo-dashboard/documentos/placeholder /pmo-dashboard/documentos/placeholder 200
+/pmo-dashboard/documentos/* /pmo-dashboard/documentos/placeholder 200
+# Colaboradores
+/pmo-dashboard/colaboradores/novo /pmo-dashboard/colaboradores/novo 200
+/pmo-dashboard/colaboradores/placeholder /pmo-dashboard/colaboradores/placeholder 200
+/pmo-dashboard/colaboradores/aniversariantes /pmo-dashboard/colaboradores/aniversariantes 200
+/pmo-dashboard/colaboradores/* /pmo-dashboard/colaboradores/placeholder 200
+# Contratos
+/pmo-dashboard/contratos /pmo-dashboard/contratos 200
+/pmo-dashboard/contratos/lista /pmo-dashboard/contratos/lista 200
+/pmo-dashboard/contratos/relatorios /pmo-dashboard/contratos/relatorios 200
+/pmo-dashboard/contratos/vencimentos /pmo-dashboard/contratos/vencimentos 200
+/pmo-dashboard/contratos/novo /pmo-dashboard/contratos/novo 200
+/pmo-dashboard/contratos/placeholder /pmo-dashboard/contratos/placeholder 200
+/pmo-dashboard/contratos/placeholder/editar /pmo-dashboard/contratos/placeholder/editar 200
+/pmo-dashboard/contratos/placeholder/ordens-servico /pmo-dashboard/contratos/placeholder/ordens-servico 200
+/pmo-dashboard/contratos/placeholder/aditivos /pmo-dashboard/contratos/placeholder/aditivos 200
+/pmo-dashboard/contratos/placeholder/medicoes /pmo-dashboard/contratos/placeholder/medicoes 200
+/pmo-dashboard/contratos/placeholder/pagamentos /pmo-dashboard/contratos/placeholder/pagamentos 200
+/pmo-dashboard/contratos/*/editar /pmo-dashboard/contratos/placeholder/editar 200
+/pmo-dashboard/contratos/*/ordens-servico /pmo-dashboard/contratos/placeholder/ordens-servico 200
+/pmo-dashboard/contratos/*/aditivos /pmo-dashboard/contratos/placeholder/aditivos 200
+/pmo-dashboard/contratos/*/medicoes /pmo-dashboard/contratos/placeholder/medicoes 200
+/pmo-dashboard/contratos/*/pagamentos /pmo-dashboard/contratos/placeholder/pagamentos 200
+/pmo-dashboard/contratos/* /pmo-dashboard/contratos/placeholder 200
+# Ordens de Serviço
+/pmo-dashboard/ordens-servico /pmo-dashboard/ordens-servico 200
+/pmo-dashboard/ordens-servico/nova /pmo-dashboard/ordens-servico/nova 200
+/pmo-dashboard/ordens-servico/placeholder /pmo-dashboard/ordens-servico/placeholder 200
+/pmo-dashboard/ordens-servico/* /pmo-dashboard/ordens-servico/placeholder 200
+# Notas — sem rotas dinâmicas
+/pmo-dashboard/notas/hoje /pmo-dashboard/notas/hoje 200
+/pmo-dashboard/notas/* /pmo-dashboard/notas 200
