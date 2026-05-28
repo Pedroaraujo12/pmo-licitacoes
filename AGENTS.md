@@ -10,7 +10,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ```bash
 npm run lint      # 0 errors, 0 warnings
 npm run typecheck # 0 errors
-npm run test      # 186 tests, all pass
+npm run test      # 200 tests, all pass
 npm run coverage  # ~79% stmts, 86% lines
 npm run build     # static export must succeed
 ```
