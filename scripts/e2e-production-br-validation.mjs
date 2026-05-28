@@ -68,6 +68,22 @@ try {
 
   await login()
   await assertLoaded('dashboard')
+  const fluxoHeaders = await page.evaluate(() => {
+    const title = Array.from(document.querySelectorAll('h2'))
+      .find(node => node.textContent?.trim() === 'Fluxo de Execução')
+    const card = title?.closest('.glass-card')
+    return Array.from(card?.querySelectorAll('thead th') || [])
+      .map(node => node.textContent?.trim() || '')
+  })
+  console.log('fluxo-execucao-headers:', JSON.stringify(fluxoHeaders))
+  if (!fluxoHeaders.includes('Atividade Atual')) {
+    throw new Error('Fluxo de Execução não exibiu a coluna Atividade Atual')
+  }
+  for (const removedHeader of ['Status', 'Prior.', 'Responsável', 'Data']) {
+    if (fluxoHeaders.includes(removedHeader)) {
+      throw new Error(`Fluxo de Execução ainda exibiu a coluna removida: ${removedHeader}`)
+    }
+  }
 
   await page.goto(`${base}/pmo-dashboard/colaboradores/novo`, { waitUntil: 'networkidle', timeout: 60000 })
   await assertLoaded('colaboradores-novo')

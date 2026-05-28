@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Edit, Trash2, ExternalLink, AlertTriangle, Download } from 'lucide-react'
 import DeleteConfirmDialog from '@/components/ui/delete-confirm-dialog'
-import { formatBRL, formatDate, getAging, exportCSV, fetchAllSeiLinks } from '@/lib/utils'
+import { formatBRL, exportCSV, fetchAllSeiLinks } from '@/lib/utils'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useToast } from '@/components/ui/toast'
 import Pagination from '@/components/ui/pagination'
@@ -56,6 +56,7 @@ interface ProcessoRow {
   valor_estimado: number
   valor_homologado: number
   prioridade: string
+  atividade_atual: string | null
   status_nome: string
   modalidade_nome: string
   responsavel_nome: string
@@ -392,10 +393,8 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                   onClick={() => exportCSV(rows.map(p => ({
                     'ID Processo': p.id_processo || '',
                     'Objeto': p.objeto_resumido || '',
+                    'Atividade Atual': p.atividade_atual || '',
                     'Valor Estimado': p.valor_estimado,
-                    'Status': p.status_nome || '',
-                    'Responsável': p.responsavel_nome || '',
-                    'Data': p.data_entrega,
                   })), 'processos_dashboard')}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-1 rounded text-[9px] font-bold transition cursor-pointer border-none flex items-center gap-1"
                 >
@@ -409,11 +408,8 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
               <thead className="sticky top-0 bg-[#1e293b] z-10 shadow-sm">
                 <tr className="text-[9px] font-black uppercase text-slate-500 border-b border-white/10 tracking-tighter">
                   <th scope="col" style={{ width: '15%', padding: '12px 8px' }}>ID Processo</th>
-                  <th scope="col" style={{ width: '22%', padding: '12px 8px' }}>Objeto / Serviço</th>
-                  <th scope="col" style={{ width: '18%', padding: '12px 8px' }}>Status</th>
-                  <th scope="col" style={{ width: '10%', padding: '12px 8px', textAlign: 'center' }}>Prior.</th>
-                  <th scope="col" style={{ width: '12%', padding: '12px 8px', textAlign: 'center' }}>Responsável</th>
-                  <th scope="col" style={{ width: '10%', padding: '12px 8px', textAlign: 'center' }}>Data</th>
+                  <th scope="col" style={{ width: '25%', padding: '12px 8px' }}>Objeto / Serviço</th>
+                  <th scope="col" style={{ width: canEdit ? '32%' : '45%', padding: '12px 8px' }}>Atividade Atual</th>
                   <th scope="col" style={{ width: '13%', padding: '12px 8px', textAlign: 'right' }}>Estimado</th>
                   {canEdit && <th scope="col" style={{ width: '15%', padding: '12px 8px', textAlign: 'center' }}>Ações</th>}
                 </tr>
@@ -424,16 +420,12 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                     <tr key={i} className="animate-pulse">
                       <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-16" /></td>
                       <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-32" /></td>
-                      <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-20" /></td>
-                      <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-12 mx-auto" /></td>
-                      <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-16 mx-auto" /></td>
-                      <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-14 mx-auto" /></td>
+                      <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-40" /></td>
                       <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-16 ml-auto" /></td>
                       {canEdit && <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-12 mx-auto" /></td>}
                     </tr>
                   ))
                 ) : rows.map(p => {
-                  const ag = getAging(p.data_entrega)
                   return (
                     <tr key={p.id} onClick={() => setModalProcesso(p)} className="hover:bg-white/5 transition cursor-pointer">
                       <td className="px-2 py-3 font-bold text-blue-400 truncate">
@@ -465,26 +457,12 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                         </button>
                       </td>
                       <td className="px-2 py-3">
-                        <div className="text-slate-300 truncate">{p.status_nome || '-'}</div>
-                      </td>
-                      <td className="px-2 py-3 text-center">
-                        {p.prioridade ? (
-                          <span style={{
-                            fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6,
-                            background: p.prioridade === 'Urgente' ? 'rgba(239,68,68,0.2)' :
-                              p.prioridade === 'Alta' ? 'rgba(249,115,22,0.2)' :
-                              p.prioridade === 'Média' ? 'rgba(234,179,8,0.2)' : 'rgba(34,197,94,0.2)',
-                            color: p.prioridade === 'Urgente' ? '#fca5a5' :
-                              p.prioridade === 'Alta' ? '#fdba74' :
-                              p.prioridade === 'Média' ? '#fde047' : '#86efac',
-                          }}>{p.prioridade}</span>
-                        ) : <span style={{ color: '#475569' }}>—</span>}
-                      </td>
-                      <td className="px-2 py-3 text-center">
-                        <span style={{ color: '#94a3b8', fontSize: 10 }}>{p.responsavel_nome || '-'}</span>
-                      </td>
-                      <td className="px-2 py-3 text-center">
-                        <span className={`aging-badge ${ag.class}`}>{formatDate(p.data_entrega)}</span>
+                        <div
+                          className="font-semibold text-slate-200 truncate"
+                          title={p.atividade_atual || 'Sem atividade atual'}
+                        >
+                          {p.atividade_atual || 'Sem atividade atual'}
+                        </div>
                       </td>
                       <td className="px-2 py-3 text-right font-bold text-slate-100">
                         {formatBRL(p.valor_estimado)}
@@ -514,7 +492,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                 })}
                 {!loadingRows && rows.length === 0 && (
                   <tr>
-                    <td colSpan={canEdit ? 8 : 7} className="p-10 text-center opacity-30 uppercase font-black tracking-widest text-[10px]">Sem dados</td>
+                    <td colSpan={canEdit ? 5 : 4} className="p-10 text-center opacity-30 uppercase font-black tracking-widest text-[10px]">Sem dados</td>
                   </tr>
                 )}
               </tbody>
@@ -673,11 +651,6 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           color: #cbd5e1; outline: none;
         }
         .filter-select:focus { border-color: rgba(59, 130, 246, 0.5); }
-        .aging-badge { font-size: 8px; padding: 2px 6px; border-radius: 4px; font-weight: 900; text-transform: uppercase; white-space: nowrap; }
-        .aging-red { background-color: #ef4444; color: white; }
-        .aging-yellow { background-color: #eab308; color: black; }
-        .aging-green { background-color: #22c55e; color: white; }
-        .aging-gray { background-color: #475569; color: #cbd5e1; }
       `}</style>
     </div>
   )
