@@ -56,6 +56,16 @@ async function login() {
 }
 
 try {
+  await page.goto(`${base}/reset-password`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+  await assertLoaded('reset-password-invalid-link')
+  const invalidResetVisible = await page.getByText('Link de redefinição inválido ou expirado.').isVisible()
+  const invalidResetDisabled = await page.getByRole('button', { name: 'Link inválido' }).isVisible()
+  console.log('reset-invalid-link-visible:', invalidResetVisible)
+  console.log('reset-invalid-link-disabled:', invalidResetDisabled)
+  if (!invalidResetVisible || !invalidResetDisabled) {
+    throw new Error('Reset de senha sem token não bloqueou envio com erro claro')
+  }
+
   await login()
   await assertLoaded('dashboard')
 
@@ -150,6 +160,25 @@ try {
       if (saveError) throw new Error('Erro ao salvar alterações ainda aparece na edição de colaborador')
     }
   }
+
+  await page.goto(`${base}/pmo-dashboard`, { waitUntil: 'networkidle', timeout: 60000 })
+  await assertLoaded('dashboard-before-logout')
+  const logoutButton = page.getByRole('button', { name: 'Sair' })
+  if (await logoutButton.count()) {
+    await logoutButton.first().click()
+    await page.waitForTimeout(1500)
+  } else {
+    throw new Error('Botão de logout não encontrado')
+  }
+  const loggedOut = page.url().includes('/login')
+  console.log('logout-redirected-login:', loggedOut)
+  if (!loggedOut) throw new Error(`Logout não redirecionou para login: ${page.url()}`)
+
+  await page.goto(`${base}/pmo-dashboard`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+  await page.waitForTimeout(2500)
+  const protectedRedirected = page.url().includes('/login')
+  console.log('protected-route-after-logout:', protectedRedirected)
+  if (!protectedRedirected) throw new Error(`Rota protegida acessível após logout: ${page.url()}`)
 
   console.log('FINDINGS_TOTAL=' + findings.length)
   console.log('FINDINGS_JSON=' + JSON.stringify(findings, null, 2))

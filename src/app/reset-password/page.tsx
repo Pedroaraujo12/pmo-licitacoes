@@ -11,6 +11,7 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
+  const [resetSessionReady, setResetSessionReady] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
 
   useEffect(() => {
@@ -23,8 +24,9 @@ export default function ResetPasswordPage() {
         const code = params.get('code')
 
         if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
           if (error && !cancelled) setMessage({ type: 'error', text: translateAuthError(error.message) })
+          if (!error && data.session && !cancelled) setResetSessionReady(true)
           return
         }
 
@@ -32,11 +34,17 @@ export default function ResetPasswordPage() {
         const accessToken = hashParams.get('access_token')
         const refreshToken = hashParams.get('refresh_token')
         if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
+          const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           })
           if (error && !cancelled) setMessage({ type: 'error', text: translateAuthError(error.message) })
+          if (!error && data.session && !cancelled) setResetSessionReady(true)
+          return
+        }
+
+        if (!cancelled) {
+          setMessage({ type: 'error', text: 'Link de redefinição inválido ou expirado.' })
         }
       } catch {
         if (!cancelled) setMessage({ type: 'error', text: 'Link de redefinição inválido ou expirado.' })
@@ -52,6 +60,10 @@ export default function ResetPasswordPage() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
 
+    if (!resetSessionReady) {
+      setMessage({ type: 'error', text: 'Link de redefinição inválido ou expirado.' })
+      return
+    }
     if (password.length < 8) {
       setMessage({ type: 'error', text: 'A senha deve ter pelo menos 8 caracteres.' })
       return
@@ -173,20 +185,20 @@ export default function ResetPasswordPage() {
 
           <button
             type="submit"
-            disabled={loading || checkingSession}
+            disabled={loading || checkingSession || !resetSessionReady}
             style={{
               width: '100%',
               padding: '12px',
-              background: loading || checkingSession ? '#1d4ed8' : '#2563eb',
+              background: loading || checkingSession || !resetSessionReady ? '#1d4ed8' : '#2563eb',
               color: '#fff',
               border: 'none',
               borderRadius: 8,
               fontSize: 15,
               fontWeight: 600,
-              cursor: loading || checkingSession ? 'not-allowed' : 'pointer',
+              cursor: loading || checkingSession || !resetSessionReady ? 'not-allowed' : 'pointer',
             }}
           >
-            {checkingSession ? 'Validando link...' : loading ? 'Atualizando...' : 'Atualizar senha'}
+            {checkingSession ? 'Validando link...' : !resetSessionReady ? 'Link inválido' : loading ? 'Atualizando...' : 'Atualizar senha'}
           </button>
         </form>
       </div>
