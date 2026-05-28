@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getContrato } from '@/lib/contratos'
 import { listPagamentos, createPagamento } from '@/lib/contrato-pagamentos'
-import { formatDateBR, formatBRL } from '@/lib/utils'
+import { cleanNum, formatDateBR, formatBRL, parseDateInputBR } from '@/lib/utils'
 import { PAGAMENTO_STATUS_RECORDS } from '@/types/contratos'
 import type { Contrato, ContratoPagamento, PagamentoStatus } from '@/types/contratos'
 import { ArrowLeft, Plus, Save, X } from 'lucide-react'
@@ -28,6 +28,7 @@ export default function PagamentosClient({ params }: { params: Promise<{ id: str
   const paramsId = use(params).id
   const [id, setId] = useState(paramsId)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const { toast } = useToast()
   const [contrato, setContrato] = useState<Contrato | null>(null)
@@ -43,6 +44,11 @@ export default function PagamentosClient({ params }: { params: Promise<{ id: str
   useEffect(() => {
     async function load() {
       const currentId = id
+      const queryId = searchParams.get('id')
+      if (queryId && queryId !== currentId) {
+        setId(queryId)
+        return
+      }
       if (currentId === 'placeholder') {
         const m = window.location.pathname.match(/\/contratos\/([a-f0-9-]+)\/pagamentos/)
         if (m && m[1] !== 'placeholder') {
@@ -59,24 +65,39 @@ export default function PagamentosClient({ params }: { params: Promise<{ id: str
       setLoading(false)
     }
     load()
-  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!form.numero_nota_fiscal.trim()) return
     setSaving(true)
     try {
+      const dataEmissao = parseDateInputBR(form.data_emissao_nf)
+      const dataVencimento = parseDateInputBR(form.data_vencimento)
+      const dataPagamento = parseDateInputBR(form.data_pagamento)
+      if (form.data_emissao_nf && !dataEmissao) {
+        toast('Emissão NF inválida. Use dd/mm/aaaa.', 'error')
+        return
+      }
+      if (form.data_vencimento && !dataVencimento) {
+        toast('Vencimento inválido. Use dd/mm/aaaa.', 'error')
+        return
+      }
+      if (form.data_pagamento && !dataPagamento) {
+        toast('Data de pagamento inválida. Use dd/mm/aaaa.', 'error')
+        return
+      }
       const { data: { user } } = await supabase.auth.getUser()
       const payload = {
         contrato_id: id,
         ordem_servico_id: null,
         medicao_id: null,
         numero_nota_fiscal: form.numero_nota_fiscal.trim(),
-        valor: Number(form.valor) || 0,
-        data_emissao_nf: form.data_emissao_nf || null,
-        data_vencimento: form.data_vencimento || null,
+        valor: cleanNum(form.valor),
+        data_emissao_nf: dataEmissao,
+        data_vencimento: dataVencimento,
         data_atesto: null,
-        data_pagamento: form.data_pagamento || null,
+        data_pagamento: dataPagamento,
         status: form.status as PagamentoStatus,
         observacoes: null,
         created_by: user?.id || null,
@@ -110,7 +131,7 @@ export default function PagamentosClient({ params }: { params: Promise<{ id: str
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => router.push(`/pmo-dashboard/contratos/${id}`)}
+        <button onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${id}`)}
           style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
           <ArrowLeft size={20} />
         </button>
@@ -146,19 +167,19 @@ export default function PagamentosClient({ params }: { params: Promise<{ id: str
             </div>
             <div>
               <label style={labelStyle}>Valor</label>
-              <input type="number" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: e.target.value }))} style={baseInput} />
+              <input value={form.valor} onChange={e => setForm(f => ({ ...f, valor: e.target.value }))} style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Emissão NF</label>
-              <input type="date" value={form.data_emissao_nf} onChange={e => setForm(f => ({ ...f, data_emissao_nf: e.target.value }))} style={baseInput} />
+              <input value={form.data_emissao_nf} onChange={e => setForm(f => ({ ...f, data_emissao_nf: e.target.value }))} placeholder="dd/mm/aaaa" style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Vencimento</label>
-              <input type="date" value={form.data_vencimento} onChange={e => setForm(f => ({ ...f, data_vencimento: e.target.value }))} style={baseInput} />
+              <input value={form.data_vencimento} onChange={e => setForm(f => ({ ...f, data_vencimento: e.target.value }))} placeholder="dd/mm/aaaa" style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Data Pagamento</label>
-              <input type="date" value={form.data_pagamento} onChange={e => setForm(f => ({ ...f, data_pagamento: e.target.value }))} style={baseInput} />
+              <input value={form.data_pagamento} onChange={e => setForm(f => ({ ...f, data_pagamento: e.target.value }))} placeholder="dd/mm/aaaa" style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Status</label>

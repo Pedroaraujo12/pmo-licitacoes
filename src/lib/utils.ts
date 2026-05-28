@@ -1,15 +1,21 @@
 export function cleanNum(v: unknown): number {
   if (!v) return 0
   if (typeof v === 'number') return v
-  const s = String(v).replace('R$', '').trim()
+  const s = String(v).replace('R$', '').replace(/\s/g, '').trim()
+  if (!s) return 0
   if (s.includes(',') && !s.includes('e')) {
     return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0
+  }
+  if ((s.match(/\./g) || []).length > 1) {
+    return parseFloat(s.replace(/\./g, '')) || 0
   }
   return parseFloat(s) || 0
 }
 
 export function formatBRL(v: unknown) {
-  return cleanNum(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  return cleanNum(v)
+    .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    .replace(/\u00a0/g, ' ')
 }
 
 export function formatDateBR(dateString: string | null | undefined): string {
@@ -22,6 +28,46 @@ export function formatDateBR(dateString: string | null | undefined): string {
 export function formatDate(d: string | null | undefined) {
   if (!d || d === 'None') return '-'
   return formatDateBR(d)
+}
+
+export function formatDateInputBR(dateString: string | null | undefined): string {
+  const formatted = formatDateBR(dateString)
+  return formatted === '-' ? '' : formatted
+}
+
+export function parseDateBR(value: string | null | undefined): string | null {
+  if (!value) return null
+  const raw = value.trim()
+  if (!raw) return null
+
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+
+  const br = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (!br) return null
+
+  const day = Number(br[1])
+  const month = Number(br[2])
+  const year = Number(br[3])
+  const date = new Date(year, month - 1, day)
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null
+  }
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${year}-${pad(month)}-${pad(day)}`
+}
+
+export function parseDateInputBR(value: string | null | undefined): string | null {
+  if (!value) return null
+  const raw = value.trim()
+  if (!raw) return null
+  if (!/^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(raw)) return null
+  return parseDateBR(raw)
 }
 
 export function getAging(dateStr: string | null | undefined, processo_atrasado?: boolean) {

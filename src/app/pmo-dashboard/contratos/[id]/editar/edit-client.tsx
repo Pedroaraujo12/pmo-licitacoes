@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getContrato, updateContrato } from '@/lib/contratos'
+import { cleanNum, formatBRL } from '@/lib/utils'
 import { CONTRATO_STATUS_RECORDS } from '@/types/contratos'
 import type { Contrato } from '@/types/contratos'
 import { ArrowLeft, Save } from 'lucide-react'
@@ -22,10 +23,11 @@ const cardStyle: React.CSSProperties = {
   borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', padding: 24, marginBottom: 16,
 }
 
-export default function EditContratoClient({ params }: { params: Promise<{ id: string }> }) {
-  const paramsId = use(params).id
+export default function EditContratoClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
+  const paramsId = idOverride ?? (params ? use(params).id : '')
   const [id, setId] = useState(paramsId)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const { toast } = useToast()
   const [contrato, setContrato] = useState<Contrato | null>(null)
@@ -37,6 +39,11 @@ export default function EditContratoClient({ params }: { params: Promise<{ id: s
   useEffect(() => {
     async function load() {
       const currentId = id
+      const queryId = searchParams.get('id')
+      if (queryId && queryId !== currentId) {
+        setId(queryId)
+        return
+      }
       if (currentId === 'placeholder') {
         const m = window.location.pathname.match(/\/contratos\/([a-f0-9-]+)\/editar/)
         if (m && m[1] !== 'placeholder') {
@@ -49,14 +56,18 @@ export default function EditContratoClient({ params }: { params: Promise<{ id: s
         setContrato(data)
         const f: Record<string, string> = {}
         for (const [key, value] of Object.entries(data)) {
-          f[key] = value === null || value === undefined ? '' : String(value)
+          f[key] = value === null || value === undefined
+            ? ''
+            : ['valor_inicial', 'valor_atual', 'valor_executado', 'valor_pago'].includes(key)
+              ? formatBRL(value)
+              : String(value)
         }
         setForm(f)
       }
       setLoading(false)
     }
     load()
-  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -71,7 +82,9 @@ export default function EditContratoClient({ params }: { params: Promise<{ id: s
           payload[key] = null
           continue
         }
-        if (['valor_inicial', 'valor_atual', 'valor_executado', 'valor_pago', 'ano'].includes(key)) {
+        if (['valor_inicial', 'valor_atual', 'valor_executado', 'valor_pago'].includes(key)) {
+          payload[key] = cleanNum(value)
+        } else if (key === 'ano') {
           payload[key] = Number(value)
         } else if (key === 'permite_renovacao' || key === 'permite_aditivo' || key === 'tem_garantia' || key === 'tem_ordem_servico' || key === 'execucao_continua' || key === 'emergencial') {
           payload[key] = value === 'true'
@@ -81,7 +94,7 @@ export default function EditContratoClient({ params }: { params: Promise<{ id: s
       }
       await updateContrato(supabase, id, payload as Partial<Contrato>)
       toast('Contrato atualizado com sucesso', 'success')
-      router.push(`/pmo-dashboard/contratos/${id}`)
+      router.push(`/pmo-dashboard/contratos/detalhe?id=${id}`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao atualizar contrato'
       setError(msg)
@@ -141,7 +154,7 @@ export default function EditContratoClient({ params }: { params: Promise<{ id: s
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => router.push(`/pmo-dashboard/contratos/${id}`)}
+        <button onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${id}`)}
           style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
           <ArrowLeft size={20} />
         </button>
@@ -179,10 +192,10 @@ export default function EditContratoClient({ params }: { params: Promise<{ id: s
         <div style={cardStyle}>
           <h3 style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', margin: '0 0 16px', textTransform: 'uppercase' }}>Valores</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            {renderField('Valor Inicial', 'valor_inicial', 'number')}
-            {renderField('Valor Atual', 'valor_atual', 'number')}
-            {renderField('Valor Executado', 'valor_executado', 'number')}
-            {renderField('Valor Pago', 'valor_pago', 'number')}
+            {renderField('Valor Inicial', 'valor_inicial')}
+            {renderField('Valor Atual', 'valor_atual')}
+            {renderField('Valor Executado', 'valor_executado')}
+            {renderField('Valor Pago', 'valor_pago')}
           </div>
         </div>
 
@@ -224,7 +237,7 @@ export default function EditContratoClient({ params }: { params: Promise<{ id: s
         </div>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" onClick={() => router.push(`/pmo-dashboard/contratos/${id}`)}
+          <button type="button" onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${id}`)}
             style={{ padding: '10px 20px', background: '#334155', color: '#f1f5f9', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
             Cancelar
           </button>

@@ -13,6 +13,7 @@ import {
 } from '@/types/notes'
 import { createNote, updateNote } from '@/lib/notes'
 import { createClient } from '@/lib/supabase/client'
+import { formatDateInputBR, parseDateInputBR } from '@/lib/utils'
 
 interface NoteModalProps {
   note?: Note | null
@@ -56,7 +57,7 @@ export default function NoteModal({
       setColaboradorId(note.colaborador_id ?? '')
       if (note.reminder_at) {
         const d = new Date(note.reminder_at)
-        setReminderDate(d.toISOString().slice(0, 10))
+        setReminderDate(formatDateInputBR(d.toISOString().slice(0, 10)))
         setReminderTime(d.toISOString().slice(11, 16))
       } else {
         setReminderDate('')
@@ -107,9 +108,15 @@ export default function NoteModal({
 
     let reminder_at: string | null = null
     if (reminderDate) {
+      const parsedReminderDate = parseDateInputBR(reminderDate)
+      if (!parsedReminderDate) {
+        setErrorMsg('Data do lembrete inválida. Use dd/mm/aaaa.')
+        setSaving(false)
+        return
+      }
       reminder_at = reminderTime
-        ? `${reminderDate}T${reminderTime}:00`
-        : `${reminderDate}T23:59:00`
+        ? `${parsedReminderDate}T${reminderTime}:00`
+        : `${parsedReminderDate}T23:59:00`
     }
 
     const payload: NoteInsert = {
@@ -223,9 +230,9 @@ export default function NoteModal({
             <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Lembrete:</span>
             <div className="flex gap-2">
               <input
-                type="date"
                 value={reminderDate}
                 onChange={e => setReminderDate(e.target.value)}
+                placeholder="dd/mm/aaaa"
                 className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
               <input

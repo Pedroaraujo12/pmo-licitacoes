@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getContrato } from '@/lib/contratos'
 import { listAditivos, createAditivo } from '@/lib/contrato-aditivos'
-import { formatDateBR, formatBRL } from '@/lib/utils'
+import { cleanNum, formatDateBR, formatBRL, parseDateInputBR } from '@/lib/utils'
 import { ADITIVO_TIPO_RECORDS } from '@/types/contratos'
 import type { Contrato, ContratoAditivo, AditivoTipo } from '@/types/contratos'
 import { ArrowLeft, Plus, Save, X } from 'lucide-react'
@@ -28,6 +28,7 @@ export default function AditivosClient({ params }: { params: Promise<{ id: strin
   const paramsId = use(params).id
   const [id, setId] = useState(paramsId)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const { toast } = useToast()
   const [contrato, setContrato] = useState<Contrato | null>(null)
@@ -44,6 +45,11 @@ export default function AditivosClient({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     async function load() {
       const currentId = id
+      const queryId = searchParams.get('id')
+      if (queryId && queryId !== currentId) {
+        setId(queryId)
+        return
+      }
       if (currentId === 'placeholder') {
         const m = window.location.pathname.match(/\/contratos\/([a-f0-9-]+)\/aditivos/)
         if (m && m[1] !== 'placeholder') {
@@ -60,23 +66,33 @@ export default function AditivosClient({ params }: { params: Promise<{ id: strin
       setLoading(false)
     }
     load()
-  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!form.numero_aditivo.trim()) return
     setSaving(true)
     try {
+      const dataAssinatura = parseDateInputBR(form.data_assinatura)
+      const dataPublicacao = parseDateInputBR(form.data_publicacao)
+      if (form.data_assinatura && !dataAssinatura) {
+        toast('Data de assinatura inválida. Use dd/mm/aaaa.', 'error')
+        return
+      }
+      if (form.data_publicacao && !dataPublicacao) {
+        toast('Data de publicação inválida. Use dd/mm/aaaa.', 'error')
+        return
+      }
       const { data: { user } } = await supabase.auth.getUser()
       const payload = {
         contrato_id: id,
         numero_aditivo: form.numero_aditivo.trim(),
         tipo: form.tipo as AditivoTipo,
-        valor_anterior: Number(form.valor_anterior) || 0,
-        valor_alteracao: Number(form.valor_alteracao) || 0,
-        valor_novo: Number(form.valor_novo) || 0,
-        data_assinatura: form.data_assinatura || null,
-        data_publicacao: form.data_publicacao || null,
+        valor_anterior: cleanNum(form.valor_anterior),
+        valor_alteracao: cleanNum(form.valor_alteracao),
+        valor_novo: cleanNum(form.valor_novo),
+        data_assinatura: dataAssinatura,
+        data_publicacao: dataPublicacao,
         justificativa: form.justificativa || null,
         status: form.status,
         created_by: user?.id || null,
@@ -110,7 +126,7 @@ export default function AditivosClient({ params }: { params: Promise<{ id: strin
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => router.push(`/pmo-dashboard/contratos/${id}`)}
+        <button onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${id}`)}
           style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
           <ArrowLeft size={20} />
         </button>
@@ -154,23 +170,23 @@ export default function AditivosClient({ params }: { params: Promise<{ id: strin
             </div>
             <div>
               <label style={labelStyle}>Valor Anterior</label>
-              <input type="number" value={form.valor_anterior} onChange={e => setForm(f => ({ ...f, valor_anterior: e.target.value }))} style={baseInput} />
+              <input value={form.valor_anterior} onChange={e => setForm(f => ({ ...f, valor_anterior: e.target.value }))} style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Valor Alteração</label>
-              <input type="number" value={form.valor_alteracao} onChange={e => setForm(f => ({ ...f, valor_alteracao: e.target.value }))} style={baseInput} />
+              <input value={form.valor_alteracao} onChange={e => setForm(f => ({ ...f, valor_alteracao: e.target.value }))} style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Valor Novo</label>
-              <input type="number" value={form.valor_novo} onChange={e => setForm(f => ({ ...f, valor_novo: e.target.value }))} style={baseInput} />
+              <input value={form.valor_novo} onChange={e => setForm(f => ({ ...f, valor_novo: e.target.value }))} style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Data Assinatura</label>
-              <input type="date" value={form.data_assinatura} onChange={e => setForm(f => ({ ...f, data_assinatura: e.target.value }))} style={baseInput} />
+              <input value={form.data_assinatura} onChange={e => setForm(f => ({ ...f, data_assinatura: e.target.value }))} placeholder="dd/mm/aaaa" style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Data Publicação</label>
-              <input type="date" value={form.data_publicacao} onChange={e => setForm(f => ({ ...f, data_publicacao: e.target.value }))} style={baseInput} />
+              <input value={form.data_publicacao} onChange={e => setForm(f => ({ ...f, data_publicacao: e.target.value }))} placeholder="dd/mm/aaaa" style={baseInput} />
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>

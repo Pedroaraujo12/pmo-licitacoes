@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { formatDateBR, formatDate, cleanNum, formatBRL, getAging, exportCSV, clearSeiLinksCache, fetchAllSeiLinks, fetchSeiLink, upsertSeiLink } from '../utils'
+import { formatDateBR, formatDate, formatDateInputBR, parseDateBR, parseDateInputBR, cleanNum, formatBRL, getAging, exportCSV, clearSeiLinksCache, fetchAllSeiLinks, fetchSeiLink, upsertSeiLink } from '../utils'
 
 describe('formatDateBR', () => {
   it('preserva dia em date-only YYYY-MM-DD', () => {
@@ -58,9 +58,47 @@ describe('formatDate', () => {
   })
 })
 
+describe('formatDateInputBR', () => {
+  it('formata date-only para edição em padrão brasileiro', () => {
+    expect(formatDateInputBR('1988-05-27')).toBe('27/05/1988')
+  })
+})
+
+describe('parseDateBR', () => {
+  it('converte dd/mm/aaaa para ISO date-only', () => {
+    expect(parseDateBR('27/05/1988')).toBe('1988-05-27')
+  })
+
+  it('mantém ISO date-only válido', () => {
+    expect(parseDateBR('1988-05-27')).toBe('1988-05-27')
+  })
+
+  it('rejeita data inválida', () => {
+    expect(parseDateBR('31/02/2026')).toBeNull()
+  })
+})
+
+describe('parseDateInputBR', () => {
+  it('aceita campo digitado em dd/mm/aaaa', () => {
+    expect(parseDateInputBR('27/05/1988')).toBe('1988-05-27')
+  })
+
+  it('rejeita ISO date-only em campos digitáveis', () => {
+    expect(parseDateInputBR('1988-05-27')).toBeNull()
+  })
+
+  it('rejeita data inexistente', () => {
+    expect(parseDateInputBR('31/02/2026')).toBeNull()
+  })
+})
+
 describe('cleanNum', () => {
   it('limpa formato brasileiro', () => {
     expect(cleanNum('R$ 1.234,56')).toBe(1234.56)
+  })
+
+  it('limpa valores monetários grandes no padrão brasileiro', () => {
+    expect(cleanNum('R$ 4.352.562,20')).toBe(4352562.2)
   })
 
   it('retorna 0 para null', () => {
@@ -74,7 +112,11 @@ describe('cleanNum', () => {
 
 describe('formatBRL', () => {
   it('formata valor em reais', () => {
-    expect(formatBRL(1234.56)).toBe('R$ 1.234,56')
+    expect(formatBRL(1234.56)).toBe('R$ 1.234,56')
+  })
+
+  it('usa separadores brasileiros para valores grandes', () => {
+    expect(formatBRL(4352562.2)).toBe('R$ 4.352.562,20')
   })
 })
 

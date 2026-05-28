@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type React from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { createColaborador } from '@/lib/colaboradores'
+import { parseDateInputBR } from '@/lib/utils'
 import { ArrowLeft, Save } from 'lucide-react'
 import { REGIME_LABELS, SITUACAO_LABELS } from '@/types/colaboradores'
 
@@ -39,8 +40,8 @@ function Field({ label, formKey, type = 'text', required, form, setForm }: {
           <option value="F">Feminino</option>
         </select>
       ) : (
-        <input type={type} value={form[formKey]} onChange={e => setForm(prev => ({ ...prev, [formKey]: e.target.value }))}
-          placeholder={label} style={baseInput} />
+        <input type={type === 'date' ? 'text' : type} value={form[formKey]} onChange={e => setForm(prev => ({ ...prev, [formKey]: e.target.value }))}
+          placeholder={type === 'date' ? 'dd/mm/aaaa' : label} style={baseInput} />
       )}
     </div>
   )
@@ -73,13 +74,25 @@ export default function NovoColaboradorPage() {
     setSaving(true)
     setError('')
     try {
+      const dataNascimento = parseDateInputBR(form.data_nascimento)
+      const dataAdmissao = parseDateInputBR(form.data_admissao)
+      if (!dataNascimento) {
+        setError('Data de nascimento inválida. Use dd/mm/aaaa.')
+        return
+      }
+      if (form.data_admissao && !dataAdmissao) {
+        setError('Data de admissão inválida. Use dd/mm/aaaa.')
+        return
+      }
       const data: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(form)) {
         data[k] = v || null
       }
+      data.data_nascimento = dataNascimento
+      data.data_admissao = dataAdmissao
       if (data.cpf) data.cpf = (data.cpf as string).replace(/\D/g, '')
       const colab = await createColaborador(supabase, data as Parameters<typeof createColaborador>[1])
-      router.push(`/pmo-dashboard/colaboradores/${colab.id}`)
+      router.push(`/pmo-dashboard/colaboradores/detalhe?id=${colab.id}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao criar colaborador')
     }

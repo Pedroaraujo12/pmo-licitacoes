@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, use, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { formatDateBR } from '@/lib/utils'
+import { formatDateBR, formatDateInputBR, parseDateInputBR } from '@/lib/utils'
 import {
   getColaborador, updateColaborador, deleteColaborador, toggleFavorito, isFavorito,
   vincularUsuario, desvincularUsuario, listProcessosColaborador, listUsersWithoutColaborador,
@@ -35,7 +35,15 @@ function Field({ label, value, displayValue, formKey, editing, form, setForm }: 
   editing: boolean
   form: Record<string, string>
   setForm: (f: Record<string, string>) => void
+  inputType?: 'date'
 }) {
+  function handleTextChange(value: string) {
+    const nextValue = formKey.includes('data_')
+      ? value.replace(/\D/g, '').slice(0, 8).replace(/^(\d{2})(\d)/, '$1/$2').replace(/^(\d{2})\/(\d{2})(\d)/, '$1/$2/$3')
+      : value
+    setForm({ ...form, [formKey]: nextValue })
+  }
+
   return (
     <div>
       <label style={labelStyle}>{label}</label>
@@ -55,8 +63,13 @@ function Field({ label, value, displayValue, formKey, editing, form, setForm }: 
             {Object.entries(SITUACAO_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         ) : (
-          <input value={form[formKey] || ''} onChange={e => setForm({ ...form, [formKey]: e.target.value })}
-            placeholder={label} style={baseInputStyle} />
+          <input
+            value={form[formKey] || ''}
+            onChange={e => handleTextChange(e.target.value)}
+            placeholder={formKey.includes('data_') ? 'dd/mm/aaaa' : label}
+            inputMode={formKey.includes('data_') ? 'numeric' : undefined}
+            style={baseInputStyle}
+          />
         )
       ) : (
         <span style={{ color: (displayValue || value) ? '#f1f5f9' : '#475569', fontSize: 13 }}>
@@ -67,10 +80,12 @@ function Field({ label, value, displayValue, formKey, editing, form, setForm }: 
   )
 }
 
-export default function ColaboradorDetailClient({ params }: { params: Promise<{ id: string }> }) {
-  const paramsId = use(params).id
-  const [id, setId] = useState(paramsId)
+export default function ColaboradorDetailClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
+  const paramsId = idOverride ?? (params ? use(params).id : '')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const queryId = searchParams.get('id')
+  const id = useMemo(() => queryId || paramsId, [queryId, paramsId])
   const supabase = createClient()
   const [colaborador, setColaborador] = useState<Colaborador | null>(null)
   const [favoritado, setFavoritado] = useState(false)
@@ -90,43 +105,52 @@ export default function ColaboradorDetailClient({ params }: { params: Promise<{ 
   const [selectedUserId, setSelectedUserId] = useState('')
 
   async function load() {
-    let currentId = id
-    if (currentId === 'placeholder') {
-      const m = window.location.pathname.match(/\/colaboradores\/([a-f0-9-]+)/)
-      if (m && m[1] !== 'placeholder') {
-        currentId = m[1]
-        setId(currentId)
+    setLoading(true)
+    try {
+      const currentId = id
+      if (currentId === 'placeholder') {
+        const m = window.location.pathname.match(/\/colaboradores\/([a-f0-9-]+)/)
+        if (m && m[1] !== 'placeholder') return
+      }
+
+      const { data: colab } = await getColaborador(supabase, currentId)
+      if (!colab) {
+        setColaborador(null)
         return
       }
-    }
-    const { data: colab } = await getColaborador(supabase, currentId)
-    if (!colab) {
+      setColaborador(colab)
+      const fav = await isFavorito(supabase, colab.id)
+      setFavoritado(fav)
+      const { processos: procs } = await listProcessosColaborador(supabase, colab.id)
+      setProcessos((procs || []) as ProcessoInfo[])
+
+      // Fetch linked user profile if user_id is set
+      if (colab.user_id) {
+        const { data: linked } = await supabase.from('profiles').select('name, email').eq('id', colab.user_id).maybeSingle()
+        setLinkedUser(linked as { name: string; email: string } | null)
+      } else {
+        setLinkedUser(null)
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (user) {
+        const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setProfile(p)
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar colaborador:', err)
+      setColaborador(null)
+    } finally {
       setLoading(false)
-      return
     }
-    setColaborador(colab)
-    const fav = await isFavorito(supabase, colab.id)
-    setFavoritado(fav)
-    const { processos: procs } = await listProcessosColaborador(supabase, colab.id)
-    setProcessos((procs || []) as ProcessoInfo[])
-
-    // Fetch linked user profile if user_id is set
-    if (colab.user_id) {
-      const { data: linked } = await supabase.from('profiles').select('name, email').eq('id', colab.user_id).maybeSingle()
-      setLinkedUser(linked as { name: string; email: string } | null)
-    } else {
-      setLinkedUser(null)
-    }
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setProfile(p)
-    }
-    setLoading(false)
   }
 
   useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/set-state-in-effect,react-hooks/exhaustive-deps
+  useEffect(() => {
+    const watchdog = window.setTimeout(() => setLoading(false), 12000)
+    return () => window.clearTimeout(watchdog)
+  }, [id])
 
   const canManage = profile?.role && ['admin', 'gestor'].includes(profile.role)
   const canViewSensitive = profile?.role && ['admin', 'gestor'].includes(profile.role)
@@ -142,7 +166,8 @@ export default function ColaboradorDetailClient({ params }: { params: Promise<{ 
       'bairro', 'cidade', 'uf', 'cep', 'observacoes',
     ]
     for (const k of keys) {
-      fields[k] = (colaborador as unknown as Record<string, string>)[k] || ''
+      const value = (colaborador as unknown as Record<string, string>)[k] || ''
+      fields[k] = k.includes('data_') ? formatDateInputBR(value) : value
     }
     setForm(fields)
     setEditing(true)
@@ -150,8 +175,9 @@ export default function ColaboradorDetailClient({ params }: { params: Promise<{ 
 
   async function saveEdit() {
     if (!form.nome_completo.trim()) return
-    if (!form.data_nascimento) {
-      setError('Data de nascimento é obrigatória')
+    const dataNascimento = parseDateInputBR(form.data_nascimento)
+    if (!dataNascimento) {
+      setError('Data de nascimento é obrigatória e deve estar no formato dd/mm/aaaa')
       return
     }
     setSaving(true)
@@ -159,8 +185,13 @@ export default function ColaboradorDetailClient({ params }: { params: Promise<{ 
     try {
       const data: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(form)) {
-        data[k] = v || null
+        if (k.includes('data_')) {
+          data[k] = parseDateInputBR(v) || null
+        } else {
+          data[k] = v || null
+        }
       }
+      data.data_nascimento = dataNascimento
       if (data.cpf) data.cpf = (data.cpf as string).replace(/\D/g, '')
       await updateColaborador(supabase, id, data as Parameters<typeof updateColaborador>[2])
       setEditing(false)
@@ -295,7 +326,7 @@ export default function ColaboradorDetailClient({ params }: { params: Promise<{ 
             <Field editing={editing} form={form} setForm={setForm} label="Lotação" value={colaborador.lotacao} formKey="lotacao" />
             <Field editing={editing} form={form} setForm={setForm} label="Regime" value={REGIME_LABELS[colaborador.regime]} formKey="regime" />
             <Field editing={editing} form={form} setForm={setForm} label="Situação" value={SITUACAO_LABELS[colaborador.situacao]} formKey="situacao" />
-            <Field editing={editing} form={form} setForm={setForm} label="Data de Admissão" value={colaborador.data_admissao || null} displayValue={formatDateBR(colaborador.data_admissao)} formKey="data_admissao" />
+            <Field editing={editing} form={form} setForm={setForm} label="Data de Admissão" value={colaborador.data_admissao || null} displayValue={formatDateBR(colaborador.data_admissao)} formKey="data_admissao" inputType="date" />
           </div>
         </div>
         {/* Identificação */}
@@ -307,7 +338,7 @@ export default function ColaboradorDetailClient({ params }: { params: Promise<{ 
             <Field editing={editing} form={form} setForm={setForm} label="CPF" value={canViewSensitive ? colaborador.cpf : (colaborador.cpf ? '*** oculto ***' : null)} formKey="cpf" />
             <Field editing={editing} form={form} setForm={setForm} label="Matrícula" value={colaborador.matricula} formKey="matricula" />
             <Field editing={editing} form={form} setForm={setForm} label="Sexo" value={SEXO_LABELS[colaborador.sexo]} formKey="sexo" />
-            <Field editing={editing} form={form} setForm={setForm} label="Data de Nascimento" value={colaborador.data_nascimento} displayValue={formatDateBR(colaborador.data_nascimento)} formKey="data_nascimento" />
+            <Field editing={editing} form={form} setForm={setForm} label="Data de Nascimento" value={colaborador.data_nascimento} displayValue={formatDateBR(colaborador.data_nascimento)} formKey="data_nascimento" inputType="date" />
           </div>
         </div>
       </div>
@@ -413,7 +444,7 @@ export default function ColaboradorDetailClient({ params }: { params: Promise<{ 
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {processos.map(p => (
-              <div key={p.id} onClick={() => router.push(`/pmo-dashboard/processos/${p.id}`)}
+              <div key={p.id} onClick={() => router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`)}
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '10px 14px', background: 'rgba(30,41,59,0.5)', borderRadius: 8, cursor: 'pointer',
                   border: '1px solid rgba(255,255,255,0.06)' }}>

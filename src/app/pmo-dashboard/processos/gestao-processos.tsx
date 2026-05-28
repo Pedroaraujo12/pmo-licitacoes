@@ -2,12 +2,13 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Edit, Trash2, ExternalLink, Save, UserPlus, X, Download, LayoutGrid, Table as TableIcon } from 'lucide-react'
 import DeleteConfirmDialog from '@/components/ui/delete-confirm-dialog'
 import Pagination from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/toast'
-import { cleanNum, formatDate, getAging, formatBRL, exportCSV, fetchAllSeiLinks } from '@/lib/utils'
+import { cleanNum, formatDate, getAging, formatBRL, exportCSV, fetchAllSeiLinks, formatDateInputBR, parseDateBR } from '@/lib/utils'
 import { PT_BR } from '@/lib/pt-br'
 import { useDebounce } from '@/hooks/useDebounce'
 import type { Processo, Modalidade, Responsavel } from '@/types/database'
@@ -36,6 +37,9 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
   const [dateEnd, setDateEnd] = useState('')
   const [sortField, setSortField] = useState<string>('data_entrada')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [atrasadosFilter, setAtrasadosFilter] = useState(
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('atrasados') === '1'
+  )
   const [deleteTarget, setDeleteTarget] = useState<Processo | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [seiLinks, setSeiLinks] = useState<Record<string, string>>({})
@@ -224,19 +228,22 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
   }, [processos])
 
   const filtered = useMemo(() => {
+    const dateStartIso = parseDateBR(dateStart)
+    const dateEndIso = parseDateBR(dateEnd)
     return processos.filter(p => {
       if (debouncedSearch) {
         const q = debouncedSearch.toLowerCase()
         const match = `${p.id_processo || ''} ${p.objeto_resumido || ''} ${p.coordenacoes?.nome || ''} ${p.responsaveis?.nome || ''}`.toLowerCase()
         if (!match.includes(q)) return false
       }
+      if (atrasadosFilter && !p.processo_atrasado) return false
       if (statusFilter && (p.status_processo?.nome || '') !== statusFilter) return false
       if (coordenacaoFilter && (p.coordenacoes?.nome || '') !== coordenacaoFilter) return false
       if (modalidadeFilter && (p.modalidades?.nome || 'N/I') !== modalidadeFilter) return false
       if (prioridadeFilter && (p.prioridade || '') !== prioridadeFilter) return false
       if (responsavelFilter && (p.responsaveis?.nome || 'N/I') !== responsavelFilter) return false
-      if (dateStart && p.data_entrada && new Date(p.data_entrada) < new Date(dateStart)) return false
-      if (dateEnd && p.data_entrada && new Date(p.data_entrada) > new Date(dateEnd + 'T23:59:59')) return false
+      if (dateStartIso && p.data_entrada && new Date(p.data_entrada) < new Date(dateStartIso)) return false
+      if (dateEndIso && p.data_entrada && new Date(p.data_entrada) > new Date(dateEndIso + 'T23:59:59')) return false
       return true
     }).sort((a, b) => {
       let cmp = 0
@@ -251,7 +258,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
       else if (sortField === 'valor_estimado') cmp = cleanNum(a.valor_estimado) - cleanNum(b.valor_estimado)
       return sortDir === 'asc' ? cmp : -cmp
     })
-  }, [processos, debouncedSearch, statusFilter, coordenacaoFilter, modalidadeFilter, prioridadeFilter, responsavelFilter, dateStart, dateEnd, sortField, sortDir])
+  }, [processos, debouncedSearch, statusFilter, coordenacaoFilter, modalidadeFilter, prioridadeFilter, responsavelFilter, dateStart, dateEnd, sortField, sortDir, atrasadosFilter])
 
   const paginated = useMemo(() => {
     const start = (page - 1) * pageSize
@@ -345,13 +352,13 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
             Resetar
           </button>
           {canEdit && (
-            <button
-              onClick={() => router.push('/pmo-dashboard/processos/novo')}
+            <Link
+              href="/pmo-dashboard/processos/novo"
               className="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-xl text-[10px] font-bold transition flex items-center gap-1.5 cursor-pointer border-none"
             >
               <Plus size={13} />
               Novo Processo
-            </button>
+            </Link>
           )}
         </div>
       </header>
@@ -366,12 +373,26 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
           className="filter-input"
           style={{ minWidth: 180 }}
         />
+        {atrasadosFilter && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+            background: 'rgba(239,68,68,0.15)', color: '#fca5a5',
+            border: '1px solid rgba(239,68,68,0.25)', cursor: 'default',
+          }}>
+            Atrasados
+            <span onClick={() => setAtrasadosFilter(false)}
+              style={{ cursor: 'pointer', marginLeft: 2, opacity: 0.7 }}>
+              ✕
+            </span>
+          </span>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <label style={{ fontSize: 9, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>De</label>
           <input
-            type="date"
             value={dateStart}
             onChange={e => { setDateStart(e.target.value); setPage(1) }}
+            placeholder="dd/mm/aaaa"
             className="filter-input"
             style={{ width: 130, fontSize: 10 }}
           />
@@ -379,19 +400,19 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <label style={{ fontSize: 9, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Até</label>
           <input
-            type="date"
             value={dateEnd}
             onChange={e => { setDateEnd(e.target.value); setPage(1) }}
+            placeholder="dd/mm/aaaa"
             className="filter-input"
             style={{ width: 130, fontSize: 10 }}
           />
-          <button onClick={() => { const d = new Date(); setDateStart(d.toISOString().split('T')[0]); setDateEnd(d.toISOString().split('T')[0]); setPage(1) }}
+          <button onClick={() => { const d = new Date(); const iso = d.toISOString().split('T')[0]; setDateStart(formatDateInputBR(iso)); setDateEnd(formatDateInputBR(iso)); setPage(1) }}
             className="period-btn">{PT_BR.filters.today}</button>
-          <button onClick={() => { const d = new Date(); const s = new Date(d); s.setDate(d.getDate()-7); setDateStart(s.toISOString().split('T')[0]); setDateEnd(d.toISOString().split('T')[0]); setPage(1) }}
+          <button onClick={() => { const d = new Date(); const s = new Date(d); s.setDate(d.getDate()-7); setDateStart(formatDateInputBR(s.toISOString().split('T')[0])); setDateEnd(formatDateInputBR(d.toISOString().split('T')[0])); setPage(1) }}
             className="period-btn">{PT_BR.filters.days7}</button>
-          <button onClick={() => { const d = new Date(); const s = new Date(d); s.setMonth(d.getMonth()-1); setDateStart(s.toISOString().split('T')[0]); setDateEnd(d.toISOString().split('T')[0]); setPage(1) }}
+          <button onClick={() => { const d = new Date(); const s = new Date(d); s.setMonth(d.getMonth()-1); setDateStart(formatDateInputBR(s.toISOString().split('T')[0])); setDateEnd(formatDateInputBR(d.toISOString().split('T')[0])); setPage(1) }}
             className="period-btn">{PT_BR.filters.days30}</button>
-          <button onClick={() => { const d = new Date(); const s = new Date(d.getFullYear(),0,1); setDateStart(s.toISOString().split('T')[0]); setDateEnd(d.toISOString().split('T')[0]); setPage(1) }}
+          <button onClick={() => { const d = new Date(); const s = new Date(d.getFullYear(),0,1); setDateStart(formatDateInputBR(s.toISOString().split('T')[0])); setDateEnd(formatDateInputBR(d.toISOString().split('T')[0])); setPage(1) }}
             className="period-btn">{PT_BR.filters.year}</button>
         </div>
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }} className="filter-select">
@@ -417,6 +438,31 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
           <option value="">Responsável</option>
           {respNames.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
+        {(() => {
+          const hasAnyFilter = search || statusFilter || coordenacaoFilter || modalidadeFilter || prioridadeFilter || responsavelFilter || dateStart || dateEnd || atrasadosFilter
+          if (!hasAnyFilter) return null
+          return (
+            <button onClick={() => {
+              setSearch('')
+              setStatusFilter('')
+              setCoordenacaoFilter('')
+              setModalidadeFilter('')
+              setPrioridadeFilter('')
+              setResponsavelFilter('')
+              setDateStart('')
+              setDateEnd('')
+              setAtrasadosFilter(false)
+              setPage(1)
+            }} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+              background: 'rgba(100,116,139,0.15)', color: '#94a3b8',
+              border: '1px solid rgba(100,116,139,0.25)', cursor: 'pointer', whiteSpace: 'nowrap',
+            }}>
+              Limpar filtros
+            </button>
+          )
+        })()}
       </div>
 
       {/* Table View */}
@@ -464,7 +510,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
                       <td className="px-3 py-3 text-center text-slate-600 font-bold">{(page - 1) * pageSize + idx + 1}</td>
                       <td className="px-3 py-3">
                         <div className="font-bold text-blue-400 truncate" style={{ cursor: 'pointer' }}
-                          onClick={() => router.push(`/pmo-dashboard/processos/${p.id}`)}
+                          onClick={() => router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`)}
                         ><a href={seiLinks[p.id] || '#'} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: seiLinks[p.id] ? 'underline' : 'none' }}>{p.id_processo || '-'}</a></div>
                       </td>
                       <td className="px-3 py-3">
@@ -542,7 +588,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
                       <td className="px-3 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
-                            onClick={() => router.push(`/pmo-dashboard/processos/${p.id}`)}
+                            onClick={() => router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`)}
                             className="p-1.5 rounded-md text-blue-400 hover:bg-blue-500/20 transition cursor-pointer border-none bg-transparent"
                             title="Ver detalhes"
                             aria-label="Ver detalhes do processo"
@@ -625,7 +671,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
             return (
               <div
                 key={p.id}
-                onClick={() => router.push(`/pmo-dashboard/processos/${p.id}`)}
+                onClick={() => router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`)}
                 style={{
                   background: 'rgba(30,41,59,0.7)',
                   border: '1px solid rgba(255,255,255,0.1)',

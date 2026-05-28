@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { createContrato } from '@/lib/contratos'
+import { cleanNum } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useToast } from '@/components/ui/toast'
 import { ArrowLeft, Search } from 'lucide-react'
@@ -69,37 +70,42 @@ export default function NovoContratoPage() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const params = new URLSearchParams(window.location.search)
-      const processoParam = params.get('processo_id')
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const processoParam = params.get('processo_id')
 
-      const [procData, colabData] = await Promise.all([
-        supabase.from('processos').select('id, id_processo').order('created_at', { ascending: false }).limit(200),
-        supabase.from('colaboradores').select('id, nome_completo').order('nome_completo', { ascending: true }).limit(100),
-      ])
-      const procs = (procData.data || []) as { id: string; id_processo: string | null }[]
-      setProcessos(procs)
-      setColaboradores((colabData.data || []) as { id: string; nome_completo: string }[])
+        const [procData, colabData] = await Promise.all([
+          supabase.from('processos').select('id, id_processo').order('created_at', { ascending: false }).limit(200),
+          supabase.from('colaboradores').select('id, nome_completo').order('nome_completo', { ascending: true }).limit(100),
+        ])
+        const procs = (procData.data || []) as { id: string; id_processo: string | null }[]
+        setProcessos(procs)
+        setColaboradores((colabData.data || []) as { id: string; nome_completo: string }[])
 
-      if (processoParam) {
-        const found = procs.find(p => p.id === processoParam)
-        if (found) {
-          setForm(prev => ({ ...prev, processo_id: found.id }))
-          setProcessoSearch(found.id_processo || found.id)
-        } else {
-          const { data: singleProc } = await supabase
-            .from('processos')
-            .select('id, id_processo')
-            .eq('id', processoParam)
-            .maybeSingle()
-          if (singleProc) {
-            procs.push(singleProc as { id: string; id_processo: string | null })
-            setProcessos([...procs])
-            setForm(prev => ({ ...prev, processo_id: singleProc.id }))
-            setProcessoSearch((singleProc as { id: string; id_processo: string | null }).id_processo || singleProc.id)
+        if (processoParam) {
+          const found = procs.find(p => p.id === processoParam)
+          if (found) {
+            setForm(prev => ({ ...prev, processo_id: found.id }))
+            setProcessoSearch(found.id_processo || found.id)
+          } else {
+            const { data: singleProc } = await supabase
+              .from('processos')
+              .select('id, id_processo')
+              .eq('id', processoParam)
+              .maybeSingle()
+            if (singleProc) {
+              procs.push(singleProc as { id: string; id_processo: string | null })
+              setProcessos([...procs])
+              setForm(prev => ({ ...prev, processo_id: singleProc.id }))
+              setProcessoSearch((singleProc as { id: string; id_processo: string | null }).id_processo || singleProc.id)
+            }
           }
         }
+      } catch (err) {
+        console.warn('Erro ao carregar tela de novo contrato:', err)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,7 +129,8 @@ export default function NovoContratoPage() {
     }
     setSubmitting(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       const payload: Record<string, unknown> = {
         numero_contrato: form.numero_contrato.trim(),
         ano: parseInt(form.ano) || new Date().getFullYear(),
@@ -139,10 +146,8 @@ export default function NovoContratoPage() {
         data_assinatura: form.data_assinatura || null,
         data_inicio_vigencia: form.data_inicio_vigencia || null,
         data_fim_vigencia: form.data_fim_vigencia || null,
-        valor_inicial: parseFloat(form.valor_inicial) || 0,
-        valor_atual: parseFloat(form.valor_atual) || 0,
-        valor_executado: 0,
-        valor_pago: 0,
+        valor_inicial: cleanNum(form.valor_inicial),
+        valor_atual: cleanNum(form.valor_atual),
         gestor_id: form.gestor_id || null,
         fiscal_tecnico_id: form.fiscal_tecnico_id || null,
         fiscal_administrativo_id: form.fiscal_administrativo_id || null,
@@ -152,8 +157,6 @@ export default function NovoContratoPage() {
         permite_aditivo: form.permite_aditivo,
         tem_garantia: form.tem_garantia,
         emergencial: form.emergencial,
-        tem_ordem_servico: false,
-        execucao_continua: false,
         observacoes: form.observacoes || null,
         status: 'minuta',
         created_by: user?.id || null,
@@ -161,10 +164,15 @@ export default function NovoContratoPage() {
       const result = await createContrato(supabase, payload as Parameters<typeof createContrato>[1])
       if (result) {
         toast('Contrato criado com sucesso', 'success')
-        router.push(`/pmo-dashboard/contratos/${result.id}`)
+        router.push(`/pmo-dashboard/contratos/detalhe?id=${result.id}`)
       }
     } catch (err: unknown) {
-      toast(err instanceof Error ? err.message : 'Erro ao criar contrato', 'error')
+      const msg = err instanceof Error ? err.message : 'Erro ao criar contrato'
+      if (msg.includes('row-level security') || msg.includes('policy')) {
+        toast('Sem permissão para criar contratos. Execute a migration SQL no Supabase Dashboard.', 'error')
+      } else {
+        toast(msg, 'error')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -364,8 +372,8 @@ export default function NovoContratoPage() {
             display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
             gap: 16, marginBottom: 24,
           }}>
-            {renderInput('valor_inicial', 'Valor Inicial (R$)', 'number')}
-            {renderInput('valor_atual', 'Valor Atual (R$)', 'number')}
+            {renderInput('valor_inicial', 'Valor Inicial (R$)')}
+            {renderInput('valor_atual', 'Valor Atual (R$)')}
           </div>
 
           <h3 style={{

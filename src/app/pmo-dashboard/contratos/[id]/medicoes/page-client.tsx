@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getContrato } from '@/lib/contratos'
 import { listMedicoes, createMedicao } from '@/lib/contrato-medicoes'
-import { formatDateBR, formatBRL } from '@/lib/utils'
+import { cleanNum, formatDateBR, formatBRL, parseDateInputBR } from '@/lib/utils'
 import { MEDICAO_STATUS_RECORDS } from '@/types/contratos'
 import type { Contrato, ContratoMedicao, MedicaoStatus } from '@/types/contratos'
 import { ArrowLeft, Plus, Save, X } from 'lucide-react'
@@ -28,6 +28,7 @@ export default function MedicoesClient({ params }: { params: Promise<{ id: strin
   const paramsId = use(params).id
   const [id, setId] = useState(paramsId)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const { toast } = useToast()
   const [contrato, setContrato] = useState<Contrato | null>(null)
@@ -43,6 +44,11 @@ export default function MedicoesClient({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     async function load() {
       const currentId = id
+      const queryId = searchParams.get('id')
+      if (queryId && queryId !== currentId) {
+        setId(queryId)
+        return
+      }
       if (currentId === 'placeholder') {
         const m = window.location.pathname.match(/\/contratos\/([a-f0-9-]+)\/medicoes/)
         if (m && m[1] !== 'placeholder') {
@@ -59,23 +65,33 @@ export default function MedicoesClient({ params }: { params: Promise<{ id: strin
       setLoading(false)
     }
     load()
-  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!form.numero_medicao.trim()) return
     setSaving(true)
     try {
+      const periodoInicio = parseDateInputBR(form.periodo_inicio)
+      const periodoFim = parseDateInputBR(form.periodo_fim)
+      if (form.periodo_inicio && !periodoInicio) {
+        toast('Período início inválido. Use dd/mm/aaaa.', 'error')
+        return
+      }
+      if (form.periodo_fim && !periodoFim) {
+        toast('Período fim inválido. Use dd/mm/aaaa.', 'error')
+        return
+      }
       const { data: { user } } = await supabase.auth.getUser()
       const payload = {
         contrato_id: id,
         ordem_servico_id: null,
         numero_medicao: form.numero_medicao.trim(),
         competencia: form.competencia || null,
-        periodo_inicio: form.periodo_inicio || null,
-        periodo_fim: form.periodo_fim || null,
-        valor_medido: Number(form.valor_medido) || 0,
-        percentual_executado: Number(form.percentual_executado) || 0,
+        periodo_inicio: periodoInicio,
+        periodo_fim: periodoFim,
+        valor_medido: cleanNum(form.valor_medido),
+        percentual_executado: cleanNum(form.percentual_executado),
         status: form.status as MedicaoStatus,
         fiscal_id: null,
         observacoes: null,
@@ -110,7 +126,7 @@ export default function MedicoesClient({ params }: { params: Promise<{ id: strin
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => router.push(`/pmo-dashboard/contratos/${id}`)}
+        <button onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${id}`)}
           style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
           <ArrowLeft size={20} />
         </button>
@@ -150,19 +166,19 @@ export default function MedicoesClient({ params }: { params: Promise<{ id: strin
             </div>
             <div>
               <label style={labelStyle}>Período Início</label>
-              <input type="date" value={form.periodo_inicio} onChange={e => setForm(f => ({ ...f, periodo_inicio: e.target.value }))} style={baseInput} />
+              <input value={form.periodo_inicio} onChange={e => setForm(f => ({ ...f, periodo_inicio: e.target.value }))} placeholder="dd/mm/aaaa" style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Período Fim</label>
-              <input type="date" value={form.periodo_fim} onChange={e => setForm(f => ({ ...f, periodo_fim: e.target.value }))} style={baseInput} />
+              <input value={form.periodo_fim} onChange={e => setForm(f => ({ ...f, periodo_fim: e.target.value }))} placeholder="dd/mm/aaaa" style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Valor Medido</label>
-              <input type="number" value={form.valor_medido} onChange={e => setForm(f => ({ ...f, valor_medido: e.target.value }))} style={baseInput} />
+              <input value={form.valor_medido} onChange={e => setForm(f => ({ ...f, valor_medido: e.target.value }))} style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>% Executado</label>
-              <input type="number" value={form.percentual_executado} onChange={e => setForm(f => ({ ...f, percentual_executado: e.target.value }))} style={baseInput} />
+              <input value={form.percentual_executado} onChange={e => setForm(f => ({ ...f, percentual_executado: e.target.value }))} placeholder="0,00" style={baseInput} />
             </div>
             <div>
               <label style={labelStyle}>Status</label>
