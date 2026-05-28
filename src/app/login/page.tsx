@@ -6,42 +6,123 @@ import { createClient } from '@/lib/supabase/client'
 import { translateAuthError } from '@/lib/auth-errors'
 import { PT_BR } from '@/lib/pt-br'
 
+type Notice = {
+  type: 'error' | 'success'
+  text: string
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [notice, setNotice] = useState<Notice | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
-    if (!error) return
-    const timer = setTimeout(() => setError(''), 8000)
+    if (!notice) return
+    const timer = setTimeout(() => setNotice(null), 8000)
     return () => clearTimeout(timer)
-  }, [error])
+  }, [notice])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function restoreExistingSession() {
+      const { data } = await supabase.auth.getSession()
+      if (cancelled || !data.session) return
+
+      const next = new URLSearchParams(window.location.search).get('next')
+      router.replace(next?.startsWith('/pmo-dashboard') ? next : '/pmo-dashboard')
+    }
+
+    restoreExistingSession()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router, supabase])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
-    setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(translateAuthError(error.message))
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail || !password) {
+      setNotice({ type: 'error', text: 'Informe e-mail e senha para entrar.' })
+      return
+    }
+    if (!isValidEmail(normalizedEmail)) {
+      setNotice({ type: 'error', text: 'Informe um e-mail válido.' })
+      return
+    }
+
+    try {
+      setLoading(true)
+      setNotice(null)
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      })
+      if (error) {
+        setNotice({ type: 'error', text: translateAuthError(error.message) })
+        return
+      }
+      if (!data.session) {
+        setNotice({ type: 'error', text: 'Sessão não criada. Tente novamente.' })
+        return
+      }
+      const next = new URLSearchParams(window.location.search).get('next')
+      router.push(next?.startsWith('/pmo-dashboard') ? next : '/pmo-dashboard')
+    } catch {
+      setNotice({ type: 'error', text: 'Não foi possível autenticar agora. Verifique sua conexão e tente novamente.' })
+    } finally {
       setLoading(false)
-    } else {
-      router.push('/pmo-dashboard')
+    }
+  }
+
+  async function handlePasswordReset() {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail) {
+      setNotice({ type: 'error', text: 'Informe seu e-mail para redefinir a senha.' })
+      return
+    }
+    if (!isValidEmail(normalizedEmail)) {
+      setNotice({ type: 'error', text: 'Informe um e-mail válido.' })
+      return
+    }
+
+    try {
+      setLoading(true)
+      setNotice(null)
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+
+      if (resetError) {
+        setNotice({ type: 'error', text: translateAuthError(resetError.message) })
+      } else {
+        setNotice({ type: 'success', text: 'Link de redefinição enviado para seu e-mail.' })
+      }
+    } catch {
+      setNotice({ type: 'error', text: 'Não foi possível solicitar a redefinição agora. Tente novamente.' })
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       background: '#020617',
+      padding: 16,
     }}>
       <div style={{
         background: 'rgba(30,41,59,0.7)',
@@ -63,14 +144,16 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <label htmlFor="email" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {PT_BR.labels.email}
             </label>
             <input
+              id="email"
               type="email"
               value={email}
-              onChange={e => { setEmail(e.target.value); if (error) setError('') }}
+              onChange={e => { setEmail(e.target.value); if (notice) setNotice(null) }}
               placeholder="seu@email.com"
+              autoComplete="email"
               required
               style={{
                 width: '100%',
@@ -86,19 +169,21 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <label htmlFor="password" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Senha
             </label>
             <div style={{ position: 'relative' }}>
               <input
+                id="password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={e => { setPassword(e.target.value); if (error) setError('') }}
+                onChange={e => { setPassword(e.target.value); if (notice) setNotice(null) }}
                 placeholder="Sua senha"
+                autoComplete="current-password"
                 required
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
+                  padding: '10px 88px 10px 14px',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 8,
                   fontSize: 14,
@@ -110,6 +195,8 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-pressed={showPassword}
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                 style={{
                   position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
                   background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer',
@@ -121,31 +208,30 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {error && (
-            <div style={{ padding: '10px 14px', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', borderRadius: 8, fontSize: 13, border: '1px solid rgba(239,68,68,0.3)' }}>
-              {error}
+          {notice && (
+            <div
+              role={notice.type === 'error' ? 'alert' : 'status'}
+              style={{
+                padding: '10px 14px',
+                background: notice.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.14)',
+                color: notice.type === 'error' ? '#fca5a5' : '#86efac',
+                borderRadius: 8,
+                fontSize: 13,
+                border: notice.type === 'error' ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(34,197,94,0.28)',
+              }}
+            >
+              {notice.text}
             </div>
           )}
 
           <div style={{ textAlign: 'right', marginTop: -8 }}>
             <button
               type="button"
-              onClick={async () => {
-                if (!email) return
-                setLoading(true)
-                setError('')
-                const { error: resetError } = await supabase.auth.resetPasswordForEmail(email)
-                setLoading(false)
-                if (resetError) {
-                  setError(translateAuthError(resetError.message))
-                } else {
-                  setError('Link de redefinição enviado para seu e-mail.')
-                }
-              }}
-              disabled={loading || !email}
+              onClick={handlePasswordReset}
+              disabled={loading || !email.trim()}
               style={{
-                background: 'none', border: 'none', color: '#94a3b8', cursor: loading || !email ? 'not-allowed' : 'pointer',
-                fontSize: 12, padding: '4px 0', textDecoration: 'underline', opacity: loading || !email ? 0.5 : 1,
+                background: 'none', border: 'none', color: '#94a3b8', cursor: loading || !email.trim() ? 'not-allowed' : 'pointer',
+                fontSize: 12, padding: '4px 0', textDecoration: 'underline', opacity: loading || !email.trim() ? 0.5 : 1,
               }}
             >
               {PT_BR.auth.forgotPassword}

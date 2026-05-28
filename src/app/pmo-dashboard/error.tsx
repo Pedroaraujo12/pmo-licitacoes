@@ -1,14 +1,11 @@
 'use client'
 
 export default function DashboardError({
-  error,
   reset: resetFn,
 }: {
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  const errMsg = error.message || 'Erro desconhecido'
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -30,14 +27,6 @@ export default function DashboardError({
         Ocorreu um erro inesperado ao carregar esta página.
         Tente recarregar ou voltar ao login.
       </p>
-      {errMsg && (
-        <pre style={{
-          fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.1)',
-          padding: '8px 12px', borderRadius: 6, maxWidth: '100%', overflow: 'auto',
-        }}>
-          {errMsg}
-        </pre>
-      )}
       <div style={{ display: 'flex', gap: 12 }}>
         <button onClick={resetFn}
           style={{

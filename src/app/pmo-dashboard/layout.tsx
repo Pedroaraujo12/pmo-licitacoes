@@ -10,7 +10,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { WebVitals } from '@/components/ui/web-vitals'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import {
-  LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X, FileEdit, Contact2, StickyNote, Sun, FileSignature,
+  LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X, FileEdit, Contact2, StickyNote, Sun, FileSignature, Building2,
 } from 'lucide-react'
 
 const DEFAULT_ALERTS = {
@@ -20,16 +20,11 @@ const DEFAULT_ALERTS = {
   sem_colaborador: false,
 }
 
-function normalizeRole(role: unknown): Profile['role'] {
-  return role === 'admin' || role === 'gestor' || role === 'consultor' || role === 'visualizador'
-    ? role
-    : 'visualizador'
-}
-
 const navItems = [
   { href: '/pmo-dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pmo-dashboard/processos', label: 'Processos', icon: FileText },
   { href: '/pmo-dashboard/contratos', label: 'Contratos', icon: FileSignature },
+  { href: '/pmo-dashboard/fornecedores', label: 'Fornecedores', icon: Building2 },
   { href: '/pmo-dashboard/cronograma', label: 'Cronograma', icon: Calendar },
   { href: '/pmo-dashboard/documentos', label: 'Documentos', icon: FileEdit },
   { href: '/pmo-dashboard/colaboradores', label: 'Colaboradores', icon: Contact2 },
@@ -53,8 +48,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       window.removeEventListener('unhandledrejection', handleRejection)
     }
   }, [])
-  const [checkingAuth, setCheckingAuth] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [layoutAlerts, setLayoutAlerts] = useState<{
@@ -74,68 +69,64 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
 
   useEffect(() => {
-    const ac = new AbortController()
-    const timeoutId = setTimeout(() => {
-      if (checkingAuth) {
-        router.replace('/login')
-      }
-    }, 10000)
+    let cancelled = false
     ;(async () => {
+      const authTimeout = window.setTimeout(() => {
+        if (!cancelled) {
+          console.warn('Dashboard auth check timeout; redirecting to login')
+          router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`)
+        }
+      }, 12000)
       try {
         const supabase = getSupabase()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { clearTimeout(timeoutId); router.replace('/login'); return }
-        if (ac.signal.aborted) return
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (cancelled) return
+        const user = session?.user
+        if (sessionError || !user) {
+          window.clearTimeout(authTimeout)
+          router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`)
+          return
+        }
 
         const { data: profileData, error: profileError } = await supabase.from('profiles')
           .select('id, name, email, role, avatar_url, created_at, updated_at')
           .eq('id', user.id).maybeSingle()
-        if (profileData) {
-          setProfile(profileData as Profile)
-        } else {
-          if (profileError) console.warn('Profile load error:', profileError)
-          setProfile({
-            id: user.id,
-            name: user.user_metadata?.name || user.email || 'Usuário',
-            email: user.email,
-            role: normalizeRole(user.user_metadata?.role),
-            avatar_url: null,
-            created_at: user.created_at || new Date().toISOString(),
-          })
+        if (cancelled) return
+        if (profileError || !profileData) {
+          console.warn('Profile load error:', profileError)
+          window.clearTimeout(authTimeout)
+          return
         }
+        setProfile(profileData as Profile)
 
         const { data: alerts, error: alertsError } = await supabase.rpc('get_layout_alerts', { p_user_id: user.id })
         if (alertsError) console.warn('Layout alerts unavailable:', alertsError)
-        if (alerts) {
-          setLayoutAlerts(alerts as {
+        if (!cancelled && alerts) {
+          const normalizedAlerts = alerts as {
             processos_atrasados: number
             proximos_vencimentos: number
             contratos_alertas: number
             sem_colaborador: boolean
-          })
+          }
+          setLayoutAlerts(normalizedAlerts)
         }
       } catch (err) {
         console.error('Dashboard layout init error:', err)
-        await getSupabase().auth.signOut()
-        router.replace('/login')
+        if (!cancelled) {
+          router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`)
+        }
         return
+      } finally {
+        window.clearTimeout(authTimeout)
+        if (!cancelled) setCheckingAuth(false)
       }
-      setCheckingAuth(false)
     })()
-    return () => { ac.abort(); clearTimeout(timeoutId) }
+    return () => { cancelled = true }
   }, []) /* eslint-disable-line react-hooks/exhaustive-deps */
 
   async function handleLogout() {
     await getSupabase().auth.signOut()
     router.push('/login')
-  }
-
-  if (checkingAuth) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="loading-spinner" />
-      </div>
-    )
   }
 
   const alertas = layoutAlerts
@@ -174,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const Icon = item.icon
             const active = pathname === item.href || (item.href !== '/pmo-dashboard' && pathname.startsWith(item.href + '/'))
             return (
-              <a key={item.href} href={item.href} onClick={() => { if (isMobile) setMobileOpen(false) }}
+              <Link key={item.href} href={item.href} onClick={() => { if (isMobile) setMobileOpen(false) }}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: sidebarOpen ? 'flex-start' : 'center',
                   gap: 12, padding: '10px 8px', borderRadius: 8, textDecoration: 'none',
@@ -192,7 +183,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {sidebarOpen && item.label === 'Contratos' && alertas.contratos_alertas > 0 && (
                   <span style={{ marginLeft: 'auto', background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, lineHeight: '1.4' }}>{alertas.contratos_alertas}</span>
                 )}
-              </a>
+              </Link>
             )
           })}
         </nav>
@@ -225,19 +216,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64), padding: isMobile ? 16 : 24,
         paddingBottom: isMobile ? 80 : 24, transition: 'margin-left 0.2s', minHeight: '100vh',
       }}>
-        {alertas.sem_colaborador && (
-          <div style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)',
-            borderRadius: 12, padding: '10px 16px', marginBottom: 16, color: '#f59e0b', fontSize: 13,
-            display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-            <span>Sua conta ainda não está vinculada a um colaborador.</span>
-            <Link href="/pmo-dashboard/colaboradores"
-              style={{ color: '#f59e0b', fontWeight: 600, textDecoration: 'underline', fontSize: 12 }}>
-              Vincular agora
-            </Link>
-          </div>
-        )}
         <ToastProvider>
-          <ErrorBoundary>{children}</ErrorBoundary>
+          {checkingAuth ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div className="loading-spinner" />
+                <p style={{ color: '#64748b', fontSize: 14, marginTop: 12 }}>Carregando...</p>
+              </div>
+            </div>
+          ) : (
+            <ErrorBoundary>{children}</ErrorBoundary>
+          )}
         </ToastProvider>
       </main>
     </div>

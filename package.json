@@ -4,14 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "deploy": "npm run lint && npm run typecheck && next build && python3 scripts/patch-turbopack-runtime.py && wrangler pages deploy out --project-name=pmo-licitacoes"
+    "deploy": "npm run lint && npm run typecheck && next build --webpack && wrangler pages deploy out --project-name=pmo-licitacoes"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { translateAuthError } from '@/lib/auth-errors'
 
+function getSafeNext(value: string | null) {
+  return value?.startsWith('/pmo-dashboard') ? value : '/pmo-dashboard'
+}
+
 export default function AuthCallbackPage() {
   const router = useRouter()
   const [error, setError] = useState('')
@@ -12,7 +16,7 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
-    const next = params.get('next') || '/pmo-dashboard'
+    const next = getSafeNext(params.get('next'))
 
     if (!code) {
       // eslint-disable-next-line react-hooks/set-state-in-effect

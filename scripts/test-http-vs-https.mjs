@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import { createServer as createHttpServer } from 'http';
 import { createServer as createHttpsServer } from 'https';
-import { readFileSync, existsSync, mkdirSync, statSync } from 'fs';
+import { readFileSync, mkdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 
@@ -15,7 +15,7 @@ function makeHandler(root) {
     let fp = join(root, urlPath);
     try {
       if (!statSync(fp).isFile()) { res.writeHead(404); res.end(); return; }
-    } catch(e) { res.writeHead(404); res.end(); return; }
+    } catch { res.writeHead(404); res.end(); return; }
     const content = readFileSync(fp);
     const ext = fp.match(/\.(\w+)$/)?.[1];
     res.writeHead(200, { 'Content-Type': MIME['.' + ext] || 'application/octet-stream' });
@@ -91,7 +91,7 @@ async function testServer(label, url) {
   // Dump DOM for analysis
   if (!ok) {
     const dump = await page.evaluate(() => ({
-      bodyChildren: Array.from(document.body.children).map((el, i) => ({
+      bodyChildren: Array.from(document.body.children).map((el) => ({
         tag: el.tagName,
         id: el.id,
         hidden: el.hidden,
