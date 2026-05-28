@@ -39,6 +39,12 @@ yarn-error.log*
 # cloudflare dev vars
 .dev.vars
 
+# local Supabase CLI state
+supabase/.temp/
+
+# local diagnostic artifacts
+tmp-*.png
+
 # vercel
 .vercel
 
