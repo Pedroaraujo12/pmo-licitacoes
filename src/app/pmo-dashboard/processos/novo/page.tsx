@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { upsertSeiLink } from '@/lib/utils'
+import { cleanNum, upsertSeiLink } from '@/lib/utils'
 import { PT_BR } from '@/lib/pt-br'
 
 export default function NovoProcessoPage() {
@@ -109,7 +109,9 @@ export default function NovoProcessoPage() {
         const str = value as string
         if (!str) continue
         if (key === 'link_sei') continue
-        if (['qtd_itens', 'progresso', 'valor_estimado', 'valor_homologado'].includes(key)) {
+        if (['valor_estimado', 'valor_homologado'].includes(key)) {
+          payload[key] = cleanNum(str)
+        } else if (['qtd_itens', 'progresso'].includes(key)) {
           payload[key] = Number(str)
         } else if (['data_entrada', 'data_atividade', 'data_entrega'].includes(key)) {
           payload[key] = str || null
@@ -118,8 +120,8 @@ export default function NovoProcessoPage() {
         }
       }
 
-      const estimado = Number(fd.get('valor_estimado')) || 0
-      const homologado = Number(fd.get('valor_homologado')) || 0
+      const estimado = cleanNum(fd.get('valor_estimado'))
+      const homologado = cleanNum(fd.get('valor_homologado'))
       payload.despesa_evitada = estimado - homologado
 
       const { data: { user } } = await getSupabase().auth.getUser()
@@ -235,8 +237,8 @@ export default function NovoProcessoPage() {
           {renderInput('data_atividade', 'Data Atividade', 'date')}
           {renderInput('progresso', 'Progresso (%)', 'number')}
           {renderInput('data_entrega', 'Data Entrega', 'date')}
-          {renderInput('valor_estimado', 'Valor Estimado (R$)', 'number')}
-          {renderInput('valor_homologado', 'Valor Homologado (R$)', 'number')}
+          {renderInput('valor_estimado', 'Valor Estimado (R$)', 'text')}
+          {renderInput('valor_homologado', 'Valor Homologado (R$)', 'text')}
         </div>
         <div style={{ marginBottom: 24 }}>
           {renderTextarea('objeto_resumido', 'Objeto Resumido')}

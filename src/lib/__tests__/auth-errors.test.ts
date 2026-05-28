@@ -18,8 +18,8 @@ describe('translateAuthError', () => {
     expect(translateAuthError('Rate limit exceeded')).toBe('Muitas tentativas. Aguarde alguns minutos.')
   })
 
-  it('retorna mensagem original se não mapeada', () => {
-    expect(translateAuthError('Unknown error')).toBe('Unknown error')
+  it('retorna mensagem genérica se não mapeada', () => {
+    expect(translateAuthError('Unknown error')).toBe('Não foi possível concluir a operação. Tente novamente.')
   })
 
   it('retorna string vazia se vazia', () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getOrdemServico } from '@/lib/ordens-servico'
 import { formatDateBR, formatBRL } from '@/lib/utils'
@@ -22,10 +22,11 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.05em',
 }
 
-export default function OrdemServicoDetailClient({ params }: { params: Promise<{ id: string }> }) {
-  const paramsId = use(params).id
+export default function OrdemServicoDetailClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
+  const paramsId = idOverride ?? (params ? use(params).id : '')
   const [id, setId] = useState(paramsId)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [os, setOs] = useState<OrdemServico | null>(null)
   const [loading, setLoading] = useState(true)
@@ -33,6 +34,11 @@ export default function OrdemServicoDetailClient({ params }: { params: Promise<{
   useEffect(() => {
     async function load() {
       const currentId = id
+      const queryId = searchParams.get('id')
+      if (queryId && queryId !== currentId) {
+        setId(queryId)
+        return
+      }
       if (currentId === 'placeholder') {
         const m = window.location.pathname.match(/\/ordens-servico\/([a-f0-9-]+)/)
         if (m && m[1] !== 'placeholder') {
@@ -45,7 +51,7 @@ export default function OrdemServicoDetailClient({ params }: { params: Promise<{
       setLoading(false)
     }
     load()
-  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -118,7 +124,7 @@ export default function OrdemServicoDetailClient({ params }: { params: Promise<{
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9' }}>{os.contratos.numero_contrato}</span>
             <span style={{ fontSize: 13, color: '#94a3b8' }}>{os.contratos.contratada_nome}</span>
-            <button onClick={() => router.push(`/pmo-dashboard/contratos/${os.contrato_id}`)}
+            <button onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${os.contrato_id}`)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
               <ExternalLink size={12} /> Ver contrato
             </button>
@@ -184,7 +190,7 @@ export default function OrdemServicoDetailClient({ params }: { params: Promise<{
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div style={fieldStyle}>
             <div style={labelStyle}>Fiscal Responsável</div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{os.fiscais?.nome || '-'}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{os.fiscais?.nome_completo || '-'}</div>
           </div>
           <div style={fieldStyle}>
             <div style={labelStyle}>Contratada Responsável</div>

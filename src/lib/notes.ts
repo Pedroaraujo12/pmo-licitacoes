@@ -1,17 +1,22 @@
 import { createClient } from './supabase/client'
 import type { Note, NoteInsert, NoteUpdate, NoteFilters, NoteCounts } from '@/types/notes'
 
-export async function listNotes(filters: NoteFilters): Promise<Note[]> {
+async function getCurrentUserId() {
   const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return []
+  const { data: { session } } = await client.auth.getSession()
+  return { client, userId: session?.user?.id ?? null }
+}
+
+export async function listNotes(filters: NoteFilters): Promise<Note[]> {
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return []
 
   const selectWithJoins = '*, processos!notes_processo_id_fkey(id_processo), colaboradores!notes_colaborador_id_fkey(nome_completo)'
 
   if (filters.search) {
     const { data, error } = await client.rpc('search_notes', {
       search_term: filters.search,
-      p_user_id: user.id,
+      p_user_id: userId,
     })
     if (error || !data) return []
     const notes = data as Note[]
@@ -41,7 +46,7 @@ export async function listNotes(filters: NoteFilters): Promise<Note[]> {
   let query = client
     .from('notes')
     .select(selectWithJoins)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
   if (filters.status === 'ativa' || !filters.status || filters.status === 'todas') {
@@ -83,28 +88,26 @@ export async function listNotes(filters: NoteFilters): Promise<Note[]> {
 }
 
 export async function getNote(id: string): Promise<Note | null> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return null
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return null
 
   const { data } = await client
     .from('notes')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single()
 
   return data as Note | null
 }
 
 export async function createNote(note: NoteInsert): Promise<Note | null> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return null
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return null
 
   const { data, error } = await client
     .from('notes')
-    .insert({ ...note, user_id: user.id })
+    .insert({ ...note, user_id: userId })
     .select()
     .single()
 
@@ -113,15 +116,14 @@ export async function createNote(note: NoteInsert): Promise<Note | null> {
 }
 
 export async function updateNote(id: string, updates: NoteUpdate): Promise<Note | null> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return null
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return null
 
   const { data, error } = await client
     .from('notes')
     .update(updates)
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .select()
     .single()
 
@@ -130,45 +132,41 @@ export async function updateNote(id: string, updates: NoteUpdate): Promise<Note 
 }
 
 export async function archiveNote(id: string): Promise<void> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return
 
   await client
     .from('notes')
     .update({ status: 'arquivada' })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
 }
 
 export async function unarchiveNote(id: string): Promise<void> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return
 
   await client
     .from('notes')
     .update({ status: 'ativa' })
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
 }
 
 export async function deleteNote(id: string): Promise<void> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return
 
   await client
     .from('notes')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
 }
 
 export async function getNoteCounts(): Promise<NoteCounts> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return { active: 0, today: 0, high_priority: 0 }
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return { active: 0, today: 0, high_priority: 0 }
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -178,9 +176,9 @@ export async function getNoteCounts(): Promise<NoteCounts> {
   const tomorrowStr = tomorrow.toISOString()
 
   const [activeRes, todayRes, highRes] = await Promise.all([
-    client.from('notes').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'ativa'),
-    client.from('notes').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'ativa').lte('reminder_at', tomorrowStr).gte('reminder_at', todayStr),
-    client.from('notes').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'ativa').eq('priority', 'alta'),
+    client.from('notes').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'ativa'),
+    client.from('notes').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'ativa').lte('reminder_at', tomorrowStr).gte('reminder_at', todayStr),
+    client.from('notes').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'ativa').eq('priority', 'alta'),
   ])
 
   return {
@@ -191,9 +189,8 @@ export async function getNoteCounts(): Promise<NoteCounts> {
 }
 
 export async function getTodayNotes(): Promise<Note[]> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return []
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return []
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -203,7 +200,7 @@ export async function getTodayNotes(): Promise<Note[]> {
   const { data } = await client
     .from('notes')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .eq('status', 'ativa')
     .or(`priority.eq.alta,destacado.eq.true,reminder_at.gte.${today.toISOString()},reminder_at.lt.${tomorrow.toISOString()},tags.cs.{Hoje}`)
     .order('priority', { ascending: false })
@@ -214,14 +211,13 @@ export async function getTodayNotes(): Promise<Note[]> {
 }
 
 export async function getNotesByProcesso(processoId: string): Promise<Note[]> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return []
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return []
 
   const { data } = await client
     .from('notes')
     .select('id, title, content, priority, destacado, reminder_at, tags, created_at, processo_id, colaborador_id')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .eq('processo_id', processoId)
     .eq('status', 'ativa')
     .order('created_at', { ascending: false })
@@ -231,14 +227,13 @@ export async function getNotesByProcesso(processoId: string): Promise<Note[]> {
 }
 
 export async function getNotesByColaborador(colaboradorId: string): Promise<Note[]> {
-  const client = createClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return []
+  const { client, userId } = await getCurrentUserId()
+  if (!userId) return []
 
   const { data } = await client
     .from('notes')
     .select('id, title, content, priority, destacado, reminder_at, tags, created_at, processo_id, colaborador_id')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .eq('colaborador_id', colaboradorId)
     .eq('status', 'ativa')
     .order('created_at', { ascending: false })

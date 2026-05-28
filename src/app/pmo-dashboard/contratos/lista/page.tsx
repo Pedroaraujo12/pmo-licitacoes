@@ -10,13 +10,14 @@ import type { Contrato, ContratoFilters } from '@/types/contratos'
 import { CONTRATO_STATUS_RECORDS } from '@/types/contratos'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { Search, Plus, FileText, ArrowLeft, X } from 'lucide-react'
+import { Suspense } from 'react'
 
 const baseInput: React.CSSProperties = {
   padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
   fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none',
 }
 
-export default function ContratosListPage() {
+function ContratosListContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -33,18 +34,25 @@ export default function ContratosListPage() {
   )
 
   useEffect(() => {
+    let cancelled = false
     async function load() {
       setLoading(true)
-      const filters: ContratoFilters = {}
-      if (search.trim()) filters.search = search.trim()
-      if (statusFilter) filters.status = statusFilter as ContratoFilters['status']
-      if (semFiscal) filters.sem_fiscal = true
-      if (vigenciaFilter) filters.vigencia = vigenciaFilter as 'vence_30d' | 'vencidos'
-      const data = await listContratos(supabase, filters)
-      setContratos(data)
-      setLoading(false)
+      try {
+        const filters: ContratoFilters = {}
+        if (search.trim()) filters.search = search.trim()
+        if (statusFilter) filters.status = statusFilter as ContratoFilters['status']
+        if (semFiscal) filters.sem_fiscal = true
+        if (vigenciaFilter) filters.vigencia = vigenciaFilter as 'vence_30d' | 'vencidos'
+        const data = await listContratos(supabase, filters)
+        if (!cancelled) setContratos(data)
+      } catch {
+        if (!cancelled) setContratos([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
     load()
+    return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter, semFiscal, vigenciaFilter])
 
@@ -64,7 +72,6 @@ export default function ContratosListPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      {/* Header */}
       <div style={{
         display: 'flex', flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center',
@@ -102,7 +109,6 @@ export default function ContratosListPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#64748b' }} />
@@ -134,7 +140,6 @@ export default function ContratosListPage() {
         )}
       </div>
 
-      {/* Loading */}
       {loading && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[1, 2, 3, 4, 5].map(i => (
@@ -146,7 +151,6 @@ export default function ContratosListPage() {
         </div>
       )}
 
-      {/* Empty state */}
       {!loading && contratos.length === 0 && (
         <div style={{
           textAlign: 'center', padding: 60, color: '#64748b',
@@ -159,11 +163,10 @@ export default function ContratosListPage() {
         </div>
       )}
 
-      {/* Mobile card view */}
       {!loading && contratos.length > 0 && isMobile && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {contratos.map(c => (
-            <div key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/${c.id}`)}
+            <div key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${c.id}`)}
               style={{
                 padding: '14px 16px', background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',
                 borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
@@ -183,7 +186,6 @@ export default function ContratosListPage() {
         </div>
       )}
 
-      {/* Table view */}
       {!loading && contratos.length > 0 && !isMobile && (
         <div style={{
           background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',
@@ -204,7 +206,7 @@ export default function ContratosListPage() {
             </thead>
             <tbody>
               {contratos.map(c => (
-                <tr key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/${c.id}`)}
+                <tr key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${c.id}`)}
                   style={{
                     cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)',
                     transition: 'background 0.1s',
@@ -235,5 +237,13 @@ export default function ContratosListPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function ContratosListPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="loading-spinner" /></div>}>
+      <ContratosListContent />
+    </Suspense>
   )
 }

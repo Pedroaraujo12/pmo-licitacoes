@@ -38,6 +38,10 @@ export default function AniversariantesPage() {
   }
 
   useEffect(() => { load() }, [periodo, filtroUnidade]) // eslint-disable-line react-hooks/set-state-in-effect,react-hooks/exhaustive-deps
+  useEffect(() => {
+    const watchdog = window.setTimeout(() => setLoading(false), 12000)
+    return () => window.clearTimeout(watchdog)
+  }, [periodo, filtroUnidade])
 
   const baseInput: React.CSSProperties = {
     padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
@@ -78,7 +82,7 @@ export default function AniversariantesPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {aniversariantes.map(a => (
-            <div key={a.id} onClick={() => router.push(`/pmo-dashboard/colaboradores/${a.id}`)}
+            <div key={a.id} onClick={() => router.push(`/pmo-dashboard/colaboradores/detalhe?id=${a.id}`)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 16px', background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',

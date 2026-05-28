@@ -44,7 +44,7 @@ export default function CronogramaPage() {
   const perPage = 50
   const searchRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [seiLinks, setSeiLinks] = useState<Record<string, string>>({})
   const isMobile = useIsMobile()
   const debouncedSearch = useDebounce(search, 300)
@@ -67,11 +67,16 @@ export default function CronogramaPage() {
       setLoading(true)
       try {
         const offset = (page - 1) * perPage
-        const { data } = await supabase.rpc('get_cronograma_page', {
+        const rpcPromise = supabase.rpc('get_cronograma_page', {
           p_search: debouncedSearch || null,
           p_limit: perPage,
           p_offset: offset,
         })
+        const timeoutPromise = new Promise<null>((resolve) => {
+          window.setTimeout(() => resolve(null), 10000)
+        })
+        const rpcResult = await Promise.race([rpcPromise, timeoutPromise]) as { data?: CronogramaRow[] } | null
+        const data = rpcResult?.data
         if (cancelled) return
         if (data) {
           setRows(data as CronogramaRow[])
@@ -150,7 +155,7 @@ export default function CronogramaPage() {
             return (
               <div
                 key={p.id}
-                onClick={() => router.push(`/pmo-dashboard/processos/${p.id}`)}
+                onClick={() => router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`)}
                 style={{
                   background: '#1e293b',
                   borderRadius: 12,

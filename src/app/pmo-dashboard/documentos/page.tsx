@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Plus, Search, Star, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { listTemplates, listFavorites, toggleFavorite } from '@/lib/documentos'
@@ -22,18 +23,24 @@ export default function DocumentosListPage() {
 
   async function load() {
     setLoading(true)
-    const [{ data: favs }, { data }] = await Promise.all([
-      listFavorites(supabase),
-      listTemplates(supabase, {
-        tipo: filtroTipo || undefined,
-        categoria: filtroCategoria || undefined,
-        status: filtroStatus || undefined,
-        search: search || undefined,
-      }),
-    ])
-    if (favs) setFavorites(new Set(favs.map(f => f.template_id)))
-    if (data) setTemplates(data)
-    setLoading(false)
+    try {
+      const [{ data: favs }, { data }] = await Promise.all([
+        listFavorites(supabase),
+        listTemplates(supabase, {
+          tipo: filtroTipo || undefined,
+          categoria: filtroCategoria || undefined,
+          status: filtroStatus || undefined,
+          search: search || undefined,
+        }),
+      ])
+      if (favs) setFavorites(new Set(favs.map(f => f.template_id)))
+      if (data) setTemplates(data)
+    } catch (err) {
+      console.warn('Erro ao carregar documentos:', err)
+      setTemplates([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [filtroTipo, filtroCategoria, filtroStatus]) // eslint-disable-line react-hooks/set-state-in-effect,react-hooks/exhaustive-deps
@@ -63,10 +70,10 @@ export default function DocumentosListPage() {
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Modelos de Documentos</h1>
-        <button onClick={() => router.push('/pmo-dashboard/documentos/novo')}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+        <Link href="/pmo-dashboard/documentos/novo"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'none' }}>
           <Plus size={16} /> Novo Modelo
-        </button>
+        </Link>
       </div>
 
       {/* Filtros */}
@@ -107,7 +114,7 @@ export default function DocumentosListPage() {
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {templates.map(t => (
-            <div key={t.id} onClick={() => router.push(`/pmo-dashboard/documentos/${t.id}`)}
+            <div key={t.id} onClick={() => router.push(`/pmo-dashboard/documentos/detalhe?id=${t.id}`)}
               style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 18px', background: 'rgba(30,41,59,0.7)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', transition: 'border-color 0.15s' }}
               onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}
               onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}>

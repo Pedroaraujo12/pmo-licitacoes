@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useRef, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useRef, use, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Processo, Atividade, CronogramaAtividade } from '@/types/database'
 import { ArrowLeft, Edit, Trash2, ExternalLink, AlertTriangle, FileText, FileSignature } from 'lucide-react'
@@ -21,10 +22,12 @@ function isOverdue(etapa: CronogramaAtividade) {
   return new Date(etapa.data_fim) < new Date(new Date().toDateString())
 }
 
-export default function ProcessoViewClient({ params }: { params: Promise<{ id: string }> }) {
-  const paramsId = use(params).id
-  const [id, setId] = useState(paramsId)
+export default function ProcessoViewClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
+  const paramsId = idOverride ?? (params ? use(params).id : '')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const queryId = searchParams.get('id')
+  const id = useMemo(() => queryId || paramsId, [queryId, paramsId])
   const [processo, setProcesso] = useState<Processo | null>(null)
   const [cronograma, setCronograma] = useState<CronogramaAtividade[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,87 +48,99 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
   }
 
   useEffect(() => {
+    let cancelled = false
+    const watchdog = window.setTimeout(() => {
+      if (!cancelled) setLoading(false)
+    }, 12000)
     const supabase = getSupabase()
     async function load() {
-      // Try processos first
-      const { data: proc } = await supabase
-        .from('processos')
-        .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
-        .eq('id', id)
-        .single()
+      setLoading(true)
+      try {
+        // Try processos first
+        const { data: proc } = await supabase
+          .from('processos')
+          .select('*, coordenacoes(nome), status_processo(nome), responsaveis(nome), demandantes(nome), modalidades(nome)')
+          .eq('id', id)
+          .single()
 
-      if (!proc && typeof window !== 'undefined') {
-        // Fallback: extract ID from URL (handles _redirects proxy)
-        const m = window.location.pathname.match(/\/processos\/([a-f0-9-]+)/)
-        if (m && m[1] !== id) {
-          setId(m[1])
-          return
+        if (!proc && typeof window !== 'undefined') {
+          // Fallback: extract ID from URL (handles _redirects proxy)
+          const m = window.location.pathname.match(/\/processos\/([a-f0-9-]+)/)
+          if (m && m[1] !== id) return
         }
-      }
 
-      if (proc) {
-        setProcesso(proc)
+        if (proc) {
+          setProcesso(proc)
 
-        // Fetch colaborador info for responsável if linked
-        try {
-          const { data: resp } = await supabase
-            .from('responsaveis')
-            .select('colaborador_id')
-            .eq('id', proc.responsavel_id)
-            .maybeSingle()
-          if (resp?.colaborador_id) {
-            const { data: colab } = await supabase
-              .from('colaboradores')
-              .select('id, nome_completo, cargo, unidade, email_institucional, telefone_institucional')
-              .eq('id', resp.colaborador_id)
-              .single()
-            setResponsavelColaborador(colab as { id: string; nome_completo: string; cargo: string | null; unidade: string | null; email_institucional: string | null; telefone_institucional: string | null })
-          } else {
+          // Fetch colaborador info for responsável if linked
+          try {
+            const { data: resp } = await supabase
+              .from('responsaveis')
+              .select('colaborador_id')
+              .eq('id', proc.responsavel_id)
+              .maybeSingle()
+            if (resp?.colaborador_id) {
+              const { data: colab } = await supabase
+                .from('colaboradores')
+                .select('id, nome_completo, cargo, unidade, email_institucional, telefone_institucional')
+                .eq('id', resp.colaborador_id)
+                .single()
+              setResponsavelColaborador(colab as { id: string; nome_completo: string; cargo: string | null; unidade: string | null; email_institucional: string | null; telefone_institucional: string | null })
+            } else {
+              setResponsavelColaborador(null)
+            }
+          } catch {
             setResponsavelColaborador(null)
           }
-        } catch {
-          setResponsavelColaborador(null)
-        }
 
-        const { data: crono } = await supabase
-          .from('cronograma_atividades')
+          const { data: crono } = await supabase
+            .from('cronograma_atividades')
+            .select('*')
+            .eq('processo_id', id)
+            .order('ordem', { ascending: true })
+            .limit(200)
+          setCronograma(crono || [])
+        }
+        const { data: atv } = await supabase
+          .from('atividades')
           .select('*')
           .eq('processo_id', id)
-          .order('ordem', { ascending: true })
+          .order('created_at', { ascending: false })
           .limit(200)
-        setCronograma(crono || [])
-      }
-      const { data: atv } = await supabase
-        .from('atividades')
-        .select('*')
-        .eq('processo_id', id)
-        .order('created_at', { ascending: false })
-        .limit(200)
-      setAtividades(atv || [])
-      const { data: docs } = await listGeneratedDocuments(supabase, id)
-      if (docs) setDocumentos(docs)
-      const seiLink = (atv || []).find((a: { atividade: string }) => a.atividade === '__SEI_LINK__')
-      setLinkSei(seiLink?.observacao || null)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-        setProfile(prof)
-      }
+        setAtividades(atv || [])
+        const { data: docs } = await listGeneratedDocuments(supabase, id)
+        if (docs) setDocumentos(docs)
+        const seiLink = (atv || []).find((a: { atividade: string }) => a.atividade === '__SEI_LINK__')
+        setLinkSei(seiLink?.observacao || null)
+        const { data: { session } } = await supabase.auth.getSession()
+        const user = session?.user
+        if (user) {
+          const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+          setProfile(prof)
+        }
 
-      // Carregar contrato vinculado
-      const { data: contratoData } = await supabase
-        .from('contratos')
-        .select('id, numero_contrato, contratada_nome, status, valor_atual')
-        .eq('processo_id', id)
-        .maybeSingle()
-      if (contratoData) {
-        const c = contratoData as { id: string; numero_contrato: string; contratada_nome: string; status: string; valor_atual: number }
-        setContratoVinculado(c)
+        // Carregar contrato vinculado
+        const { data: contratoData } = await supabase
+          .from('contratos')
+          .select('id, numero_contrato, contratada_nome, status, valor_atual')
+          .eq('processo_id', id)
+          .maybeSingle()
+        if (contratoData) {
+          const c = contratoData as { id: string; numero_contrato: string; contratada_nome: string; status: string; valor_atual: number }
+          setContratoVinculado(c)
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar processo:', err)
+      } finally {
+        if (!cancelled) setLoading(false)
+        window.clearTimeout(watchdog)
       }
-
-      setLoading(false)
     }
     load()
+    return () => {
+      cancelled = true
+      window.clearTimeout(watchdog)
+    }
   }, [id])
 
   const [deleteTarget, setDeleteTarget] = useState(false)
@@ -258,7 +273,7 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
             {processo.responsaveis?.nome || '-'}
             {responsavelColaborador && (
-              <button onClick={() => router.push(`/pmo-dashboard/colaboradores/${responsavelColaborador.id}`)}
+              <button onClick={() => router.push(`/pmo-dashboard/colaboradores/detalhe?id=${responsavelColaborador.id}`)}
                 style={{ fontSize: 11, color: '#60a5fa', background: 'rgba(96,165,250,0.1)', border: 'none',
                   borderRadius: 6, padding: '2px 8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 Ver ficha
@@ -322,15 +337,15 @@ export default function ProcessoViewClient({ params }: { params: Promise<{ id: s
           </h3>
           <div style={{ display: 'flex', gap: 6 }}>
             {contratoVinculado ? (
-              <button onClick={() => router.push(`/pmo-dashboard/contratos/${contratoVinculado.id}`)}
+              <button onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${contratoVinculado.id}`)}
                 className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition border-none">
                 Ver Contrato
               </button>
             ) : (
-              <button onClick={() => router.push(`/pmo-dashboard/contratos/novo?processo_id=${id}`)}
-                className="cursor-pointer bg-violet-600 hover:bg-violet-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition border-none">
+              <Link href={`/pmo-dashboard/contratos/novo?processo_id=${id}`}
+                className="cursor-pointer bg-violet-600 hover:bg-violet-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition border-none inline-flex items-center">
                 Criar Contrato
-              </button>
+              </Link>
             )}
           </div>
         </div>

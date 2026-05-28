@@ -219,7 +219,7 @@ export default function ContratosDashboardPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {proximosVencimentos.slice(0, 5).map(c => (
-              <div key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/${c.id}`)}
+              <div key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${c.id}`)}
                 style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '10px 14px', background: 'rgba(30,41,59,0.5)', borderRadius: 10,
@@ -267,7 +267,7 @@ export default function ContratosDashboardPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {semFiscal.slice(0, 3).map(c => (
-                  <div key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/${c.id}`)}
+                  <div key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${c.id}`)}
                     style={{ fontSize: 12, color: '#94a3b8', cursor: 'pointer', padding: '4px 0' }}>
                     {c.numero_contrato} - {c.contratada_nome}
                   </div>
@@ -288,7 +288,7 @@ export default function ContratosDashboardPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {semMovimentacao.slice(0, 3).map(c => (
-                  <div key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/${c.id}`)}
+                  <div key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${c.id}`)}
                     style={{ fontSize: 12, color: '#94a3b8', cursor: 'pointer', padding: '4px 0' }}>
                     {c.numero_contrato} - {c.contratada_nome}
                   </div>

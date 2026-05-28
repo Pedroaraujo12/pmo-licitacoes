@@ -317,7 +317,7 @@ export async function listProcessosColaborador(supabase: SupabaseClient, colabor
     query,
     responsavelIds.length > 0
       ? supabase.from('cronograma_atividades')
-          .select('processo_id, atividade, status, processos!cronograma_atividades_processo_id_fkey(id, id_processo, objeto_resumido, data_entrada)')
+          .select('processo_id, processos!cronograma_atividades_processo_id_fkey(id, id_processo, objeto_resumido, data_entrada)')
           .in('responsavel_id', responsavelIds)
           .order('processo_id', { ascending: false })
           .limit(100)

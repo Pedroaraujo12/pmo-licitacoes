@@ -1,13 +1,15 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import EditProcessoClient from '../[id]/edit/edit-client'
 
 function EditarContent() {
   const sp = useSearchParams()
-  const id = sp.get('id') || ''
-  return <EditProcessoClient params={Promise.resolve({ id })} />
+  const pathname = usePathname()
+  const pathId = pathname.match(/\/processos\/([a-f0-9-]+)\/edit/)?.[1]
+  const id = sp.get('id') || pathId || ''
+  return <EditProcessoClient idOverride={id} />
 }
 
 export default function EditarPage() {

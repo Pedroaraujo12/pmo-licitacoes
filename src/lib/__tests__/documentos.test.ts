@@ -33,6 +33,9 @@ function createMockSupabase(results?: Record<string, unknown>) {
     rpc: vi.fn().mockResolvedValue(results?.rpc ?? { data: null, error: null }) as never,
     auth: {
       getUser: vi.fn().mockResolvedValue(results?.auth ?? { data: { user: { id: 'user-1' } }, error: null }),
+      getSession: vi.fn().mockResolvedValue(
+        results?.authSession ?? { data: { session: { user: { id: 'user-1' } } }, error: null },
+      ),
     } as never,
   }
   return {
@@ -124,7 +127,7 @@ describe('createTemplate', () => {
 
   it('lança erro se não autenticado', async () => {
     const { supabase } = createMockSupabase({
-      auth: { data: { user: null }, error: { message: 'No user' } },
+      authSession: { data: { session: null }, error: { message: 'No user' } },
     })
     await expect((await import('../documentos')).createTemplate(supabase, {
       title: 'Teste', tipo_documento: 'edital', categoria: 'licitacoes', conteudo: 'teste',

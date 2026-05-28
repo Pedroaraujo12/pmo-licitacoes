@@ -1,4 +1,5 @@
 import ProcessoViewClient from './view-client'
+import { Suspense } from 'react'
 
 export async function generateStaticParams() {
   const ids: { id: string }[] = [{ id: 'placeholder' }]
@@ -18,5 +19,9 @@ export async function generateStaticParams() {
 }
 
 export default function ProcessoViewPage({ params }: { params: Promise<{ id: string }> }) {
-  return <ProcessoViewClient params={params} />
+  return (
+    <Suspense fallback={<div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="loading-spinner" /></div>}>
+      <ProcessoViewClient params={params} />
+    </Suspense>
+  )
 }

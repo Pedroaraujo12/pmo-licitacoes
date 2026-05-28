@@ -1,4 +1,5 @@
 import EditProcessoClient from './edit-client'
+import { Suspense } from 'react'
 
 export async function generateStaticParams() {
   try {
@@ -19,5 +20,9 @@ export async function generateStaticParams() {
 }
 
 export default function EditProcessoPage({ params }: { params: Promise<{ id: string }> }) {
-  return <EditProcessoClient params={params} />
+  return (
+    <Suspense fallback={<div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="loading-spinner" /></div>}>
+      <EditProcessoClient params={params} />
+    </Suspense>
+  )
 }

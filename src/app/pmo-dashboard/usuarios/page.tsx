@@ -97,10 +97,10 @@ export default function UsuariosPage() {
       const supabase = getSupabase()
       const { data: { session } } = await supabase.auth.getSession()
 
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: createEmail,
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: createEmail.trim(),
         password: createPassword,
-        options: { data: { name: createName, role: createRole, email: createEmail } },
+        options: { data: { name: createName.trim(), email: createEmail.trim() } },
       })
 
       if (signUpError) {
@@ -109,7 +109,24 @@ export default function UsuariosPage() {
         return
       }
 
+      if (!signUpData.user?.id) {
+        setCreateError('Usuário criado sem identificador retornado. Recarregue a lista antes de editar permissões.')
+        setCreateLoading(false)
+        return
+      }
+
       try { if (session) await supabase.auth.setSession(session) } catch { /* ok */ }
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ name: createName.trim(), role: createRole as Profile['role'] })
+        .eq('id', signUpData.user.id)
+
+      if (profileError) {
+        setCreateError(translateAuthError(profileError.message))
+        setCreateLoading(false)
+        return
+      }
 
       setShowCreate(false)
       setCreateName('')

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Edit, Trash2, ExternalLink, AlertTriangle, Download } from 'lucide-react'
 import DeleteConfirmDialog from '@/components/ui/delete-confirm-dialog'
-import { formatBRL, formatDate, getAging, exportCSV } from '@/lib/utils'
+import { formatBRL, formatDate, getAging, exportCSV, fetchAllSeiLinks } from '@/lib/utils'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useToast } from '@/components/ui/toast'
 import Pagination from '@/components/ui/pagination'
@@ -75,12 +75,16 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const [totalCount, setTotalCount] = useState(0)
   const [loadingSummary, setLoadingSummary] = useState(true)
   const [loadingRows, setLoadingRows] = useState(true)
+  const [porResponsavel, setPorResponsavel] = useState<[string | null, number][]>([])
 
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 300)
   const [modalidadeFilter, setModalidadeFilter] = useState('')
   const [prioridadeFilter, setPrioridadeFilter] = useState('')
+  const [responsavelFilter, setResponsavelFilter] = useState<string | null>(null)
+  const [modalidadeChartFilter, setModalidadeChartFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [seiLinks, setSeiLinks] = useState<Record<string, string>>({})
 
   const [modalProcesso, setModalProcesso] = useState<ProcessoRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ProcessoRow | null>(null)
@@ -98,6 +102,25 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   // Load dashboard summary (KPIs + chart data) — 1 chamada
   useEffect(() => {
     let cancelled = false
+    const watchdog = window.setTimeout(() => {
+      if (!cancelled) {
+        setLoadingSummary(false)
+        if (!summary) {
+          setSummary({
+            total_processos: 0,
+            processos_atrasados: 0,
+            processos_vencendo_7_dias: 0,
+            valor_estimado_total: 0,
+            valor_homologado_total: 0,
+            economia_total: 0,
+            por_status: [],
+            por_modalidade: [],
+            etapa_distribuicao: [],
+            aniversariantes_15_dias: [],
+          })
+        }
+      }
+    }, 12000)
     getSupabase().rpc('get_dashboard_summary').then(
       ({ data }: { data: DashboardSummary | null }) => {
         if (!cancelled && data) setSummary(data)
@@ -105,37 +128,72 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
       },
       () => { if (!cancelled) setLoadingSummary(false) },
     )
-    return () => { cancelled = true }
+    return () => { cancelled = true; window.clearTimeout(watchdog) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load paginated processos — 1 chamada
   useEffect(() => {
-    if (loadingSummary && !summary) return
     let cancelled = false
     setLoadingRows(true) /* eslint-disable-line react-hooks/set-state-in-effect */
     const supabase = getSupabase()
-    const offset = (page - 1) * PAGE_SIZE
-    const params: Record<string, unknown> = { p_limit: PAGE_SIZE, p_offset: offset }
-    if (debouncedSearch) params.p_search = debouncedSearch
-    if (modalidadeFilter) params.p_modalidade_id = modalidadeFilter
-    if (prioridadeFilter) params.p_prioridade = prioridadeFilter
 
-    supabase.rpc('search_processos', params).then(
-      ({ data }: { data: ProcessoRow[] | null }) => {
-        if (cancelled) return
-        if (data && data.length > 0) {
-          setRows(data)
-          setTotalCount(data[0].total_count)
-        } else {
-          setRows([])
-          setTotalCount(0)
-        }
-        setLoadingRows(false)
-      },
-      () => { if (!cancelled) setLoadingRows(false) },
-    )
+    if (responsavelFilter || modalidadeChartFilter) {
+      const params: Record<string, unknown> = { p_limit: 1000, p_offset: 0 }
+      if (debouncedSearch) params.p_search = debouncedSearch
+      if (modalidadeFilter) params.p_modalidade_id = modalidadeFilter
+      if (prioridadeFilter) params.p_prioridade = prioridadeFilter
+
+      supabase.rpc('search_processos', params).then(
+        ({ data }: { data: ProcessoRow[] | null }) => {
+          if (cancelled) return
+          const filtered = (data || []).filter((p) => {
+            if (responsavelFilter) {
+              const matchesResp = (p.responsavel_nome || 'Sem responsável').trim() === responsavelFilter
+              const matchesStatus = (p.status_nome || '').trim() === 'Em andamento'
+              if (!matchesResp || !matchesStatus) return false
+            }
+            if (modalidadeChartFilter) {
+              const matchesModalidade = (p.modalidade_nome || 'Sem modalidade').trim() === modalidadeChartFilter
+              if (!matchesModalidade) return false
+            }
+            return true
+          })
+          const total = filtered.length
+          const offset = (page - 1) * PAGE_SIZE
+          setRows(filtered.slice(offset, offset + PAGE_SIZE))
+          setTotalCount(total)
+          setLoadingRows(false)
+        },
+        () => { if (!cancelled) setLoadingRows(false) },
+      )
+    } else {
+      const offset = (page - 1) * PAGE_SIZE
+      const params: Record<string, unknown> = { p_limit: PAGE_SIZE, p_offset: offset }
+      if (debouncedSearch) params.p_search = debouncedSearch
+      if (modalidadeFilter) params.p_modalidade_id = modalidadeFilter
+      if (prioridadeFilter) params.p_prioridade = prioridadeFilter
+
+      supabase.rpc('search_processos', params).then(
+        ({ data }: { data: ProcessoRow[] | null }) => {
+          if (cancelled) return
+          if (data && data.length > 0) {
+            setRows(data)
+            setTotalCount(data[0].total_count)
+          } else {
+            setRows([])
+            setTotalCount(0)
+          }
+          setLoadingRows(false)
+        },
+        () => { if (!cancelled) setLoadingRows(false) },
+      )
+    }
     return () => { cancelled = true }
-  }, [page, debouncedSearch, modalidadeFilter, prioridadeFilter, loadingSummary]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearch, modalidadeFilter, prioridadeFilter, responsavelFilter, modalidadeChartFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    fetchAllSeiLinks(getSupabase()).then(setSeiLinks).catch(() => setSeiLinks({}))
+  }, [getSupabase])
 
   const searchRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -151,6 +209,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   }, [])
 
   const kpis = useMemo(() => {
+    if (loadingSummary && !summary) return { total: 0, estimado: 0, economia: 0, atrasados: 0, concluidos: 0 }
     if (!summary) return { total: 0, estimado: 0, economia: 0, atrasados: 0, concluidos: 0 }
     return {
       total: summary.total_processos,
@@ -159,25 +218,48 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
       atrasados: summary.processos_atrasados,
       concluidos: summary.por_status.find(s => s.status === 'Concluído')?.total || 0,
     }
-  }, [summary])
+  }, [loadingSummary, summary])
 
   const chartData = useMemo(() => {
-    if (!summary) return { resp: [] as [string | null, number][], mod: [] as [string | null, number][], health: { g: 0, y: 0, r: 0 } }
-    const health = {
-      g: summary.por_status.reduce((a, s) => a + s.total, 0) - summary.processos_atrasados,
-      y: summary.processos_vencendo_7_dias,
-      r: summary.processos_atrasados,
-    }
+    if (!summary) return { resp: [] as [string | null, number][], mod: [] as [string | null, number][] }
     return {
-      resp: [] as [string | null, number][],
+      resp: porResponsavel,
       mod: summary.por_modalidade.map(m => [m.modalidade, m.total] as [string | null, number]),
-      health,
     }
-  }, [summary])
+  }, [summary, porResponsavel])
 
-  const etapaData = useMemo(() => {
-    return summary?.etapa_distribuicao || []
-  }, [summary])
+  // Carrega distribuição de processos em andamento por responsável.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const supabase = getSupabase()
+      const { data } = await supabase.rpc('search_processos', {
+        p_search: null,
+        p_status_id: null,
+        p_modalidade_id: null,
+        p_responsavel_id: null,
+        p_coordenacao_id: null,
+        p_data_inicio: null,
+        p_data_fim: null,
+        p_prioridade: null,
+        p_limit: 1000,
+        p_offset: 0,
+      })
+      if (cancelled) return
+      const bucket = new Map<string, number>()
+      for (const row of (data as ProcessoRow[] | null) || []) {
+        if ((row.status_nome || '').trim() !== 'Em andamento') continue
+        const key = (row.responsavel_nome || 'Sem responsável').trim() || 'Sem responsável'
+        bucket.set(key, (bucket.get(key) || 0) + 1)
+      }
+      const series = Array.from(bucket.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([name, count]) => [name, count] as [string, number])
+      setPorResponsavel(series)
+    })()
+    return () => { cancelled = true }
+  }, [getSupabase])
 
   async function handleDelete() {
     if (!deleteTarget) return
@@ -206,31 +288,6 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
 
   const uniquePrioridades = ['Baixa', 'Média', 'Alta', 'Urgente']
 
-  if (loadingSummary) {
-    return (
-      <div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="kpi-card animate-pulse">
-              <div className="h-3 bg-gray-700 rounded w-1/2 mb-3" />
-              <div className="h-8 bg-gray-700 rounded w-3/4 mb-2" />
-              <div className="h-3 bg-gray-700 rounded w-1/3" />
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="glass-card p-5 animate-pulse">
-              <div className="h-4 bg-gray-700 rounded w-1/2 mb-3" />
-              <div className="h-8 bg-gray-700 rounded w-3/4 mb-2" />
-              <div className="h-3 bg-gray-700 rounded w-1/4" />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
       {/* Alert Banner */}
@@ -245,7 +302,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
             <strong>{kpis.atrasados} processo{kpis.atrasados !== 1 ? 's' : ''} em atraso</strong> — verifique os prazos no gráfico abaixo
           </span>
           <span
-            onClick={() => router.push('/pmo-dashboard/processos')}
+            onClick={() => router.push('/pmo-dashboard/processos?atrasados=1')}
             style={{ marginLeft: 'auto', color: '#60a5fa', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
           >Ver processos →</span>
         </div>
@@ -304,10 +361,20 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           <option value="">Prioridade</option>
           {uniquePrioridades.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
-        <button onClick={() => { setSearch(''); setModalidadeFilter(''); setPrioridadeFilter(''); setPage(1) }}
+        <button onClick={() => { setSearch(''); setModalidadeFilter(''); setPrioridadeFilter(''); setResponsavelFilter(null); setModalidadeChartFilter(null); setPage(1) }}
           className="bg-slate-700 text-white rounded-lg px-3 py-1.5 text-[10px] font-bold hover:bg-slate-600 transition">
           Limpar
         </button>
+        {responsavelFilter && (
+          <span className="text-[10px] text-blue-300 font-bold">
+            Responsável: {responsavelFilter}
+          </span>
+        )}
+        {modalidadeChartFilter && (
+          <span className="text-[10px] text-cyan-300 font-bold">
+            Modalidade: {modalidadeChartFilter}
+          </span>
+        )}
       </div>
 
       {/* Main Grid */}
@@ -369,9 +436,33 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                   const ag = getAging(p.data_entrega)
                   return (
                     <tr key={p.id} onClick={() => setModalProcesso(p)} className="hover:bg-white/5 transition cursor-pointer">
-                      <td className="px-2 py-3 font-bold text-blue-400 truncate">{p.id_processo || '-'}</td>
+                      <td className="px-2 py-3 font-bold text-blue-400 truncate">
+                        <a
+                          href={seiLinks[p.id] || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!seiLinks[p.id]) e.preventDefault()
+                          }}
+                          className="cursor-pointer text-blue-400 hover:text-blue-300 underline-offset-2 hover:underline bg-transparent border-none p-0 font-inherit text-inherit"
+                          title={seiLinks[p.id] ? 'Abrir no SEI' : 'Link SEI não cadastrado'}
+                        >
+                          {p.id_processo || '-'}
+                        </a>
+                      </td>
                       <td className="px-2 py-3">
-                        <div className="font-bold text-slate-100 truncate">{p.objeto_resumido || '-'}</div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setModalProcesso(p)
+                          }}
+                          className="font-bold text-slate-100 truncate cursor-pointer hover:text-white text-left bg-transparent border-none p-0"
+                          title={p.objeto_resumido || '-'}
+                        >
+                          {p.objeto_resumido || '-'}
+                        </button>
                       </td>
                       <td className="px-2 py-3">
                         <div className="text-slate-300 truncate">{p.status_nome || '-'}</div>
@@ -401,7 +492,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                       {canEdit && (
                         <td className="px-2 py-3 text-center" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1">
-                            <button onClick={() => router.push(`/pmo-dashboard/processos/${p.id}`)}
+                            <button onClick={() => setModalProcesso(p)}
                               className="p-1.5 rounded-md text-blue-400 hover:bg-blue-500/20 transition cursor-pointer border-none bg-transparent" title="Ver detalhes">
                               <ExternalLink size={14} />
                             </button>
@@ -444,9 +535,18 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
         <ErrorBoundary>
         <Suspense fallback={<div className="glass-card p-6 text-center text-slate-500 text-xs">Carregando gráficos...</div>}>
           <DashboardCharts
+            porResponsavel={chartData.resp}
             porModalidade={chartData.mod}
-            etapaData={etapaData}
-            health={chartData.health}
+            selectedResponsavel={responsavelFilter}
+            onResponsavelSelect={(responsavel) => {
+              setResponsavelFilter(responsavel)
+              setPage(1)
+            }}
+            selectedModalidade={modalidadeChartFilter}
+            onModalidadeSelect={(modalidade) => {
+              setModalidadeChartFilter(modalidade)
+              setPage(1)
+            }}
           />
         </Suspense>
         </ErrorBoundary>
@@ -460,7 +560,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           <div className="glass-card w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
             onClick={e => e.stopPropagation()}>
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-y-auto">
-              <div className="col-span-2 p-4 glass-card-inner">
+              <div className="sm:col-span-2 p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-blue-400 uppercase mb-1">Objeto</p>
                 <p className="text-sm font-bold text-slate-100">{modalProcesso.objeto_resumido || '-'}</p>
               </div>
@@ -498,7 +598,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
               </div>
             </div>
             <div className="px-6 py-4 border-t border-white/5 flex justify-end gap-3 shrink-0">
-              <button onClick={() => router.push(`/pmo-dashboard/processos/${modalProcesso.id}`)}
+              <button onClick={() => router.push(`/pmo-dashboard/processos/detalhe?id=${modalProcesso.id}`)}
                 className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-[10px] font-bold transition cursor-pointer border-none flex items-center gap-1.5">
                 <ExternalLink size={12} /> Ver Detalhes
               </button>

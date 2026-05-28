@@ -53,8 +53,6 @@ export default function AniversariantesWidget() {
     load()
   }, [])
 
-  if (proximos.length === 0) return null
-
   const primeiro = proximos[0]
 
   return (
@@ -73,35 +71,47 @@ export default function AniversariantesWidget() {
         )}
       </div>
 
-      {/* Destaque do próximo aniversariante */}
-      <div
-        onClick={() => router.push(`/pmo-dashboard/colaboradores/${primeiro.id}`)}
-        style={{
-          background: 'rgba(251,146,60,0.12)', borderRadius: 12,
-          border: '1px solid rgba(251,146,60,0.25)', padding: '14px 16px',
-          cursor: 'pointer', marginBottom: proximos.length > 1 ? 8 : 0,
-        }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: 'rgba(251,146,60,0.2)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
+      {primeiro ? (
+        <div
+          onClick={() => router.push(`/pmo-dashboard/colaboradores/detalhe?id=${primeiro.id}`)}
+          style={{
+            background: 'rgba(251,146,60,0.12)', borderRadius: 12,
+            border: '1px solid rgba(251,146,60,0.25)', padding: '14px 16px',
+            cursor: 'pointer', marginBottom: proximos.length > 1 ? 8 : 0,
           }}>
-            <Gift size={22} style={{ color: '#fb923c' }} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#fed7aa' }}>{primeiro.nome}</div>
-            <div style={{ fontSize: 12, color: '#fb923c', marginTop: 1 }}>
-              {primeiro.dia}/{String(primeiro.mes).padStart(2, '0')}
-              {primeiro.unidade && <> · {primeiro.unidade}</>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12,
+              background: 'rgba(251,146,60,0.2)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Gift size={22} style={{ color: '#fb923c' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#fed7aa' }}>{primeiro.nome}</div>
+              <div style={{ fontSize: 12, color: '#fb923c', marginTop: 1 }}>
+                {primeiro.dia}/{String(primeiro.mes).padStart(2, '0')}
+                {primeiro.unidade && <> · {primeiro.unidade}</>}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div style={{
+          background: 'rgba(251,146,60,0.08)',
+          borderRadius: 12,
+          border: '1px solid rgba(251,146,60,0.2)',
+          padding: '12px 14px',
+          color: '#fb923c',
+          fontSize: 12,
+        }}>
+          Nenhum aniversariante nos próximos 15 dias.
+        </div>
+      )}
 
       {/* Lista dos demais */}
       {proximos.slice(1).map(a => (
-        <div key={a.id} onClick={() => router.push(`/pmo-dashboard/colaboradores/${a.id}`)}
+        <div key={a.id} onClick={() => router.push(`/pmo-dashboard/colaboradores/detalhe?id=${a.id}`)}
           style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
             borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#cbd5e1',

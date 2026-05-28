@@ -22,7 +22,7 @@ interface ContratoAlertaItem {
 
 export default function TodayNotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [alertas, setAlertas] = useState<ContratoAlertaItem[]>([])
@@ -60,7 +60,7 @@ export default function TodayNotesPage() {
             tipo: diff < 0 ? 'vencido' : 'proximo_vencimento',
             descricao: diff < 0 ? `Vencido há ${Math.abs(diff)} dia(s)` : `Vence em ${diff} dia(s)`,
             gravidade: diff < 0 ? 'alto' : diff <= 7 ? 'alto' : 'medio',
-            link: `/pmo-dashboard/contratos/${c.id}`,
+            link: `/pmo-dashboard/contratos/detalhe?id=${c.id}`,
           })
         }
       }
@@ -81,7 +81,7 @@ export default function TodayNotesPage() {
           tipo: 'os_atrasada',
           descricao: `OS ${os.numero_os} atrasada (vencia ${formatDateBR(os.data_fim_prevista)})`,
           gravidade: 'alto',
-          link: `/pmo-dashboard/ordens-servico/${os.id}`,
+          link: `/pmo-dashboard/ordens-servico/detalhe?id=${os.id}`,
         })
       }
     }
@@ -100,7 +100,7 @@ export default function TodayNotesPage() {
           tipo: 'medicao_pendente',
           descricao: `Medição ${m.numero_medicao} aguardando análise`,
           gravidade: 'medio',
-          link: m.contrato_id ? `/pmo-dashboard/contratos/${m.contrato_id}/medicoes` : '#',
+          link: m.contrato_id ? `/pmo-dashboard/contratos/detalhe?id=${m.contrato_id}` : '#',
         })
       }
     }
@@ -110,9 +110,18 @@ export default function TodayNotesPage() {
 
   async function loadNotes() {
     setLoading(true)
-    const data = await getTodayNotes()
-    setNotes(data)
-    setLoading(false)
+    try {
+      const data = await Promise.race([
+        getTodayNotes(),
+        new Promise<Note[]>((resolve) => window.setTimeout(() => resolve([]), 10000)),
+      ])
+      setNotes(data)
+    } catch (err) {
+      console.warn('Erro ao carregar painel do dia:', err)
+      setNotes([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   function openNew() {

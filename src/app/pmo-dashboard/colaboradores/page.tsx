@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
   listFavoritos, toggleFavorito, listUnidades, listCargos, getMetricas,
@@ -37,6 +38,8 @@ export default function ColaboradoresListPage() {
     ativos: number; afastados: number; desligados: number; total: number
     unidades_distintas: number
   } | null>(null)
+  const [loadingList, setLoadingList] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
@@ -45,7 +48,8 @@ export default function ColaboradoresListPage() {
     let cancelled = false
     const supabase = getSupabase()
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (cancelled || !user) return
       const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (p && !cancelled) setProfile(p as { role: string })
@@ -65,27 +69,40 @@ export default function ColaboradoresListPage() {
     let cancelled = false
     const supabase = getSupabase()
     async function load() {
-      const filters: Record<string, string> = {}
-      if (filtroUnidade) filters.unidade = filtroUnidade
-      if (filtroCargo) filters.cargo = filtroCargo
-      if (filtroSituacao) filters.situacao = filtroSituacao
-      if (debouncedSearch) filters.search = debouncedSearch
-      const from = (page - 1) * PAGE_SIZE
-      const to = from + PAGE_SIZE - 1
+      setLoadingList(true)
+      setLoadError(null)
+      try {
+        const from = (page - 1) * PAGE_SIZE
+        const to = from + PAGE_SIZE - 1
+        const searchTerm = debouncedSearch.trim().replace(/[,%()]/g, ' ')
 
-      const [result, favs] = await Promise.all([
-        (supabase
+        let query = supabase
           .from('colaboradores')
           .select('*', { count: 'exact', head: false })
-          .order('nome_completo', { ascending: true })
-          .range(from, to)
-        ) as unknown as { data: Colaborador[] | null; count: number | null; error: unknown },
-        listFavoritos(supabase),
-      ])
-      if (cancelled) return
-      if (result.data) setColaboradores(result.data)
-      if (result.count !== null) setTotalCount(result.count)
-      setFavoritoIds(new Set(favs.map(f => f.colaborador_id)))
+        if (filtroUnidade) query = query.eq('unidade', filtroUnidade)
+        if (filtroCargo) query = query.eq('cargo', filtroCargo)
+        if (filtroSituacao) query = query.eq('situacao', filtroSituacao)
+        if (searchTerm) {
+          query = query.or(`nome_completo.ilike.%${searchTerm}%,unidade.ilike.%${searchTerm}%,cargo.ilike.%${searchTerm}%,email_institucional.ilike.%${searchTerm}%`)
+        }
+
+        const [result, favs] = await Promise.all([
+          query.order('nome_completo', { ascending: true }).range(from, to) as unknown as { data: Colaborador[] | null; count: number | null; error: { message?: string } | null },
+          listFavoritos(supabase),
+        ])
+        if (cancelled) return
+        if (result.error) throw new Error(result.error.message || 'Erro ao carregar colaboradores')
+        setColaboradores(result.data || [])
+        setTotalCount(result.count ?? 0)
+        setFavoritoIds(new Set(favs.map(f => f.colaborador_id)))
+      } catch (err) {
+        if (cancelled) return
+        setColaboradores([])
+        setTotalCount(0)
+        setLoadError(err instanceof Error ? err.message : 'Erro ao carregar colaboradores')
+      } finally {
+        if (!cancelled) setLoadingList(false)
+      }
     }
     load()
     return () => { cancelled = true }
@@ -131,10 +148,10 @@ export default function ColaboradoresListPage() {
             🎂 Aniversariantes
           </button>
           {canEdit && (
-            <button onClick={() => router.push('/pmo-dashboard/colaboradores/novo')}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <Link href="/pmo-dashboard/colaboradores/novo"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'none' }}>
               <Plus size={14} /> Novo Colaborador
-            </button>
+            </Link>
           )}
         </div>
       </div>
@@ -168,13 +185,27 @@ export default function ColaboradoresListPage() {
 
       {/* Lista */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {colaboradores.length === 0 ? (
+        {loadingList ? (
+          [1, 2, 3, 4, 5].map(i => (
+            <div key={i} style={{
+              height: 66, padding: '12px 16px', background: 'rgba(30,41,59,0.7)',
+              borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              <div style={{ height: 14, width: '55%', background: 'rgba(71,85,105,0.45)', borderRadius: 7, marginBottom: 10 }} />
+              <div style={{ height: 10, width: '38%', background: 'rgba(71,85,105,0.35)', borderRadius: 5 }} />
+            </div>
+          ))
+        ) : loadError ? (
+          <div style={{ textAlign: 'center', padding: 60, color: '#fca5a5', fontSize: 14 }}>
+            {loadError}
+          </div>
+        ) : colaboradores.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 60, color: '#64748b', fontSize: 14 }}>
             Nenhum colaborador encontrado
           </div>
         ) : (
           colaboradores.map(c => (
-            <div key={c.id} onClick={() => router.push(`/pmo-dashboard/colaboradores/${c.id}`)}
+            <div key={c.id} onClick={() => router.push(`/pmo-dashboard/colaboradores/detalhe?id=${c.id}`)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 16px', background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',

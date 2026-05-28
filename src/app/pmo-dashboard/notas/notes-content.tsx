@@ -19,9 +19,15 @@ export default function NotesPage() {
 
   const loadNotes = useCallback(async () => {
     setLoading(true)
-    const data = await listNotes(filters)
-    setNotes(data)
-    setLoading(false)
+    try {
+      const data = await listNotes(filters)
+      setNotes(data)
+    } catch (err) {
+      console.warn('Erro ao carregar notas:', err)
+      setNotes([])
+    } finally {
+      setLoading(false)
+    }
   }, [filters])
 
   useEffect(() => {

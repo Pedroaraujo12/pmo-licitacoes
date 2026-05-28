@@ -1,4 +1,5 @@
 import TemplateDetailClient from './template-detail-client'
+import { Suspense } from 'react'
 
 export async function generateStaticParams() {
   const ids: { id: string }[] = [{ id: 'placeholder' }]
@@ -16,5 +17,9 @@ export async function generateStaticParams() {
 }
 
 export default function TemplateDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  return <TemplateDetailClient params={params} />
+  return (
+    <Suspense fallback={<div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="loading-spinner" /></div>}>
+      <TemplateDetailClient params={params} />
+    </Suspense>
+  )
 }

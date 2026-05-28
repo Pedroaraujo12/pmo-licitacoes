@@ -13,7 +13,7 @@ const cardStyle: React.CSSProperties = {
   borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', padding: 24, marginBottom: 16,
 }
 
-export default function VencimentosPage() {
+function VencimentosContent() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [vencendo7d, setVencendo7d] = useState<Contrato[]>([])
@@ -22,40 +22,49 @@ export default function VencimentosPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let cancelled = false
     async function load() {
-      const hoje = new Date().toISOString().slice(0, 10)
-      const seteDias = new Date()
-      seteDias.setDate(seteDias.getDate() + 7)
-      const seteDiasStr = seteDias.toISOString().slice(0, 10)
-      const trintaDias = new Date()
-      trintaDias.setDate(trintaDias.getDate() + 30)
-      const trintaDiasStr = trintaDias.toISOString().slice(0, 10)
+      try {
+        const hoje = new Date().toISOString().slice(0, 10)
+        const seteDias = new Date()
+        seteDias.setDate(seteDias.getDate() + 7)
+        const seteDiasStr = seteDias.toISOString().slice(0, 10)
+        const trintaDias = new Date()
+        trintaDias.setDate(trintaDias.getDate() + 30)
+        const trintaDiasStr = trintaDias.toISOString().slice(0, 10)
 
-      const { data: todos, error: err } = await supabase
-        .from('contratos')
-        .select('*, processos(id_processo, objeto_resumido)')
-        .not('data_fim_vigencia', 'is', null)
-        .order('data_fim_vigencia', { ascending: true })
-        .limit(200)
+        const { data: todos, error: err } = await supabase
+          .from('contratos')
+          .select('*, processos(id_processo, objeto_resumido)')
+          .not('data_fim_vigencia', 'is', null)
+          .order('data_fim_vigencia', { ascending: true })
+          .limit(200)
 
-      if (err) {
-        setError('Erro ao carregar vencimentos')
-        setLoading(false)
-        return
+        if (cancelled) return
+
+        if (err) {
+          setError('Erro ao carregar vencimentos')
+          setLoading(false)
+          return
+        }
+
+        const contratos = (todos as Contrato[]) || []
+        setVencidos(contratos.filter(c =>
+          c.data_fim_vigencia! < hoje && !['encerrado', 'rescindido'].includes(c.status)))
+        setVencendo7d(contratos.filter(c =>
+          c.data_fim_vigencia! >= hoje && c.data_fim_vigencia! <= seteDiasStr &&
+          ['vigente', 'proximo_vencimento'].includes(c.status)))
+        setVencendo30d(contratos.filter(c =>
+          c.data_fim_vigencia! > seteDiasStr && c.data_fim_vigencia! <= trintaDiasStr &&
+          ['vigente', 'proximo_vencimento'].includes(c.status)))
+      } catch {
+        if (!cancelled) setError('Erro ao carregar vencimentos')
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-
-      const contratos = (todos as Contrato[]) || []
-      setVencidos(contratos.filter(c =>
-        c.data_fim_vigencia! < hoje && !['encerrado', 'rescindido'].includes(c.status)))
-      setVencendo7d(contratos.filter(c =>
-        c.data_fim_vigencia! >= hoje && c.data_fim_vigencia! <= seteDiasStr &&
-        ['vigente', 'proximo_vencimento'].includes(c.status)))
-      setVencendo30d(contratos.filter(c =>
-        c.data_fim_vigencia! > seteDiasStr && c.data_fim_vigencia! <= trintaDiasStr &&
-        ['vigente', 'proximo_vencimento'].includes(c.status)))
-      setLoading(false)
     }
     load()
+    return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -71,7 +80,7 @@ export default function VencimentosPage() {
             (new Date(c.data_fim_vigencia! + 'T00:00:00').getTime() - new Date().getTime()) / 86400000,
           )
           return (
-            <Link key={c.id} href={`/pmo-dashboard/contratos/${c.id}`}
+            <Link key={c.id} href={`/pmo-dashboard/contratos/detalhe?id=${c.id}`}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '10px 14px', borderRadius: 10, textDecoration: 'none',
@@ -146,4 +155,8 @@ export default function VencimentosPage() {
       </div>
     </div>
   )
+}
+
+export default function VencimentosPage() {
+  return <VencimentosContent />
 }

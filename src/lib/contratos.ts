@@ -5,9 +5,9 @@ import { logHistorico } from './contrato-historico'
 const CONTRATO_SELECT = `
   *,
   processos(id_processo, objeto_resumido, modalidades(nome)),
-  gestor:gestor_id(nome),
-  fiscal_tecnico:fiscal_tecnico_id(nome),
-  fiscal_administrativo:fiscal_administrativo_id(nome),
+  gestor:gestor_id(nome_completo),
+  fiscal_tecnico:fiscal_tecnico_id(nome_completo),
+  fiscal_administrativo:fiscal_administrativo_id(nome_completo),
   coordenacoes(nome)
 `
 

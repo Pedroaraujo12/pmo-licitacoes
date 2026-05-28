@@ -217,7 +217,7 @@ export interface OrdemServico {
   // Joins
   contratos?: { numero_contrato: string; contratada_nome: string; status: ContratoStatus } | null
   processos?: { id_processo: string | null } | null
-  fiscais?: { nome: string } | null
+  fiscais?: { nome_completo: string } | null
 }
 
 export interface ContratoAditivo {
@@ -258,7 +258,7 @@ export interface ContratoMedicao {
 
   // Joins
   ordens_servico?: { numero_os: string } | null
-  fiscais?: { nome: string } | null
+  fiscais?: { nome_completo: string } | null
 }
 
 export interface ContratoPagamento {

@@ -12,5 +12,6 @@ const ERROR_MAP: Record<string, string> = {
 }
 
 export function translateAuthError(message: string): string {
-  return ERROR_MAP[message] || message
+  if (!message) return ''
+  return ERROR_MAP[message] || 'Não foi possível concluir a operação. Tente novamente.'
 }

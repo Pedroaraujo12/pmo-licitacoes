@@ -36,7 +36,7 @@ export default function NovoModeloPage() {
         descricao: form.descricao || undefined,
         tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined,
       })
-      router.push(`/pmo-dashboard/documentos/${data.id}`)
+      router.push(`/pmo-dashboard/documentos/detalhe?id=${data.id}`)
     } catch (err) {
       setError((err as Error).message || 'Erro ao criar modelo')
     } finally { setSaving(false) }

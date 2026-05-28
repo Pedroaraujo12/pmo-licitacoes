@@ -5,6 +5,11 @@ import type {
 } from '@/types/documentos'
 import { formatDateBR } from './utils'
 
+async function getSessionUserId(supabase: SupabaseClient) {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.user?.id ?? null
+}
+
 /* ─────────── MODELOS ─────────── */
 
 export async function listTemplates(
@@ -40,8 +45,8 @@ export async function createTemplate(supabase: SupabaseClient, data: {
   title: string; tipo_documento: string; categoria: string
   base_legal?: string; sei_link?: string; descricao?: string; conteudo: string; tags?: string[]
 }) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Usuário não autenticado')
+  const userId = await getSessionUserId(supabase)
+  if (!userId) throw new Error('Usuário não autenticado')
 
   const { data: template, error } = await supabase.from('document_templates').insert({
     title: data.title,
@@ -52,7 +57,7 @@ export async function createTemplate(supabase: SupabaseClient, data: {
     descricao: data.descricao || null,
     conteudo: data.conteudo,
     tags: data.tags || [],
-    created_by: user.id,
+    created_by: userId,
     status: 'rascunho',
   }).select().single()
 
@@ -65,7 +70,7 @@ export async function createTemplate(supabase: SupabaseClient, data: {
     conteudo: data.conteudo,
     resumo_alteracao: 'Versão inicial',
     status: 'rascunho',
-    author_id: user.id,
+    author_id: userId,
   })
 
   return template
@@ -88,30 +93,30 @@ export async function deleteTemplate(supabase: SupabaseClient, id: string) {
 }
 
 export async function toggleFavorite(supabase: SupabaseClient, templateId: string) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Usuário não autenticado')
+  const userId = await getSessionUserId(supabase)
+  if (!userId) throw new Error('Usuário não autenticado')
 
   const { data: existing } = await supabase
     .from('template_favorites')
     .select('id')
     .eq('template_id', templateId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle()
 
   if (existing) {
     return supabase.from('template_favorites').delete().eq('id', existing.id)
   }
-  return supabase.from('template_favorites').insert({ template_id: templateId, user_id: user.id })
+  return supabase.from('template_favorites').insert({ template_id: templateId, user_id: userId })
 }
 
 export async function listFavorites(supabase: SupabaseClient) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { data: null, error: 'Usuário não autenticado' }
+  const userId = await getSessionUserId(supabase)
+  if (!userId) return { data: null, error: 'Usuário não autenticado' }
 
   return supabase
     .from('template_favorites')
     .select('template_id')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .limit(100) as unknown as { data: { template_id: string }[] | null; error: unknown }
 }
 
@@ -131,8 +136,8 @@ export async function listVersions(supabase: SupabaseClient, templateId: string)
 export async function createVersion(supabase: SupabaseClient, templateId: string, data: {
   conteudo: string; resumo_alteracao: string
 }) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Usuário não autenticado')
+  const userId = await getSessionUserId(supabase)
+  if (!userId) throw new Error('Usuário não autenticado')
 
   const { data: last } = await supabase
     .from('template_versions')
@@ -149,7 +154,7 @@ export async function createVersion(supabase: SupabaseClient, templateId: string
     conteudo: data.conteudo,
     resumo_alteracao: data.resumo_alteracao,
     status: 'rascunho',
-    author_id: user.id,
+    author_id: userId,
   }).select().single()
 }
 
@@ -158,14 +163,14 @@ export async function approveVersion(
   versionId: string,
   observacoes?: string,
 ) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Usuário não autenticado')
+  const userId = await getSessionUserId(supabase)
+  if (!userId) throw new Error('Usuário não autenticado')
 
   const { data: version } = await supabase
     .from('template_versions')
     .update({
       status: 'aprovado',
-      aprovado_por: user.id,
+      aprovado_por: userId,
       data_aprovacao: new Date().toISOString(),
       observacoes_aprovacao: observacoes || null,
     })
@@ -212,8 +217,8 @@ export async function generateDocument(
   processoId: string,
   templateVersionId: string,
 ) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Usuário não autenticado')
+  const userId = await getSessionUserId(supabase)
+  if (!userId) throw new Error('Usuário não autenticado')
 
   // 1. Buscar versão do modelo
   const { data: version, error: verr } = await supabase
@@ -305,7 +310,7 @@ export async function generateDocument(
     template_version_id: version.id,
     titulo_documento: titulo,
     conteudo_gerado: conteudo,
-    created_by: user.id,
+    created_by: userId,
   }).select().single()
 
   if (derr) throw derr
@@ -315,7 +320,7 @@ export async function generateDocument(
     template_id: version.template_id,
     template_version_id: version.id,
     acao: 'utilizou',
-    user_id: user.id,
+    user_id: userId,
     processo_id: processoId,
     metadata: { titulo_documento: titulo },
   })

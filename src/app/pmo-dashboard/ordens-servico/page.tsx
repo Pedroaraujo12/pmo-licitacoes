@@ -94,7 +94,7 @@ export default function OrdensServicoListPage() {
           {ordens.map(os => {
             const statusRec = OS_STATUS_RECORDS[os.status]
             return (
-              <div key={os.id} onClick={() => router.push(`/pmo-dashboard/ordens-servico/${os.id}`)}
+              <div key={os.id} onClick={() => router.push(`/pmo-dashboard/ordens-servico/detalhe?id=${os.id}`)}
                 style={{
                   display: 'grid', gridTemplateColumns: '80px 1fr 2fr 120px 130px 120px 100px 80px',
                   gap: 8, padding: '12px 16px', background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',

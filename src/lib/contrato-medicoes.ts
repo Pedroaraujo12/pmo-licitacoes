@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 const MEDICAO_SELECT = `
   *,
   ordens_servico(numero_os),
-  fiscais:fiscal_id(nome)
+  fiscais:fiscal_id(nome_completo)
 `
 
 export async function listMedicoes(

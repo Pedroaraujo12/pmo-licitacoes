@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { upsertSeiLink, fetchSeiLink } from '@/lib/utils'
+import { cleanNum, formatBRL, upsertSeiLink, fetchSeiLink } from '@/lib/utils'
 import { PT_BR } from '@/lib/pt-br'
 
-export default function EditProcessoClient({ params }: { params: Promise<{ id: string }> }) {
-  const paramsId = use(params).id
-  const [id, setId] = useState(paramsId)
+export default function EditProcessoClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
+  const paramsId = idOverride ?? (params ? use(params).id : '')
+  const id = paramsId
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [notFound, setNotFound] = useState(false)
@@ -72,23 +72,16 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
         if (proc.data) {
           const f: Record<string, string> = {}
           for (const [key, value] of Object.entries(proc.data)) {
-            f[key] = value === null || value === undefined ? '' : String(value)
+            f[key] = value === null || value === undefined
+              ? ''
+              : ['valor_estimado', 'valor_homologado'].includes(key)
+                ? formatBRL(value)
+                : String(value)
           }
           const sei = await fetchSeiLink(getSupabase(), id)
           if (sei) f.link_sei = sei
           setForm(f)
         } else if (typeof window !== 'undefined') {
-          const m = window.location.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)
-          if (m && m[0] !== id) {
-            setId(m[0])
-            return
-          }
-          const sp = new URLSearchParams(window.location.search)
-          const idFromSearch = sp.get('id')
-          if (idFromSearch && idFromSearch !== id) {
-            setId(idFromSearch)
-            return
-          }
           setNotFound(true)
           setError('Processo não encontrado.')
         } else {
@@ -121,7 +114,9 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
         payload[key] = null
         continue
       }
-      if (['qtd_itens', 'progresso', 'valor_estimado', 'valor_homologado'].includes(key)) {
+      if (['valor_estimado', 'valor_homologado'].includes(key)) {
+        payload[key] = cleanNum(value)
+      } else if (['qtd_itens', 'progresso'].includes(key)) {
         payload[key] = Number(value)
       } else if (['data_entrada', 'data_atividade', 'data_entrega'].includes(key)) {
         payload[key] = value || null
@@ -131,8 +126,8 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
     }
 
     // Auto-compute despesa_evitada
-    const estimado = Number(form.valor_estimado) || 0
-    const homologado = Number(form.valor_homologado) || 0
+    const estimado = cleanNum(form.valor_estimado)
+    const homologado = cleanNum(form.valor_homologado)
     payload.despesa_evitada = estimado - homologado
 
     const { error: err } = await getSupabase().from('processos').update(payload).eq('id', id)
@@ -148,7 +143,7 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
       await upsertSeiLink(getSupabase(), id, null)
     }
 
-    router.push(`/pmo-dashboard/processos/${id}`)
+    router.push(`/pmo-dashboard/processos/detalhe?id=${id}`)
     router.refresh()
   }
 
@@ -170,8 +165,8 @@ export default function EditProcessoClient({ params }: { params: Promise<{ id: s
     { label: 'Data Atividade', name: 'data_atividade', type: 'date' },
     { label: 'Progresso (%)', name: 'progresso', type: 'number' },
     { label: 'Data Entrega', name: 'data_entrega', type: 'date' },
-    { label: 'Valor Estimado (R$)', name: 'valor_estimado', type: 'number' },
-    { label: 'Valor Homologado (R$)', name: 'valor_homologado', type: 'number' },
+    { label: 'Valor Estimado (R$)', name: 'valor_estimado', type: 'text' },
+    { label: 'Valor Homologado (R$)', name: 'valor_homologado', type: 'text' },
   ]
 
   const baseInput = {

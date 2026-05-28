@@ -25,6 +25,7 @@ const fakeClient = {
   rpc: vi.fn(),
   auth: {
     getUser: vi.fn(),
+    getSession: vi.fn(),
   },
 }
 
@@ -52,6 +53,7 @@ const mockNote = {
 beforeEach(() => {
   vi.clearAllMocks()
   fakeClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
+  fakeClient.auth.getSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null })
 })
 
 describe('listNotes', () => {
@@ -71,6 +73,7 @@ describe('listNotes', () => {
 
   it('usa RPC quando search é fornecido', async () => {
     fakeClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
+    fakeClient.auth.getSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null })
     const notesChain = createChain({ data: [], error: null })
     fakeClient.rpc.mockResolvedValue({ data: [mockNote], error: null })
     fakeClient.from.mockReturnValue(notesChain)
@@ -125,6 +128,7 @@ describe('listNotes', () => {
 
   it('retorna [] se não autenticado', async () => {
     fakeClient.auth.getUser.mockResolvedValue({ data: { user: null }, error: { message: 'no user' } })
+    fakeClient.auth.getSession.mockResolvedValue({ data: { session: null }, error: { message: 'no user' } })
     const result = await testListNotes({})
     expect(result).toEqual([])
   })
@@ -147,6 +151,7 @@ describe('getNote', () => {
 
   it('retorna null se não autenticado', async () => {
     fakeClient.auth.getUser.mockResolvedValue({ data: { user: null }, error: { message: 'no user' } })
+    fakeClient.auth.getSession.mockResolvedValue({ data: { session: null }, error: { message: 'no user' } })
     const result = await testGetNote('note-1')
     expect(result).toBeNull()
   })

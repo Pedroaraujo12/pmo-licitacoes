@@ -1,14 +1,14 @@
-import PagamentosClient from './page-client'
+import FornecedorDetailClient from './detail-client'
 import { Suspense } from 'react'
 
 export async function generateStaticParams() {
   return [{ id: 'placeholder' }]
 }
 
-export default function PagamentosWrapper({ params }: { params: Promise<{ id: string }> }) {
+export default function FornecedorDetailPage() {
   return (
     <Suspense fallback={<div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="loading-spinner" /></div>}>
-      <PagamentosClient params={params} />
+      <FornecedorDetailClient />
     </Suspense>
   )
 }

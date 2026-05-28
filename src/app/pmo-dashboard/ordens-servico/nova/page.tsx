@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { listContratos } from '@/lib/contratos'
 import { createOrdemServico } from '@/lib/ordens-servico'
+import { cleanNum } from '@/lib/utils'
 import type { Contrato } from '@/types/contratos'
 import { ArrowLeft, Save } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
@@ -77,9 +78,9 @@ export default function NovaOrdemServicoPage() {
         data_emissao: form.data_emissao || null,
         data_inicio: form.data_inicio || null,
         data_fim_prevista: form.data_fim_prevista || null,
-        valor: Number(form.valor) || 0,
-        valor_medido: Number(form.valor_medido) || 0,
-        valor_pago: Number(form.valor_pago) || 0,
+        valor: cleanNum(form.valor),
+        valor_medido: cleanNum(form.valor_medido),
+        valor_pago: cleanNum(form.valor_pago),
         fiscal_id: form.fiscal_id || null,
         contratada_responsavel: form.contratada_responsavel || null,
         local_execucao: form.local_execucao || null,
@@ -90,7 +91,7 @@ export default function NovaOrdemServicoPage() {
       }
       const os = await createOrdemServico(supabase, payload as Parameters<typeof createOrdemServico>[1])
       toast('Ordem de serviço criada com sucesso', 'success')
-      router.push(`/pmo-dashboard/ordens-servico/${os!.id}`)
+      router.push(`/pmo-dashboard/ordens-servico/detalhe?id=${os!.id}`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao criar ordem de serviço'
       setError(msg)
@@ -169,7 +170,7 @@ export default function NovaOrdemServicoPage() {
         <div style={cardStyle}>
           <h3 style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', margin: '0 0 16px', textTransform: 'uppercase' }}>Valores</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            {renderField('Valor', 'valor', 'number')}
+            {renderField('Valor', 'valor')}
             {renderField('% Execução', 'percentual_execucao', 'number')}
           </div>
         </div>

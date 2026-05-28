@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, use, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Edit, Trash2, CheckCircle, AlertTriangle, Plus,
   Save, X,
@@ -12,10 +12,11 @@ import { formatDate } from '@/lib/utils'
 import { TIPO_DOCUMENTO_LABELS, CATEGORIA_LABELS, TEMPLATE_STATUS_LABELS, TEMPLATE_STATUS_COLORS } from '@/types/documentos'
 import type { DocumentTemplate, TemplateVersion } from '@/types/documentos'
 
-export default function TemplateDetailClient({ params }: { params: Promise<{ id: string }> }) {
-  const paramsId = use(params).id
-  const [id, setId] = useState(paramsId)
+export default function TemplateDetailClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
+  const paramsId = idOverride ?? (params ? use(params).id : '')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const queryId = searchParams.get('id')
   const supabase = createClient()
   const [template, setTemplate] = useState<DocumentTemplate | null>(null)
   const [versions, setVersions] = useState<TemplateVersion[]>([])
@@ -39,31 +40,43 @@ export default function TemplateDetailClient({ params }: { params: Promise<{ id:
   const [nvConteudo, setNvConteudo] = useState('')
   const [nvResumo, setNvResumo] = useState('')
   const [nvSaving, setNvSaving] = useState(false)
+  const resolvedId = useMemo(() => queryId || paramsId, [queryId, paramsId])
 
   async function load() {
-    const supabase = createClient()
-    const [{ data: t }, { data: v }] = await Promise.all([
-      getTemplate(supabase, id),
-      listVersions(supabase, id),
-    ])
-    if (!t && typeof window !== 'undefined') {
-      const m = window.location.pathname.match(/\/documentos\/([a-f0-9-]+)/)
-      if (m && m[1] !== id) {
-        setId(m[1])
-        return
+    setLoading(true)
+    try {
+      const targetId = resolvedId || queryId || paramsId
+      if (!targetId) return
+      const [{ data: t }, { data: v }] = await Promise.all([
+        getTemplate(supabase, targetId),
+        listVersions(supabase, targetId),
+      ])
+      if (!t && typeof window !== 'undefined') {
+        const m = window.location.pathname.match(/\/documentos\/([a-f0-9-]+)/)
+        if (m && m[1] !== targetId) return
       }
+      if (t) setTemplate(t)
+      if (v) setVersions(v)
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (user) {
+        const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setProfile(p)
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar documento:', err)
+      setTemplate(null)
+      setVersions([])
+    } finally {
+      setLoading(false)
     }
-    if (t) setTemplate(t)
-    if (v) setVersions(v)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: p } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setProfile(p)
-    }
-    setLoading(false)
   }
 
-  useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/set-state-in-effect,react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [resolvedId]) // eslint-disable-line react-hooks/set-state-in-effect,react-hooks/exhaustive-deps
+  useEffect(() => {
+    const watchdog = window.setTimeout(() => setLoading(false), 12000)
+    return () => window.clearTimeout(watchdog)
+  }, [resolvedId])
 
   const canManage = profile?.role && ['admin', 'gestor'].includes(profile.role)
   const canApprove = profile?.role && ['admin', 'gestor'].includes(profile.role)
@@ -86,7 +99,7 @@ export default function TemplateDetailClient({ params }: { params: Promise<{ id:
     if (!editTitle.trim()) return
     setSaving(true)
     try {
-      await updateTemplate(supabase, id, {
+      await updateTemplate(supabase, resolvedId, {
         title: editTitle,
         tipo_documento: editTipo,
         categoria: editCategoria,
@@ -120,7 +133,7 @@ export default function TemplateDetailClient({ params }: { params: Promise<{ id:
   async function handleDelete() {
     if (!confirm('Excluir este modelo? Todas as versões serão removidas.')) return
     try {
-      await deleteTemplate(supabase, id)
+      await deleteTemplate(supabase, resolvedId)
       router.push('/pmo-dashboard/documentos')
     } catch (err: unknown) {
       setDeleteError(err instanceof Error ? err.message : 'Erro ao excluir modelo. Verifique se não há documentos gerados vinculados.')
@@ -132,7 +145,7 @@ export default function TemplateDetailClient({ params }: { params: Promise<{ id:
     if (!nvConteudo.trim() || !nvResumo.trim()) return
     setNvSaving(true)
     try {
-      await createVersion(supabase, id, { conteudo: nvConteudo, resumo_alteracao: nvResumo })
+      await createVersion(supabase, resolvedId, { conteudo: nvConteudo, resumo_alteracao: nvResumo })
       setNovaVersao(false)
       setNvConteudo('')
       setNvResumo('')

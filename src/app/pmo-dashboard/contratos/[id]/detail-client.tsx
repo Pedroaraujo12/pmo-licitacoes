@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getContrato, computeContratoAlertas, computeSaldoContrato, computeDiasRestantes, computeValoresBreakdown } from '@/lib/contratos'
@@ -60,10 +60,11 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   )
 }
 
-export default function ContratoDetailClient({ params }: { params: Promise<{ id: string }> }) {
-  const paramsId = use(params).id
+export default function ContratoDetailClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
+  const paramsId = idOverride ?? (params ? use(params).id : '')
   const [id, setId] = useState(paramsId)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const isMobile = useIsMobile()
 
@@ -86,6 +87,11 @@ export default function ContratoDetailClient({ params }: { params: Promise<{ id:
   useEffect(() => {
     async function load() {
       let currentId = id
+      const queryId = searchParams.get('id')
+      if (queryId && queryId !== currentId) {
+        setId(queryId)
+        return
+      }
       if (currentId === 'placeholder') {
         const m = window.location.pathname.match(/\/contratos\/([a-f0-9-]+)/)
         if (m && m[1] !== 'placeholder') {
@@ -129,7 +135,7 @@ export default function ContratoDetailClient({ params }: { params: Promise<{ id:
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, searchParams])
 
   if (loading) return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
@@ -582,7 +588,7 @@ export default function ContratoDetailClient({ params }: { params: Promise<{ id:
                 {drBadge.label}
               </span>
               {c.processos?.id_processo && (
-                <Link href={`/pmo-dashboard/processos/${c.processo_id}`}
+                <Link href={`/pmo-dashboard/processos/detalhe?id=${c.processo_id}`}
                   style={{ fontSize: 12, color: '#60a5fa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <LinkIcon size={12} /> {c.processos.id_processo}
                 </Link>
@@ -594,7 +600,7 @@ export default function ContratoDetailClient({ params }: { params: Promise<{ id:
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flexShrink: 0 }}>
           {c.processo_id && (
-            <Link href={`/pmo-dashboard/processos/${c.processo_id}`}
+            <Link href={`/pmo-dashboard/processos/detalhe?id=${c.processo_id}`}
               style={{
                 display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px',
                 background: '#334155', color: '#f1f5f9', border: 'none', borderRadius: 6,
@@ -604,7 +610,7 @@ export default function ContratoDetailClient({ params }: { params: Promise<{ id:
             </Link>
           )}
           {canEdit && (
-            <Link href={`/pmo-dashboard/contratos/novo`}
+            <Link href={`/pmo-dashboard/contratos/editar?id=${id}`}
               style={{
                 display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px',
                 background: '#334155', color: '#f1f5f9', border: 'none', borderRadius: 6,

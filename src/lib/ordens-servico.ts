@@ -6,7 +6,7 @@ const OS_SELECT = `
   *,
   contratos(numero_contrato, contratada_nome, status),
   processos(id_processo),
-  fiscais:fiscal_id(nome)
+  fiscais:fiscal_id(nome_completo)
 `
 
 export async function listOrdensServico(

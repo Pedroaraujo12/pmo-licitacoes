@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getContrato } from '@/lib/contratos'
 import { listOrdensServico } from '@/lib/ordens-servico'
@@ -19,6 +19,7 @@ export default function OrdensServicoClient({ params }: { params: Promise<{ id: 
   const paramsId = use(params).id
   const [id, setId] = useState(paramsId)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [contrato, setContrato] = useState<Contrato | null>(null)
   const [ordens, setOrdens] = useState<OrdemServico[]>([])
@@ -27,6 +28,11 @@ export default function OrdensServicoClient({ params }: { params: Promise<{ id: 
   useEffect(() => {
     async function load() {
       const currentId = id
+      const queryId = searchParams.get('id')
+      if (queryId && queryId !== currentId) {
+        setId(queryId)
+        return
+      }
       if (currentId === 'placeholder') {
         const m = window.location.pathname.match(/\/contratos\/([a-f0-9-]+)\/ordens-servico/)
         if (m && m[1] !== 'placeholder') {
@@ -43,7 +49,7 @@ export default function OrdensServicoClient({ params }: { params: Promise<{ id: 
       setLoading(false)
     }
     load()
-  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -62,7 +68,7 @@ export default function OrdensServicoClient({ params }: { params: Promise<{ id: 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => router.push(`/pmo-dashboard/contratos/${id}`)}
+        <button onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${id}`)}
           style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
           <ArrowLeft size={20} />
         </button>
@@ -101,7 +107,7 @@ export default function OrdensServicoClient({ params }: { params: Promise<{ id: 
           {ordens.map(os => {
             const statusRec = OS_STATUS_RECORDS[os.status]
             return (
-              <div key={os.id} onClick={() => router.push(`/pmo-dashboard/ordens-servico/${os.id}`)}
+              <div key={os.id} onClick={() => router.push(`/pmo-dashboard/ordens-servico/detalhe?id=${os.id}`)}
                 style={{
                   display: 'grid', gridTemplateColumns: '80px 2fr 120px 130px 110px 80px',
                   gap: 8, padding: '12px 16px', background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',
