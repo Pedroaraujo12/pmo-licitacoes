@@ -275,6 +275,19 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
         </div>
 
         <div style={{ marginBottom: 24 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Observações</label>
+          <textarea
+            name="observacoes"
+            aria-label="Observações"
+            value={form.observacoes || ''}
+            onChange={e => setForm(fm => ({ ...fm, observacoes: e.target.value }))}
+            rows={4}
+            placeholder="Registre observações relevantes do processo"
+            style={{ ...baseInput, resize: 'vertical', minHeight: 96 }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{PT_BR.googleDrive}</label>
           <input
             value={form.drive || ''}

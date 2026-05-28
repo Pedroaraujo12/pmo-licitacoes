@@ -57,6 +57,7 @@ interface ProcessoRow {
   valor_homologado: number
   prioridade: string
   atividade_atual: string | null
+  observacoes: string | null
   status_nome: string
   modalidade_nome: string
   responsavel_nome: string
@@ -394,6 +395,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                     'ID Processo': p.id_processo || '',
                     'Objeto': p.objeto_resumido || '',
                     'Atividade Atual': p.atividade_atual || '',
+                    'Observações': p.observacoes || '',
                     'Valor Estimado': p.valor_estimado,
                   })), 'processos_dashboard')}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-1 rounded text-[9px] font-bold transition cursor-pointer border-none flex items-center gap-1"
@@ -404,14 +406,15 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left table-fixed">
+            <table className="w-full min-w-[980px] text-left table-fixed">
               <thead className="sticky top-0 bg-[#1e293b] z-10 shadow-sm">
                 <tr className="text-[9px] font-black uppercase text-slate-500 border-b border-white/10 tracking-tighter">
-                  <th scope="col" style={{ width: '15%', padding: '12px 8px' }}>ID Processo</th>
-                  <th scope="col" style={{ width: '25%', padding: '12px 8px' }}>Objeto / Serviço</th>
-                  <th scope="col" style={{ width: canEdit ? '32%' : '45%', padding: '12px 8px' }}>Atividade Atual</th>
-                  <th scope="col" style={{ width: '13%', padding: '12px 8px', textAlign: 'right' }}>Estimado</th>
-                  {canEdit && <th scope="col" style={{ width: '15%', padding: '12px 8px', textAlign: 'center' }}>Ações</th>}
+                  <th scope="col" style={{ width: canEdit ? '14%' : '15%', padding: '12px 8px' }}>ID Processo</th>
+                  <th scope="col" style={{ width: canEdit ? '19%' : '22%', padding: '12px 8px' }}>Objeto / Serviço</th>
+                  <th scope="col" style={{ width: canEdit ? '22%' : '28%', padding: '12px 8px' }}>Atividade Atual</th>
+                  <th scope="col" style={{ width: canEdit ? '21%' : '23%', padding: '12px 8px' }}>Observações</th>
+                  <th scope="col" style={{ width: '12%', padding: '12px 8px', textAlign: 'right' }}>Estimado</th>
+                  {canEdit && <th scope="col" style={{ width: '12%', padding: '12px 8px', textAlign: 'center' }}>Ações</th>}
                 </tr>
               </thead>
               <tbody className="text-[10px] divide-y divide-white/5">
@@ -421,6 +424,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                       <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-16" /></td>
                       <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-32" /></td>
                       <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-40" /></td>
+                      <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-36" /></td>
                       <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-16 ml-auto" /></td>
                       {canEdit && <td className="px-2 py-3"><div className="h-3 bg-gray-700 rounded w-12 mx-auto" /></td>}
                     </tr>
@@ -464,6 +468,14 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                           {p.atividade_atual || 'Sem atividade atual'}
                         </div>
                       </td>
+                      <td className="px-2 py-3">
+                        <div
+                          className="text-slate-300 truncate"
+                          title={p.observacoes || 'Sem observações'}
+                        >
+                          {p.observacoes || 'Sem observações'}
+                        </div>
+                      </td>
                       <td className="px-2 py-3 text-right font-bold text-slate-100">
                         {formatBRL(p.valor_estimado)}
                       </td>
@@ -492,7 +504,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                 })}
                 {!loadingRows && rows.length === 0 && (
                   <tr>
-                    <td colSpan={canEdit ? 5 : 4} className="p-10 text-center opacity-30 uppercase font-black tracking-widest text-[10px]">Sem dados</td>
+                    <td colSpan={canEdit ? 6 : 5} className="p-10 text-center opacity-30 uppercase font-black tracking-widest text-[10px]">Sem dados</td>
                   </tr>
                 )}
               </tbody>
@@ -573,6 +585,10 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
               <div className="p-4 glass-card-inner">
                 <p className="text-[9px] font-bold text-slate-500 mb-1">Demandante</p>
                 <p className="text-sm font-bold text-slate-100">{modalProcesso.demandante_nome || '-'}</p>
+              </div>
+              <div className="sm:col-span-2 p-4 glass-card-inner">
+                <p className="text-[9px] font-bold text-slate-500 mb-1">Observações</p>
+                <p className="text-sm font-bold text-slate-100 whitespace-pre-wrap">{modalProcesso.observacoes || '-'}</p>
               </div>
             </div>
             <div className="px-6 py-4 border-t border-white/5 flex justify-end gap-3 shrink-0">

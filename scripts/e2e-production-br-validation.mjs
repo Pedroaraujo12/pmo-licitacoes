@@ -79,10 +79,22 @@ try {
   if (!fluxoHeaders.includes('Atividade Atual')) {
     throw new Error('Fluxo de Execução não exibiu a coluna Atividade Atual')
   }
+  if (!fluxoHeaders.includes('Observações')) {
+    throw new Error('Fluxo de Execução não exibiu a coluna Observações')
+  }
   for (const removedHeader of ['Status', 'Prior.', 'Responsável', 'Data']) {
     if (fluxoHeaders.includes(removedHeader)) {
       throw new Error(`Fluxo de Execução ainda exibiu a coluna removida: ${removedHeader}`)
     }
+  }
+  const firstEditButton = page.locator('button[title="Editar"]').first()
+  await firstEditButton.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+  if (await firstEditButton.count()) {
+    await firstEditButton.click()
+    await assertLoaded('processo-editar')
+    const observacoesField = page.locator('textarea[name="observacoes"], textarea[aria-label="Observações"]').first()
+    await observacoesField.waitFor({ state: 'visible', timeout: 10000 })
+    console.log('processo-editar-observacoes-visible:', true)
   }
 
   await page.goto(`${base}/pmo-dashboard/colaboradores/novo`, { waitUntil: 'networkidle', timeout: 60000 })
