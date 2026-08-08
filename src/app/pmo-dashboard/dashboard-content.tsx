@@ -89,6 +89,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const [prioridadeFilter, setPrioridadeFilter] = useState('')
   const [responsavelFilter, setResponsavelFilter] = useState<string | null>(null)
   const [modalidadeChartFilter, setModalidadeChartFilter] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [seiLinks, setSeiLinks] = useState<Record<string, string>>({})
 
@@ -145,7 +146,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
     setLoadingRows(true) /* eslint-disable-line react-hooks/set-state-in-effect */
     const supabase = getSupabase()
 
-    if (responsavelFilter || modalidadeChartFilter) {
+    if (responsavelFilter || modalidadeChartFilter || statusFilter !== null) {
       const params: Record<string, unknown> = { p_limit: 1000, p_offset: 0 }
       if (debouncedSearch) params.p_search = debouncedSearch
       if (modalidadeFilter) params.p_modalidade_id = modalidadeFilter
@@ -163,6 +164,10 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
             if (modalidadeChartFilter) {
               const matchesModalidade = (p.modalidade_nome || 'Sem modalidade').trim() === modalidadeChartFilter
               if (!matchesModalidade) return false
+            }
+            if (statusFilter !== null) {
+              const matchesStatus = (p.status_nome || '').trim() === (statusFilter || '')
+              if (!matchesStatus) return false
             }
             return true
           })
@@ -197,7 +202,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
       )
     }
     return () => { cancelled = true }
-  }, [page, debouncedSearch, modalidadeFilter, prioridadeFilter, responsavelFilter, modalidadeChartFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearch, modalidadeFilter, prioridadeFilter, responsavelFilter, modalidadeChartFilter, statusFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchAllSeiLinks(getSupabase()).then(setSeiLinks).catch(() => setSeiLinks({}))
@@ -370,6 +375,11 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           totalHomologado={summary.valor_homologado_total}
           totalProcessos={summary.total_processos}
           economia={summary.economia_total}
+          selected={statusFilter}
+          onSelect={status => {
+            setStatusFilter(status)
+            setPage(1)
+          }}
         />
       )}
 
@@ -400,13 +410,18 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           <option value="">Prioridade</option>
           {uniquePrioridades.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
-        <button onClick={() => { setSearch(''); setModalidadeFilter(''); setPrioridadeFilter(''); setResponsavelFilter(null); setModalidadeChartFilter(null); setPage(1) }}
+        <button onClick={() => { setSearch(''); setModalidadeFilter(''); setPrioridadeFilter(''); setResponsavelFilter(null); setModalidadeChartFilter(null); setStatusFilter(null); setPage(1) }}
           className="bg-slate-700 text-white rounded-lg px-3 py-1.5 text-[10px] font-bold hover:bg-slate-600 transition">
           Limpar
         </button>
         {responsavelFilter && (
           <span className="text-[10px] text-blue-300 font-bold">
             Responsável: {responsavelFilter}
+          </span>
+        )}
+        {statusFilter !== null && (
+          <span className="text-[10px] font-bold" style={{ color: '#7dd3fc' }}>
+            Status: {statusFilter || 'Sem status'}
           </span>
         )}
         {modalidadeChartFilter && (

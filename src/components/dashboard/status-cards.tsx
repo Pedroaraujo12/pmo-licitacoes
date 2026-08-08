@@ -15,6 +15,8 @@ interface Props {
   totalHomologado: number
   totalProcessos: number
   economia: number
+  selected?: string | null
+  onSelect?: (status: string | null) => void
 }
 
 const STATUS_COLORS: Record<string, { dot: string; bar: string; text: string }> = {
@@ -32,7 +34,7 @@ function colorFor(status: string) {
   return STATUS_COLORS[status] || { dot: '#94a3b8', bar: 'rgba(148,163,184,0.4)', text: '#cbd5e1' }
 }
 
-export default function StatusCards({ porStatus, totalEstimado, totalHomologado, totalProcessos, economia }: Props) {
+export default function StatusCards({ porStatus, totalEstimado, totalHomologado, totalProcessos, economia, selected, onSelect }: Props) {
   const renda = totalEstimado > 0 ? totalEstimado : 1
 
   return (
@@ -43,19 +45,35 @@ export default function StatusCards({ porStatus, totalEstimado, totalHomologado,
         <span className="text-[9px] font-bold bg-slate-800 px-2 py-0.5 rounded-full text-slate-500">
           {totalProcessos} processos
         </span>
+        {onSelect && (
+          <span className="text-[9px] font-medium text-slate-500">
+            {selected ? 'Clique de novo no card ou no total para limpar' : 'Clique em um card para filtrar o fluxo'}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {porStatus.map(s => {
           const nome = s.status || 'Sem status'
+          const chave = s.status || ''
           const c = colorFor(nome)
           const share = Math.round((s.valor_estimado / renda) * 100)
           const economizado = s.valor_estimado - s.valor_homologado
+          const isSelected = selected === chave
           return (
-            <div key={s.status || 'null'} style={{
-              background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',
-              borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: '16px 18px',
-            }}>
+            <div
+              key={s.status || 'null'}
+              onClick={onSelect ? () => onSelect(isSelected ? null : chave) : undefined}
+              style={{
+                background: isSelected ? 'rgba(30,41,59,0.9)' : 'rgba(30,41,59,0.7)',
+                backdropFilter: 'blur(12px)',
+                borderRadius: 16,
+                border: isSelected ? `1px solid ${c.dot}` : '1px solid rgba(255,255,255,0.06)',
+                boxShadow: isSelected ? `0 0 0 1px ${c.dot}` : undefined,
+                padding: '16px 18px',
+                cursor: onSelect ? 'pointer' : 'default',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <span style={{ width: 9, height: 9, borderRadius: 3, background: c.dot, flexShrink: 0 }} />
                 <span style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 13, flex: 1 }}>{nome}</span>
@@ -95,10 +113,13 @@ export default function StatusCards({ porStatus, totalEstimado, totalHomologado,
           )
         })}
 
-        <div style={{
+        <div onClick={onSelect ? () => onSelect(null) : undefined} style={{
           background: 'linear-gradient(135deg, rgba(56,189,248,0.12), rgba(34,211,238,0.06))',
-          borderRadius: 16, border: '1px solid rgba(56,189,248,0.25)', padding: '16px 18px',
+          borderRadius: 16, border: selected ? '1px solid #38bdf8' : '1px solid rgba(56,189,248,0.25)',
+          boxShadow: selected ? '0 0 0 1px #38bdf8' : undefined,
+          padding: '16px 18px',
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          cursor: onSelect ? 'pointer' : 'default',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <span style={{ width: 9, height: 9, borderRadius: 3, background: '#38bdf8', flexShrink: 0 }} />
