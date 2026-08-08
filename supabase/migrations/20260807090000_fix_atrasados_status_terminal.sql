@@ -81,9 +81,19 @@ BEGIN
       WHERE COALESCE((SELECT sp.nome FROM status_processo sp WHERE sp.id = processos.status_id), '') IN ('Concluído', 'Homologado')
     ),
     'por_status', (
-      SELECT COALESCE(jsonb_agg(jsonb_build_object('status', x.nome, 'total', x.total)), '[]'::jsonb)
+      SELECT COALESCE(jsonb_agg(
+        jsonb_build_object(
+          'status', x.nome,
+          'total', x.total,
+          'valor_estimado', x.valor_estimado,
+          'valor_homologado', x.valor_homologado
+        )
+      ), '[]'::jsonb)
       FROM (
-        SELECT sp.nome, COUNT(*)::int AS total
+        SELECT sp.nome,
+               COUNT(*)::int AS total,
+               COALESCE(SUM(p.valor_estimado), 0)::float8 AS valor_estimado,
+               COALESCE(SUM(p.valor_homologado), 0)::float8 AS valor_homologado
         FROM processos p
         LEFT JOIN status_processo sp ON sp.id = p.status_id
         GROUP BY sp.nome

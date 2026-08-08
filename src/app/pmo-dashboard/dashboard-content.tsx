@@ -14,6 +14,7 @@ import AniversariantesWidget from '@/components/ui/colaboradores/aniversariantes
 import NotesWidget from '@/components/ui/notes/notes-widget'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import ContratosWidget from '@/components/ui/contratos/contratos-widget'
+import StatusCards from '@/components/dashboard/status-cards'
 
 const DashboardCharts = dynamic(() => import('@/components/dashboard/DashboardCharts'), {
   ssr: false,
@@ -41,7 +42,7 @@ interface DashboardSummary {
   valor_estimado_total: number
   valor_homologado_total: number
   economia_total: number
-  por_status: { status: string | null; total: number }[]
+  por_status: { status: string | null; total: number; valor_estimado: number; valor_homologado: number }[]
   por_modalidade: { modalidade: string | null; total: number }[]
   etapa_distribuicao: { fase: string | null; qtd: number }[]
   aniversariantes_15_dias: { id: string; nome: string; dia: number; mes: number; unidade: string | null }[]
@@ -360,6 +361,16 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
             </div>
           ))}
         </div>
+      )}
+
+      {summary && (
+        <StatusCards
+          porStatus={summary.por_status}
+          totalEstimado={summary.valor_estimado_total}
+          totalHomologado={summary.valor_homologado_total}
+          totalProcessos={summary.total_processos}
+          economia={summary.economia_total}
+        />
       )}
 
       {/* Widgets extra */}
