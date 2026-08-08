@@ -11,11 +11,9 @@ function mapRpcToProcesso(row: Record<string, unknown>, responsavelIdByName: Map
   const dataEntrega = (row.data_entrega as string) || null
   const statusNome = (row.status_nome as string) || null
   const TERMINAL = new Set(['Concluído', 'Homologado', 'Cancelado', 'Devolvido', 'Suspenso'])
-  let atrasado = row.processo_atrasado
-  if (atrasado === undefined || atrasado === null) {
-    const isTerminal = !!statusNome && TERMINAL.has(statusNome.trim())
-    atrasado = !isTerminal && !!dataEntrega && new Date(dataEntrega) < new Date(new Date().toDateString())
-  }
+  const isTerminal = !!statusNome && TERMINAL.has(statusNome.trim())
+  const atrasado =
+    !isTerminal && !!dataEntrega && new Date(dataEntrega) < new Date(new Date().toDateString())
   const responsavelNome = (row.responsavel_nome as string) || null
   const responsavelId =
     (row.responsavel_id as string) ||
