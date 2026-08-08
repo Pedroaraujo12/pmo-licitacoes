@@ -16,7 +16,7 @@ BEGIN
       SELECT COUNT(*)::int
       FROM processos p
       WHERE p.data_entrega < CURRENT_DATE
-        AND p.status_processo NOT IN ('Concluído', 'Homologado', 'Cancelado', 'Devolvido', 'Suspenso')
+        AND COALESCE((SELECT sp.nome FROM status_processo sp WHERE sp.id = p.status_id), '') NOT IN ('Concluído', 'Homologado', 'Cancelado', 'Devolvido', 'Suspenso')
     ),
     'proximos_vencimentos', (
       SELECT COUNT(*)::int
@@ -62,7 +62,7 @@ BEGIN
       SELECT COUNT(*)::int
       FROM processos
       WHERE data_entrega < CURRENT_DATE
-        AND status_processo NOT IN ('Concluído', 'Homologado', 'Cancelado', 'Devolvido', 'Suspenso')
+        AND COALESCE((SELECT sp.nome FROM status_processo sp WHERE sp.id = processos.status_id), '') NOT IN ('Concluído', 'Homologado', 'Cancelado', 'Devolvido', 'Suspenso')
     ),
     'processos_vencendo_7_dias', (
       SELECT COUNT(*)::int
@@ -78,10 +78,10 @@ BEGIN
     'economia_total', (
       SELECT COALESCE(SUM(valor_estimado - valor_homologado), 0)
       FROM processos
-      WHERE status_processo IN ('Concluído', 'Homologado')
+      WHERE COALESCE((SELECT sp.nome FROM status_processo sp WHERE sp.id = processos.status_id), '') IN ('Concluído', 'Homologado')
     ),
     'por_status', (
-      SELECT COALESCE(jsonb_agg(jsonb_build_object('status', sp.nome, 'total', x.total)), '[]'::jsonb)
+      SELECT COALESCE(jsonb_agg(jsonb_build_object('status', x.nome, 'total', x.total)), '[]'::jsonb)
       FROM (
         SELECT sp.nome, COUNT(*)::int AS total
         FROM processos p
@@ -91,7 +91,7 @@ BEGIN
       ) x
     ),
     'por_modalidade', (
-      SELECT COALESCE(jsonb_agg(jsonb_build_object('modalidade', m.nome, 'total', x.total)), '[]'::jsonb)
+      SELECT COALESCE(jsonb_agg(jsonb_build_object('modalidade', x.nome, 'total', x.total)), '[]'::jsonb)
       FROM (
         SELECT m.nome, COUNT(*)::int AS total
         FROM processos p
@@ -113,14 +113,13 @@ BEGIN
     'aniversariantes_15_dias', (
       SELECT COALESCE(jsonb_agg(jsonb_build_object('id', c.id, 'nome', c.nome_completo, 'dia', EXTRACT(DAY FROM c.data_nascimento)::int, 'mes', EXTRACT(MONTH FROM c.data_nascimento)::int, 'unidade', c.unidade)), '[]'::jsonb)
       FROM colaboradores c
+      CROSS JOIN LATERAL (
+        SELECT (date_trunc('year', CURRENT_DATE) + (c.data_nascimento - date_trunc('year', c.data_nascimento)))::date AS bday_this
+      ) b
       WHERE c.data_nascimento IS NOT NULL
         AND (
-          (EXTRACT(MONTH FROM c.data_nascimento) > EXTRACT(MONTH FROM CURRENT_DATE))
-          OR (EXTRACT(MONTH FROM c.data_nascimento) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM c.data_nascimento) >= EXTRACT(DAY FROM CURRENT_DATE))
-        )
-        AND (
-          (EXTRACT(MONTH FROM c.data_nascimento) < EXTRACT(MONTH FROM CURRENT_DATE) + INTERVAL '1 month' AND EXTRACT(DAY FROM c.data_nascimento) <= EXTRACT(DAY FROM CURRENT_DATE) + 15)
-          OR (EXTRACT(MONTH FROM c.data_nascimento) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM c.data_nascimento) <= EXTRACT(DAY FROM CURRENT_DATE) + 15)
+          b.bday_this BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '15 days'
+          OR (b.bday_this + INTERVAL '1 year') BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '15 days'
         )
       LIMIT 20
     )
