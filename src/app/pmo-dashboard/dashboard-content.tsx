@@ -73,9 +73,12 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const router = useRouter()
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [summaryError, setSummaryError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [rows, setRows] = useState<ProcessoRow[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [loadingSummary, setLoadingSummary] = useState(true)
+  const summaryResolved = useRef(false)
   const [loadingRows, setLoadingRows] = useState(true)
   const [porResponsavel, setPorResponsavel] = useState<[string | null, number][]>([])
 
@@ -104,34 +107,36 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   // Load dashboard summary (KPIs + chart data) — 1 chamada
   useEffect(() => {
     let cancelled = false
+    summaryResolved.current = false
+    setSummaryError(false) /* eslint-disable-line react-hooks/set-state-in-effect */
+    setLoadingSummary(true)
     const watchdog = window.setTimeout(() => {
-      if (!cancelled) {
-        setLoadingSummary(false)
-        if (!summary) {
-          setSummary({
-            total_processos: 0,
-            processos_atrasados: 0,
-            processos_vencendo_7_dias: 0,
-            valor_estimado_total: 0,
-            valor_homologado_total: 0,
-            economia_total: 0,
-            por_status: [],
-            por_modalidade: [],
-            etapa_distribuicao: [],
-            aniversariantes_15_dias: [],
-          })
-        }
-      }
+      if (!cancelled && !summaryResolved.current) setSummaryError(true)
+      if (!cancelled) setLoadingSummary(false)
     }, 12000)
     getSupabase().rpc('get_dashboard_summary').then(
-      ({ data }: { data: DashboardSummary | null }) => {
-        if (!cancelled && data) setSummary(data)
-        if (!cancelled) setLoadingSummary(false)
+      ({ data, error }: { data: DashboardSummary | null; error: unknown }) => {
+        if (cancelled) return
+        if (error) {
+          console.warn('Dashboard summary RPC error:', error)
+          setSummaryError(true)
+        } else if (data) {
+          summaryResolved.current = true
+          setSummary(data)
+        } else {
+          setSummaryError(true)
+        }
+        setLoadingSummary(false)
       },
-      () => { if (!cancelled) setLoadingSummary(false) },
+      (err: unknown) => {
+        if (cancelled) return
+        console.warn('Dashboard summary failure:', err)
+        setSummaryError(true)
+        setLoadingSummary(false)
+      },
     )
     return () => { cancelled = true; window.clearTimeout(watchdog) }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reloadKey, getSupabase])
 
   // Load paginated processos — 1 chamada
   useEffect(() => {
@@ -256,7 +261,6 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
       }
       const series = Array.from(bucket.entries())
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
         .map(([name, count]) => [name, count] as [string, number])
       setPorResponsavel(series)
     })()
@@ -311,7 +315,18 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {summaryError ? (
+        <div className="glass-card p-6 flex items-center justify-between gap-4 mb-6">
+          <p className="text-xs text-slate-400">Não foi possível carregar os indicadores do dashboard.</p>
+          <button
+            onClick={() => setReloadKey(k => k + 1)}
+            className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-4 py-2 text-[11px] font-bold transition cursor-pointer border-none shrink-0"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      ) : summary ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <div className="kpi-card" style={{ borderLeft: '4px solid #22c55e' }}>
           <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Economia</p>
           <h3 className="text-2xl font-extrabold text-emerald-400">{formatBRL(kpis.economia)}</h3>
@@ -334,7 +349,18 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
             {kpis.total - kpis.atrasados} no prazo · {kpis.atrasados} atrasados
           </p>
         </div>
-      </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="kpi-card animate-pulse space-y-2">
+              <div className="h-3 bg-gray-700 rounded w-1/3" />
+              <div className="h-6 bg-gray-700 rounded w-1/2" />
+              <div className="h-2 bg-gray-700 rounded w-2/3" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Widgets extra */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

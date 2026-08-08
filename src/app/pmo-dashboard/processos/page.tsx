@@ -7,13 +7,20 @@ import { PageShell } from '@/components/page-shell'
 import GestaoProcessos from './gestao-processos'
 import type { Processo, Modalidade, Responsavel } from '@/types/database'
 
-function mapRpcToProcesso(row: Record<string, unknown>): Processo {
+function mapRpcToProcesso(row: Record<string, unknown>, responsavelIdByName: Map<string, string>): Processo {
   const dataEntrega = (row.data_entrega as string) || null
   const statusNome = (row.status_nome as string) || null
+  const TERMINAL = new Set(['Concluído', 'Homologado', 'Cancelado', 'Devolvido', 'Suspenso'])
   let atrasado = row.processo_atrasado
   if (atrasado === undefined || atrasado === null) {
-    atrasado = !!dataEntrega && new Date(dataEntrega) < new Date(new Date().toDateString())
+    const isTerminal = !!statusNome && TERMINAL.has(statusNome.trim())
+    atrasado = !isTerminal && !!dataEntrega && new Date(dataEntrega) < new Date(new Date().toDateString())
   }
+  const responsavelNome = (row.responsavel_nome as string) || null
+  const responsavelId =
+    (row.responsavel_id as string) ||
+    (responsavelNome ? responsavelIdByName.get(responsavelNome.trim()) : undefined) ||
+    null
   return {
     id: row.id as string,
     id_processo: (row.id_processo as string) || null,
@@ -26,7 +33,8 @@ function mapRpcToProcesso(row: Record<string, unknown>): Processo {
     status_nome: statusNome,
     status_processo: statusNome ? { nome: statusNome } : undefined,
     modalidades: row.modalidade_nome ? { nome: row.modalidade_nome as string } : undefined,
-    responsaveis: row.responsavel_nome ? { nome: row.responsavel_nome as string } : undefined,
+    responsaveis: responsavelNome ? { nome: responsavelNome } : undefined,
+    responsavel_id: responsavelId,
     coordenacoes: row.coordenacao_nome ? { nome: row.coordenacao_nome as string } : undefined,
     demandantes: row.demandante_nome ? { nome: row.demandante_nome as string } : undefined,
     processo_atrasado: atrasado,
@@ -70,7 +78,11 @@ function ProcessosContent({ userRole }: { userRole: string | null }) {
         if (m.data) setModalidades(m.data)
         if (r.data) setResponsaveis(r.data)
         const rows = procResult.data || []
-        setProcessos(rows.map(mapRpcToProcesso))
+        const responsavelIdByName = new Map<string, string>()
+        for (const resp of r.data || []) {
+          if (resp.id && resp.nome) responsavelIdByName.set(resp.nome.trim(), resp.id)
+        }
+        setProcessos(rows.map((row: Record<string, unknown>) => mapRpcToProcesso(row, responsavelIdByName)))
       } catch (err) {
         if (!cancelled) { console.warn('Erro inesperado:', err); setError((err as Error)?.message || 'Erro de conexão') }
       } finally {
