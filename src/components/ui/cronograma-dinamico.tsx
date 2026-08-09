@@ -6,7 +6,7 @@ import type { CronogramaAtividade } from '@/types/database'
 import { formatDate } from '@/lib/utils'
 import {
   computeCronogramaStatus, getAtividadeIcon, getAtividadeBadgeColor,
-  recalcCascata, getFaseAgrupada,
+  getFaseAgrupada,
 } from '@/lib/cronograma-engine'
 
 interface Props {
@@ -78,7 +78,7 @@ export default function CronogramaDinamico({ atividades: initial, processoId, ca
     // Update processos.data_entrega with the new final deadline
     const lastUpdate = updates[updates.length - 1]
     if (lastUpdate && lastUpdate.data_fim) {
-      await supabase.from('processos').update({ data_entrega: lastUpdate.data_fim, processo_atrasado: false }).eq('id', processoId)
+      await supabase.from('processos').update({ data_entrega: lastUpdate.data_fim }).eq('id', processoId)
     }
 
     // Audit trail
@@ -171,8 +171,65 @@ export default function CronogramaDinamico({ atividades: initial, processoId, ca
       alterado_por: user?.id,
     }).maybeSingle()
 
-    // Recalculate cascade client-side
-    const updatedA = atividades.map(a => {
+    // Recalcula em cascata a partir da atividade ajustada (persistindo no banco)
+    const dataCorrenteBase = overrideTarget.data_inicio_real
+      ? new Date(overrideTarget.data_inicio_real)
+      : overrideTarget.data_inicio
+        ? new Date(overrideTarget.data_inicio)
+        : new Date()
+    dataCorrenteBase.setHours(0, 0, 0, 0)
+    let dataCorrente = dataCorrenteBase.toISOString().split('T')[0]
+
+    const pendentes = atividades
+      .filter(a => a.ordem >= overrideTarget.ordem)
+      .sort((a, b) => a.ordem - b.ordem)
+
+    const updates: { id: string; data_inicio: string; data_fim: string | null }[] = []
+    for (const a of pendentes) {
+      if (a.status === 'concluido') {
+        const ancora = a.data_fim_real || a.data_fim
+        if (ancora) {
+          const d = new Date(ancora)
+          d.setDate(d.getDate() + 1)
+          dataCorrente = d.toISOString().split('T')[0]
+        }
+        continue
+      }
+      if (a.id === overrideTarget.id) {
+        dataCorrente = overrideTarget.data_inicio_real || overrideTarget.data_inicio || dataCorrente
+      }
+      const diasAtiv = a.id === overrideTarget.id ? dias : (a.dias_uteis || 0)
+      let dataFim: string | null = dataCorrente
+      if (diasAtiv > 0) {
+        const { data: result } = await supabase.rpc('somar_dias_uteis', {
+          data_inicio: dataCorrente,
+          qtd_dias: diasAtiv,
+        })
+        dataFim = (result as string) || dataCorrente
+      }
+      updates.push({ id: a.id, data_inicio: dataCorrente, data_fim: dataFim })
+      if (dataFim) {
+        const next = new Date(dataFim)
+        next.setDate(next.getDate() + 1)
+        dataCorrente = next.toISOString().split('T')[0]
+      }
+    }
+
+    for (const u of updates) {
+      await supabase.from('cronograma_atividades').update({
+        data_inicio: u.data_inicio,
+        data_fim: u.data_fim,
+      }).eq('id', u.id)
+    }
+
+    const lastUpdate = updates[updates.length - 1]
+    if (lastUpdate && lastUpdate.data_fim) {
+      await supabase.from('processos').update({ data_entrega: lastUpdate.data_fim }).eq('id', processoId)
+    }
+
+    const recalculated = atividades.map(a => {
+      const u = updates.find(x => x.id === a.id)
+      if (u) return { ...a, data_inicio: u.data_inicio, data_fim: u.data_fim }
       if (a.id === overrideTarget.id) {
         return {
           ...a, dias_uteis: dias, overridden: true,
@@ -184,7 +241,6 @@ export default function CronogramaDinamico({ atividades: initial, processoId, ca
       }
       return a
     })
-    const recalculated = recalcCascata(updatedA, overrideTarget.id, null)
     setAtividades(recalculated)
     if (onUpdate) onUpdate(recalculated)
 
