@@ -331,22 +331,22 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
         </div>
       ) : summary ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <div className="kpi-card" style={{ borderLeft: '4px solid #22c55e' }}>
-          <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Economia</p>
-          <h3 className="text-2xl font-extrabold text-emerald-400">{formatBRL(kpis.economia)}</h3>
-          <p className="kpi-sub">↑ sobre valor estimado · {kpis.concluidos} processos concluídos</p>
-        </div>
-        <div className="kpi-card">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Valor Estimado</p>
-          <h3 className="text-2xl font-extrabold text-slate-100">{formatBRL(kpis.estimado)}</h3>
-          <p className="kpi-sub">Total da carteira</p>
-        </div>
         <div className="kpi-card">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Processos Totais</p>
           <h3 className="text-4xl font-extrabold">{kpis.total}</h3>
           <p className="kpi-sub">
             {kpis.total - kpis.atrasados} no prazo · {kpis.atrasados} atrasados
           </p>
+        </div>
+        <div className="kpi-card">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Valor Estimado</p>
+          <h3 className="text-2xl font-extrabold text-slate-100">{formatBRL(kpis.estimado)}</h3>
+          <p className="kpi-sub">Total da carteira</p>
+        </div>
+        <div className="kpi-card" style={{ borderLeft: '4px solid #22c55e' }}>
+          <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Economia</p>
+          <h3 className="text-2xl font-extrabold text-emerald-400">{formatBRL(kpis.economia)}</h3>
+          <p className="kpi-sub">↑ sobre valor estimado · {kpis.concluidos} processos concluídos</p>
         </div>
         </div>
       ) : (
