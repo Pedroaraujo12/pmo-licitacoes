@@ -376,9 +376,30 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
         />
       )}
 
-      {/* Widgets extra */}
+      {/* Widgets + Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <ErrorBoundary><AniversariantesWidget /></ErrorBoundary>
+        <div className="lg:col-span-2">
+          <ErrorBoundary>
+            <Suspense fallback={<div className="glass-card p-6 text-center text-slate-500 text-xs">Carregando gráficos...</div>}>
+              <DashboardCharts
+                horizontal
+                porResponsavel={chartData.resp}
+                porModalidade={chartData.mod}
+                selectedResponsavel={responsavelFilter}
+                onResponsavelSelect={(responsavel) => {
+                  setResponsavelFilter(responsavel)
+                  setPage(1)
+                }}
+                selectedModalidade={modalidadeChartFilter}
+                onModalidadeSelect={(modalidade) => {
+                  setModalidadeChartFilter(modalidade)
+                  setPage(1)
+                }}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -425,7 +446,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Table */}
-        <div className="lg:col-span-2 glass-card overflow-hidden">
+        <div className="lg:col-span-3 glass-card overflow-hidden">
           <div className="px-4 py-3 border-b border-white/5 flex justify-between items-center">
             <h2 className="text-xs font-bold uppercase text-slate-400">Fluxo de Execução</h2>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -563,26 +584,6 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
             compact
           />
         </div>
-
-        {/* Charts (carregado sob demanda) */}
-        <ErrorBoundary>
-        <Suspense fallback={<div className="glass-card p-6 text-center text-slate-500 text-xs">Carregando gráficos...</div>}>
-          <DashboardCharts
-            porResponsavel={chartData.resp}
-            porModalidade={chartData.mod}
-            selectedResponsavel={responsavelFilter}
-            onResponsavelSelect={(responsavel) => {
-              setResponsavelFilter(responsavel)
-              setPage(1)
-            }}
-            selectedModalidade={modalidadeChartFilter}
-            onModalidadeSelect={(modalidade) => {
-              setModalidadeChartFilter(modalidade)
-              setPage(1)
-            }}
-          />
-        </Suspense>
-        </ErrorBoundary>
       </div>
 
       {/* Modal */}

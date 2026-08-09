@@ -12,6 +12,7 @@ interface Props {
   onResponsavelSelect: (responsavel: string | null) => void
   selectedModalidade: string | null
   onModalidadeSelect: (modalidade: string | null) => void
+  horizontal?: boolean
 }
 
 const RESP_COLORS = ['#60a5fa', '#38bdf8', '#22d3ee', '#2dd4bf', '#34d399', '#a78bfa', '#c084fc', '#f472b6', '#fb923c', '#f87171']
@@ -24,6 +25,7 @@ export default function DashboardCharts({
   onResponsavelSelect,
   selectedModalidade,
   onModalidadeSelect,
+  horizontal,
 }: Props) {
   const makeGradient = (ctx: CanvasRenderingContext2D, area: { top: number; bottom: number }, from: string, to: string) => {
     const gradient = ctx.createLinearGradient(0, area.top, 0, area.bottom)
@@ -33,7 +35,7 @@ export default function DashboardCharts({
   }
 
   return (
-    <div className="space-y-6">
+    <div className={horizontal ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'space-y-6'}>
       {/* Responsável */}
       <div className="glass-card p-6">
         <h2 className="text-[10px] font-bold uppercase text-blue-400 mb-4 tracking-wider">Em Andamento por Responsável</h2>
