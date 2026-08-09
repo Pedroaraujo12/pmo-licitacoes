@@ -76,6 +76,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const [reloadKey, setReloadKey] = useState(0)
   const [rows, setRows] = useState<ProcessoRow[]>([])
   const [totalCount, setTotalCount] = useState(0)
+  const [filteredSum, setFilteredSum] = useState(0)
   const [loadingSummary, setLoadingSummary] = useState(true)
   const summaryResolved = useRef(false)
   const [loadingRows, setLoadingRows] = useState(true)
@@ -170,14 +171,17 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
             return true
           })
           const total = filtered.length
+          const sumEstimado = filtered.reduce((s, p) => s + (Number(p.valor_estimado) || 0), 0)
           const offset = (page - 1) * PAGE_SIZE
           setRows(filtered.slice(offset, offset + PAGE_SIZE))
           setTotalCount(total)
+          setFilteredSum(sumEstimado)
           setLoadingRows(false)
         },
         () => { if (!cancelled) setLoadingRows(false) },
       )
     } else {
+      setFilteredSum(0)
       const offset = (page - 1) * PAGE_SIZE
       const params: Record<string, unknown> = { p_limit: PAGE_SIZE, p_offset: offset }
       if (debouncedSearch) params.p_search = debouncedSearch
@@ -453,6 +457,11 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
               <span className="text-[9px] font-bold bg-slate-800 px-2 py-0.5 rounded-full text-slate-500">
                 {totalCount} processos
               </span>
+              {(responsavelFilter || modalidadeChartFilter || statusFilter !== null) && filteredSum > 0 && (
+                <span className="text-[9px] font-bold bg-blue-600/20 px-2 py-0.5 rounded-full text-blue-300">
+                  {formatBRL(filteredSum)} estimados
+                </span>
+              )}
               {rows.length > 0 && (
                 <button
                   onClick={() => exportCSV(rows.map(p => ({
