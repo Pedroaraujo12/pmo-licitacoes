@@ -11,9 +11,7 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { useToast } from '@/components/ui/toast'
 import Pagination from '@/components/ui/pagination'
 import AniversariantesWidget from '@/components/ui/colaboradores/aniversariantes-widget'
-import NotesWidget from '@/components/ui/notes/notes-widget'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
-import ContratosWidget from '@/components/ui/contratos/contratos-widget'
 import StatusCards from '@/components/dashboard/status-cards'
 
 const DashboardCharts = dynamic(() => import('@/components/dashboard/DashboardCharts'), {
@@ -338,11 +336,6 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           <h3 className="text-2xl font-extrabold text-emerald-400">{formatBRL(kpis.economia)}</h3>
           <p className="kpi-sub">↑ sobre valor estimado · {kpis.concluidos} processos concluídos</p>
         </div>
-        <div className="kpi-card" style={{ borderLeft: '4px solid #ef4444' }}>
-          <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Em Atraso</p>
-          <h3 className="text-4xl font-extrabold text-red-100">{kpis.atrasados}</h3>
-          <p className="kpi-sub">de {kpis.total} processos</p>
-        </div>
         <div className="kpi-card">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Valor Estimado</p>
           <h3 className="text-2xl font-extrabold text-slate-100">{formatBRL(kpis.estimado)}</h3>
@@ -358,7 +351,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          {[0, 1, 2, 3].map(i => (
+          {[0, 1, 2].map(i => (
             <div key={i} className="kpi-card animate-pulse space-y-2">
               <div className="h-3 bg-gray-700 rounded w-1/3" />
               <div className="h-6 bg-gray-700 rounded w-1/2" />
@@ -385,9 +378,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
 
       {/* Widgets extra */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <ErrorBoundary><ContratosWidget /></ErrorBoundary>
         <ErrorBoundary><AniversariantesWidget /></ErrorBoundary>
-        <ErrorBoundary><NotesWidget /></ErrorBoundary>
       </div>
 
       {/* Filter Bar */}
