@@ -26,7 +26,132 @@ export default function CronogramaDinamico({ atividades: initial, processoId, ca
   const supabase = createClient()
   const [resetting, setResetting] = useState(false)
 
+  // Reposicionamento: declarar em que etapa o processo realmente está hoje
+  const [reposOpen, setReposOpen] = useState(false)
+  const [reposOrdem, setReposOrdem] = useState('')
+  const [reposData, setReposData] = useState('')
+  const [reposConcluirAnteriores, setReposConcluirAnteriores] = useState(true)
+  const [reposJustificativa, setReposJustificativa] = useState('')
+  const [repositioning, setRepositioning] = useState(false)
+
   const status = computeCronogramaStatus(atividades)
+  const ordenadas = [...atividades].sort((a, b) => a.ordem - b.ordem)
+
+  function abrirReposicionamento() {
+    const atual = ordenadas.find(a => a.status !== 'concluido') || ordenadas[0]
+    setReposOrdem(String(atual?.ordem ?? 1))
+    setReposData(new Date().toISOString().split('T')[0])
+    setReposConcluirAnteriores(true)
+    setReposJustificativa('')
+    setReposOpen(true)
+  }
+
+  /**
+   * Reancora o cronograma numa etapa escolhida: as anteriores podem ser dadas
+   * como cumpridas e a contagem recomeça na data informada, seguindo as
+   * durações do modelo. Difere do "Reiniciar Prazos", que sempre parte da
+   * primeira etapa pendente e usa a data de hoje.
+   */
+  async function handleReposicionar(e: React.FormEvent) {
+    e.preventDefault()
+    const alvoOrdem = parseInt(reposOrdem, 10)
+    if (!alvoOrdem || !reposData || !reposJustificativa.trim()) return
+
+    setRepositioning(true)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const anteriores = ordenadas.filter(a => a.ordem < alvoOrdem)
+    const aPartirDe = ordenadas.filter(a => a.ordem >= alvoOrdem)
+
+    // 1. Etapas anteriores viram cumpridas (sem inventar datas reais que
+    //    ninguém registrou — só o status muda)
+    const concluidasIds: string[] = []
+    if (reposConcluirAnteriores) {
+      for (const a of anteriores) {
+        if (a.status === 'concluido') continue
+        await supabase.from('cronograma_atividades')
+          .update({ status: 'concluido' }).eq('id', a.id)
+        concluidasIds.push(a.id)
+      }
+    }
+
+    // 2. Reencadeia da etapa alvo em diante, a partir da data informada
+    let dataCorrente = reposData
+    const updates: { id: string; data_inicio: string; data_fim: string | null }[] = []
+
+    for (const a of aPartirDe) {
+      if (a.status === 'concluido') {
+        const ancora = a.data_fim_real || a.data_fim
+        if (ancora) {
+          const d = new Date(ancora)
+          d.setDate(d.getDate() + 1)
+          dataCorrente = d.toISOString().split('T')[0]
+        }
+        continue
+      }
+
+      const dias = a.dias_uteis || 0
+      let dataFim: string | null = dataCorrente
+      if (dias > 0) {
+        const { data: result } = await supabase.rpc('somar_dias_uteis', {
+          data_inicio: dataCorrente,
+          qtd_dias: dias,
+        })
+        dataFim = (result as string) || dataCorrente
+      }
+
+      updates.push({ id: a.id, data_inicio: dataCorrente, data_fim: dataFim })
+
+      if (dataFim) {
+        const next = new Date(dataFim)
+        next.setDate(next.getDate() + 1)
+        dataCorrente = next.toISOString().split('T')[0]
+      }
+    }
+
+    for (const u of updates) {
+      await supabase.from('cronograma_atividades').update({
+        data_inicio: u.data_inicio,
+        data_fim: u.data_fim,
+      }).eq('id', u.id)
+    }
+
+    const ultima = updates[updates.length - 1]
+    if (ultima?.data_fim) {
+      await supabase.from('processos').update({ data_entrega: ultima.data_fim }).eq('id', processoId)
+    }
+
+    // 3. Trilha de auditoria
+    const alvo = ordenadas.find(a => a.ordem === alvoOrdem)
+    await supabase.from('atividades').insert({
+      processo_id: processoId,
+      atividade: '__REPOSICIONAMENTO__',
+      observacao: JSON.stringify({
+        etapa_ordem: alvoOrdem,
+        etapa_descricao: alvo?.descricao,
+        data_base: reposData,
+        etapas_reagendadas: updates.length,
+        anteriores_concluidas: concluidasIds.length,
+        justificativa: reposJustificativa.trim(),
+        por: user?.id,
+      }),
+      data: new Date().toISOString().split('T')[0],
+      created_by: user?.id || null,
+    })
+
+    // 4. Estado local
+    const atualizadas = atividades.map(a => {
+      const u = updates.find(x => x.id === a.id)
+      if (u) return { ...a, data_inicio: u.data_inicio, data_fim: u.data_fim }
+      if (concluidasIds.includes(a.id)) return { ...a, status: 'concluido' } as CronogramaAtividade
+      return a
+    })
+    setAtividades(atualizadas)
+    if (onUpdate) onUpdate(atualizadas)
+
+    setReposOpen(false)
+    setRepositioning(false)
+  }
 
   async function handleReiniciarPrazos() {
     if (!confirm('Reiniciar a contagem de prazos para as atividades pendentes a partir de hoje?')) return
@@ -289,16 +414,26 @@ export default function CronogramaDinamico({ atividades: initial, processoId, ca
             </div>
           )}
         </div>
-        {canEdit && status.atrasadas > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <button onClick={handleReiniciarPrazos} disabled={resetting} style={{
+        {canEdit && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={abrirReposicionamento} disabled={repositioning} style={{
               padding: '8px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8,
-              border: '1px solid rgba(234,179,8,0.3)', cursor: resetting ? 'not-allowed' : 'pointer',
-              background: 'rgba(234,179,8,0.12)', color: '#eab308',
+              border: '1px solid rgba(56,189,248,0.3)', cursor: repositioning ? 'not-allowed' : 'pointer',
+              background: 'rgba(56,189,248,0.12)', color: '#38bdf8',
               transition: 'background 0.15s',
-            }}>
-              {resetting ? 'Reiniciando...' : '🔄 Reiniciar Prazos'}
+            }} title="Informar em que etapa o processo está hoje e recalcular a partir dela">
+              📍 Etapa atual
             </button>
+            {status.atrasadas > 0 && (
+              <button onClick={handleReiniciarPrazos} disabled={resetting} style={{
+                padding: '8px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+                border: '1px solid rgba(234,179,8,0.3)', cursor: resetting ? 'not-allowed' : 'pointer',
+                background: 'rgba(234,179,8,0.12)', color: '#eab308',
+                transition: 'background 0.15s',
+              }} title="Recontar todas as etapas pendentes a partir de hoje">
+                {resetting ? 'Reiniciando...' : '🔄 Reiniciar Prazos'}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -396,6 +531,86 @@ export default function CronogramaDinamico({ atividades: initial, processoId, ca
           </div>
         </div>
       ))}
+
+      {/* Reposicionamento Modal */}
+      {reposOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+        }} onClick={() => setReposOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#1e293b', borderRadius: 16, padding: 24,
+            width: '90%', maxWidth: 520, border: '1px solid rgba(255,255,255,0.1)',
+            maxHeight: '90vh', overflowY: 'auto',
+          }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', margin: '0 0 4px' }}>
+              📍 Em que etapa o processo está?
+            </h3>
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 16px' }}>
+              A contagem recomeça nessa etapa, na data informada, e segue as durações do modelo.
+            </p>
+
+            <form onSubmit={handleReposicionar}>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 4 }}>
+                  ETAPA ATUAL
+                </label>
+                <select value={reposOrdem} onChange={e => setReposOrdem(e.target.value)} required
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 13, background: 'rgba(15,23,42,0.5)', color: '#cbd5e1', outline: 'none', cursor: 'pointer' }}
+                >
+                  {ordenadas.map(a => (
+                    <option key={a.id} value={a.ordem}>
+                      {a.ordem}. {a.descricao}{a.dias_uteis ? ` (${a.dias_uteis}D)` : ' (marco)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 4 }}>
+                  DATA DE INÍCIO DESSA ETAPA
+                </label>
+                <input type="date" value={reposData} required
+                  onChange={e => setReposData(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 13, background: 'rgba(15,23,42,0.5)', color: '#cbd5e1', outline: 'none' }}
+                />
+                <p style={{ fontSize: 11, color: '#64748b', margin: '4px 0 0' }}>
+                  Se a etapa já começou, informe a data real de início — não a de hoje.
+                </p>
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 12, color: '#cbd5e1', cursor: 'pointer' }}>
+                <input type="checkbox" checked={reposConcluirAnteriores}
+                  onChange={e => setReposConcluirAnteriores(e.target.checked)}
+                  style={{ width: 15, height: 15, accentColor: '#38bdf8', cursor: 'pointer' }}
+                />
+                Marcar as etapas anteriores como concluídas
+              </label>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 4 }}>
+                  JUSTIFICATIVA (OBRIGATÓRIA)
+                </label>
+                <textarea value={reposJustificativa} required rows={3}
+                  onChange={e => setReposJustificativa(e.target.value)}
+                  placeholder="Informe o motivo do reposicionamento do cronograma..."
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 13, background: 'rgba(15,23,42,0.5)', color: '#cbd5e1', outline: 'none', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setReposOpen(false)}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none"
+                >Cancelar</button>
+                <button type="submit" disabled={repositioning || !reposJustificativa.trim()}
+                  className="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer border-none disabled:opacity-50"
+                >{repositioning ? 'Reposicionando...' : 'Reposicionar Cronograma'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Override Modal */}
       {overrideTarget && (
