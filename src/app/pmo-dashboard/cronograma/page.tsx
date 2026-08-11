@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fetchAllSeiLinks, formatDate } from '@/lib/utils'
+import { listarCronograma, type LinhaCronograma } from '@/lib/cronograma-lista'
 
 import {
   CheckCircle2, Clock, Circle, ArrowRight, Search,
@@ -15,25 +16,7 @@ import {
 /** Status de `status_processo` que representam execução em curso. */
 const STATUS_ANDAMENTO = ['Em andamento']
 
-/** Teto do filtro feito no cliente, enquanto o banco não tem p_status. */
-const FALLBACK_LIMIT = 500
-
-interface CronogramaRow {
-  id: string
-  id_processo: string | null
-  objeto_resumido: string | null
-  data_entrada: string | null
-  data_entrega: string | null
-  modalidade_nome: string | null
-  status_nome: string | null
-  total_atividades: number
-  concluidas: number
-  atrasadas: number
-  ultima_fase: string | null
-  progresso: number
-  processo_atrasado: boolean
-  total_count: number
-}
+type CronogramaRow = LinhaCronograma & { total_count?: number }
 
 function statusBadge(pa: string) {
   switch (pa) {
@@ -58,8 +41,7 @@ export default function CronogramaPage() {
   // A tela existe para acompanhar execução: só processos em andamento por
   // padrão. Concluídos, cancelados e devolvidos ficam atrás do filtro.
   const [apenasAndamento, setApenasAndamento] = useState(true)
-  const [semFiltroBanco, setSemFiltroBanco] = useState(false)
-  const [filtroLocalFalhou, setFiltroLocalFalhou] = useState(false)
+  const [semResultadoFiltrado, setSemResultadoFiltrado] = useState(false)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -79,83 +61,21 @@ export default function CronogramaPage() {
     async function load() {
       setLoading(true)
       try {
-        const offset = (page - 1) * perPage
-        const timeoutPromise = new Promise<null>((resolve) => {
-          window.setTimeout(() => resolve(null), 10000)
+        const { linhas, total } = await listarCronograma(supabase, {
+          statusNomes: apenasAndamento ? STATUS_ANDAMENTO : null,
+          busca: debouncedSearch || null,
+          limite: perPage,
+          offset: (page - 1) * perPage,
         })
 
-        type RpcResult = { data?: CronogramaRow[]; error?: { message?: string } } | null
-
-        const chamar = (comStatus: boolean) => supabase.rpc('get_cronograma_page', {
-          p_search: debouncedSearch || null,
-          p_limit: perPage,
-          p_offset: offset,
-          ...(comStatus ? { p_status: STATUS_ANDAMENTO } : {}),
-        })
-
-        const rpcResult = await Promise.race([chamar(apenasAndamento), timeoutPromise]) as RpcResult
-
-        // Banco ainda sem o parâmetro p_status (migration não aplicada).
-        // Em vez de desistir do filtro, busca a lista inteira e filtra pelos
-        // ids dos processos em andamento, paginando no cliente. Funciona bem
-        // nesta escala; a migration apenas devolve o trabalho ao banco.
-        if (apenasAndamento && rpcResult?.error) {
-          // Resolve o status para id antes de filtrar. Filtrar por coluna de
-          // tabela relacionada (status_processo.nome) depende de o filtro ser
-          // aplicado no join; se não for, a consulta devolve todos os
-          // processos e o cruzamento deixa de filtrar. Comparar status_id é
-          // uma igualdade simples sobre a própria tabela.
-          const { data: statusRows } = await supabase
-            .from('status_processo')
-            .select('id, nome')
-            .in('nome', STATUS_ANDAMENTO)
-
-          const statusIds = (statusRows ?? []).map(s => (s as { id: string }).id)
-
-          const [todos, emAndamento] = await Promise.all([
-            supabase.rpc('get_cronograma_page', {
-              p_search: debouncedSearch || null,
-              p_limit: FALLBACK_LIMIT,
-              p_offset: 0,
-            }),
-            statusIds.length > 0
-              ? supabase.from('processos').select('id').in('status_id', statusIds).limit(FALLBACK_LIMIT)
-              : Promise.resolve({ data: [] as { id: string }[] }),
-          ])
-
-          if (cancelled) return
-
-          const linhas = (todos.data ?? []) as CronogramaRow[]
-          const idsAndamento = new Set(
-            (emAndamento.data ?? []).map(p => (p as { id: string }).id),
-          )
-
-          // Sem conseguir resolver o status, mostra tudo em vez de esvaziar a
-          // tela — e o aviso explica que o filtro não pôde ser aplicado.
-          const filtrados = idsAndamento.size > 0
-            ? linhas.filter(r => idsAndamento.has(r.id))
-            : linhas
-
-          setSemFiltroBanco(true)
-          setFiltroLocalFalhou(idsAndamento.size === 0)
-          setTotalCount(filtrados.length)
-          setRows(filtrados.slice(offset, offset + perPage))
-          return
-        }
-
-        const data = rpcResult?.data
         if (cancelled) return
 
-        setSemFiltroBanco(false)
-        setFiltroLocalFalhou(false)
-        if (data) {
-          setRows(data as CronogramaRow[])
-          setTotalCount(data[0]?.total_count ?? 0)
-        } else {
-          setRows([])
-          setTotalCount(0)
-        }
-      } catch {
+        setRows(linhas as CronogramaRow[])
+        setTotalCount(total)
+        // Filtro pedido, nenhum processo: pode ser cadastro sem esse status.
+        setSemResultadoFiltrado(apenasAndamento && total === 0)
+      } catch (err) {
+        console.warn('Erro ao carregar cronograma:', err)
         if (!cancelled) { setRows([]); setTotalCount(0) }
       } finally {
         if (!cancelled) setLoading(false)
@@ -214,17 +134,15 @@ export default function CronogramaPage() {
         ))}
       </div>
 
-      {semFiltroBanco && apenasAndamento && (
+      {semResultadoFiltrado && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          background: filtroLocalFalhou ? 'rgba(245,158,11,0.1)' : 'rgba(148,163,184,0.08)',
-          border: `1px solid ${filtroLocalFalhou ? 'rgba(245,158,11,0.25)' : 'rgba(148,163,184,0.2)'}`,
-          borderRadius: 10, padding: '8px 12px', marginBottom: 16,
-          fontSize: 11, color: filtroLocalFalhou ? '#fbbf24' : '#94a3b8',
+          background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)',
+          borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+          fontSize: 12, color: '#fbbf24',
         }}>
-          {filtroLocalFalhou
-            ? 'Não foi possível identificar os processos em andamento — exibindo todos. Verifique se o status "Em andamento" existe em status_processo.'
-            : 'Filtro aplicado no navegador. Para que o banco faça esse trabalho, aplique a migration 20260811020000_cronograma_filtro_status.'}
+          Nenhum processo com status &quot;{STATUS_ANDAMENTO.join('&quot; ou &quot;')}&quot;.
+          Confira o status cadastrado nos processos ou veja todos.
         </div>
       )}
 
