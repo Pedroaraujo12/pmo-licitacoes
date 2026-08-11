@@ -10,7 +10,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { WebVitals } from '@/components/ui/web-vitals'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import {
-  LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X, FileEdit, Contact2, StickyNote, Sun, FileSignature, Building2,
+  LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X, FileEdit, Contact2, StickyNote, Sun, FileSignature, Building2, CalendarClock,
 } from 'lucide-react'
 
 const DEFAULT_ALERTS = {
@@ -26,6 +26,7 @@ const navItems = [
   { href: '/pmo-dashboard/contratos', label: 'Contratos', icon: FileSignature },
   { href: '/pmo-dashboard/fornecedores', label: 'Fornecedores', icon: Building2 },
   { href: '/pmo-dashboard/cronograma', label: 'Cronograma', icon: Calendar },
+  { href: '/pmo-dashboard/simulador', label: 'Simulador', icon: CalendarClock },
   { href: '/pmo-dashboard/documentos', label: 'Documentos', icon: FileEdit },
   { href: '/pmo-dashboard/colaboradores', label: 'Colaboradores', icon: Contact2 },
   { href: '/pmo-dashboard/notas', label: 'Notas', icon: StickyNote },
