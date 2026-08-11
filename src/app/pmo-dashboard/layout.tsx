@@ -16,11 +16,11 @@ import {
 
 const navItems = [
   { href: '/pmo-dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/pmo-dashboard/cronograma', label: 'Cronograma', icon: Calendar },
+  { href: '/pmo-dashboard/simulador', label: 'Simulador', icon: CalendarClock },
   { href: '/pmo-dashboard/processos', label: 'Processos', icon: FileText },
   { href: '/pmo-dashboard/contratos', label: 'Contratos', icon: FileSignature },
   { href: '/pmo-dashboard/fornecedores', label: 'Fornecedores', icon: Building2 },
-  { href: '/pmo-dashboard/cronograma', label: 'Cronograma', icon: Calendar },
-  { href: '/pmo-dashboard/simulador', label: 'Simulador', icon: CalendarClock },
   { href: '/pmo-dashboard/documentos', label: 'Documentos', icon: FileEdit },
   { href: '/pmo-dashboard/colaboradores', label: 'Colaboradores', icon: Contact2 },
   { href: '/pmo-dashboard/notas', label: 'Notas', icon: StickyNote },
