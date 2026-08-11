@@ -76,9 +76,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const supabase = getSupabase()
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         if (cancelled) return
-        const user = session?.user
-        if (sessionError || !user) {
+        if (sessionError || !session?.user) {
           window.clearTimeout(authTimeout)
+          router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`)
+          return
+        }
+
+        // getSession() lê do armazenamento local e aceita um token já vencido.
+        // getUser() valida no servidor: se o token expirou e a renovação
+        // falhou, é aqui que se descobre. Sem esta checagem o dashboard
+        // carregava com sessão morta — as telas abriam, mas toda consulta
+        // protegida por RLS voltava vazia, como se não houvesse dado.
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (cancelled) return
+        if (userError || !user) {
+          console.warn('Sessão inválida ou expirada; redirecionando para login')
+          window.clearTimeout(authTimeout)
+          await supabase.auth.signOut().catch(() => {})
           router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`)
           return
         }
@@ -106,6 +120,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     })()
     return () => { cancelled = true }
   }, []) /* eslint-disable-line react-hooks/exhaustive-deps */
+
+  // A sessão também pode morrer com o dashboard aberto — token expirado,
+  // logout em outra aba, renovação recusada. Sem isto, a pessoa continua
+  // navegando por telas que voltam vazias sem explicar o motivo.
+  useEffect(() => {
+    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((evento, sessao) => {
+      if (evento === 'SIGNED_OUT' || (evento === 'TOKEN_REFRESHED' && !sessao)) {
+        router.replace('/login')
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [getSupabase, router])
 
   async function handleLogout() {
     await getSupabase().auth.signOut()
