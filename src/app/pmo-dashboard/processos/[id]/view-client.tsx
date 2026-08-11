@@ -436,6 +436,8 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
             processoId={id}
             canEdit={canEdit}
             userRole={profile?.role || null}
+            modalidadeId={processo?.modalidade_id || null}
+            dataEntrada={processo?.data_entrada || null}
             onUpdate={(updated) => setCronograma(updated)}
           />
         )}

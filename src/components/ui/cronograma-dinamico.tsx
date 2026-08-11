@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { CronogramaAtividade } from '@/types/database'
 import { formatDate } from '@/lib/utils'
@@ -8,16 +8,24 @@ import {
   computeCronogramaStatus, getAtividadeIcon, getAtividadeBadgeColor,
   getFaseAgrupada,
 } from '@/lib/cronograma-engine'
+import { listEtapasPorModalidade, type EtapaModelo } from '@/lib/simulador-cronograma'
+import { aplicarRitoDaModalidade, ritoDivergente } from '@/lib/aplicar-rito'
 
 interface Props {
   atividades: CronogramaAtividade[]
   processoId: string
   canEdit: boolean
   userRole?: string | null
+  /** Modalidade do processo — habilita a checagem contra o rito cadastrado. */
+  modalidadeId?: string | null
+  /** Data de entrada, usada como base ao aplicar o rito. */
+  dataEntrada?: string | null
   onUpdate?: (atividades: CronogramaAtividade[]) => void
 }
 
-export default function CronogramaDinamico({ atividades: initial, processoId, canEdit, onUpdate }: Props) {
+export default function CronogramaDinamico({
+  atividades: initial, processoId, canEdit, modalidadeId, dataEntrada, onUpdate,
+}: Props) {
   const [atividades, setAtividades] = useState<CronogramaAtividade[]>(initial)
   const [overrideTarget, setOverrideTarget] = useState<CronogramaAtividade | null>(null)
   const [overrideDays, setOverrideDays] = useState('')
@@ -34,8 +42,71 @@ export default function CronogramaDinamico({ atividades: initial, processoId, ca
   const [reposJustificativa, setReposJustificativa] = useState('')
   const [repositioning, setRepositioning] = useState(false)
 
+  // Rito da modalidade x cronograma gravado
+  const [etapasModelo, setEtapasModelo] = useState<EtapaModelo[]>([])
+  const [aplicandoRito, setAplicandoRito] = useState(false)
+  const [erroRito, setErroRito] = useState('')
+
   const status = computeCronogramaStatus(atividades)
   const ordenadas = [...atividades].sort((a, b) => a.ordem - b.ordem)
+
+  useEffect(() => {
+    let cancelado = false
+
+    async function carregar() {
+      if (!modalidadeId) return
+      const lista = await listEtapasPorModalidade(createClient(), modalidadeId)
+      if (!cancelado) setEtapasModelo(lista)
+    }
+
+    carregar()
+    return () => { cancelado = true }
+  }, [modalidadeId])
+
+  const divergente = ritoDivergente(atividades, etapasModelo)
+
+  /**
+   * Regrava as etapas deste processo com as do rito da modalidade,
+   * preservando o que já foi trabalhado. É a correção pontual do mesmo
+   * problema que `recalc_cronograma_modelos()` resolve em lote.
+   */
+  async function handleAplicarRito() {
+    if (!modalidadeId || !dataEntrada) return
+    if (!confirm(
+      'As etapas deste processo serão substituídas pelas do rito da modalidade. ' +
+      'Etapas concluídas ou em andamento mantêm o status, o responsável e as datas reais. ' +
+      'Prazos ajustados manualmente voltam ao padrão do modelo. Continuar?'
+    )) return
+
+    setAplicandoRito(true)
+    setErroRito('')
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      await aplicarRitoDaModalidade(supabase, {
+        processoId,
+        modalidadeId,
+        dataEntrada,
+        atividades,
+        userId: user?.id ?? null,
+      })
+
+      const { data } = await supabase
+        .from('cronograma_atividades')
+        .select('*')
+        .eq('processo_id', processoId)
+        .order('ordem', { ascending: true })
+
+      if (data) {
+        setAtividades(data as CronogramaAtividade[])
+        if (onUpdate) onUpdate(data as CronogramaAtividade[])
+      }
+    } catch (e) {
+      setErroRito((e as Error)?.message || 'Não foi possível aplicar o rito da modalidade.')
+    } finally {
+      setAplicandoRito(false)
+    }
+  }
 
   function abrirReposicionamento() {
     const atual = ordenadas.find(a => a.status !== 'concluido') || ordenadas[0]
@@ -385,6 +456,51 @@ export default function CronogramaDinamico({ atividades: initial, processoId, ca
 
   return (
     <div>
+      {/* Cronograma fora do rito da modalidade */}
+      {divergente && (
+        <div style={{
+          background: 'rgba(245,158,11,0.1)',
+          border: '1px solid rgba(245,158,11,0.25)',
+          borderRadius: 12,
+          padding: '14px 16px',
+          marginBottom: 16,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 12,
+        }}>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fbbf24', marginBottom: 2 }}>
+              Este cronograma não corresponde ao rito da modalidade
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>
+              São {atividades.length} etapas gravadas contra {etapasModelo.length} do modelo.
+              Aplicar o rito substitui as etapas pelas oficiais, preservando status,
+              responsável e datas reais do que já foi trabalhado.
+            </div>
+            {erroRito && (
+              <div style={{ fontSize: 12, color: '#fca5a5', marginTop: 6 }}>{erroRito}</div>
+            )}
+          </div>
+          {canEdit && dataEntrada && (
+            <button onClick={handleAplicarRito} disabled={aplicandoRito} style={{
+              padding: '8px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+              border: '1px solid rgba(245,158,11,0.4)',
+              cursor: aplicandoRito ? 'not-allowed' : 'pointer',
+              background: 'rgba(245,158,11,0.15)', color: '#fbbf24',
+              whiteSpace: 'nowrap',
+            }}>
+              {aplicandoRito ? 'Aplicando...' : '⟳ Aplicar rito da modalidade'}
+            </button>
+          )}
+          {canEdit && !dataEntrada && (
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+              Informe a data de entrada do processo para aplicar o rito.
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Status Header */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 20, padding: 16, background: 'rgba(15,23,42,0.5)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ flex: 1, minWidth: 120 }}>
