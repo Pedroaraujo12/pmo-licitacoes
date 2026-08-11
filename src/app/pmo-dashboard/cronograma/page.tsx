@@ -15,6 +15,9 @@ import {
 /** Status de `status_processo` que representam execução em curso. */
 const STATUS_ANDAMENTO = ['Em andamento']
 
+/** Teto do filtro feito no cliente, enquanto o banco não tem p_status. */
+const FALLBACK_LIMIT = 500
+
 interface CronogramaRow {
   id: string
   id_processo: string | null
@@ -89,20 +92,44 @@ export default function CronogramaPage() {
           ...(comStatus ? { p_status: STATUS_ANDAMENTO } : {}),
         })
 
-        let semFiltroNoBanco = false
-        let rpcResult = await Promise.race([chamar(apenasAndamento), timeoutPromise]) as RpcResult
+        const rpcResult = await Promise.race([chamar(apenasAndamento), timeoutPromise]) as RpcResult
 
-        // Banco ainda sem o parâmetro p_status (migration não aplicada):
-        // repete sem o filtro e avisa, em vez de listar tudo em silêncio.
+        // Banco ainda sem o parâmetro p_status (migration não aplicada).
+        // Em vez de desistir do filtro, busca a lista inteira e filtra pelos
+        // ids dos processos em andamento, paginando no cliente. Funciona bem
+        // nesta escala; a migration apenas devolve o trabalho ao banco.
         if (apenasAndamento && rpcResult?.error) {
-          semFiltroNoBanco = true
-          rpcResult = await Promise.race([chamar(false), timeoutPromise]) as RpcResult
+          const [todos, emAndamento] = await Promise.all([
+            supabase.rpc('get_cronograma_page', {
+              p_search: debouncedSearch || null,
+              p_limit: FALLBACK_LIMIT,
+              p_offset: 0,
+            }),
+            supabase
+              .from('processos')
+              .select('id, status_processo!inner(nome)')
+              .in('status_processo.nome', STATUS_ANDAMENTO)
+              .limit(FALLBACK_LIMIT),
+          ])
+
+          if (cancelled) return
+
+          const idsAndamento = new Set(
+            (emAndamento.data ?? []).map(p => (p as { id: string }).id),
+          )
+          const filtrados = ((todos.data ?? []) as CronogramaRow[])
+            .filter(r => idsAndamento.has(r.id))
+
+          setSemFiltroBanco(true)
+          setTotalCount(filtrados.length)
+          setRows(filtrados.slice(offset, offset + perPage))
+          return
         }
 
         const data = rpcResult?.data
         if (cancelled) return
 
-        setSemFiltroBanco(semFiltroNoBanco)
+        setSemFiltroBanco(false)
         if (data) {
           setRows(data as CronogramaRow[])
           setTotalCount(data[0]?.total_count ?? 0)
@@ -141,7 +168,7 @@ export default function CronogramaPage() {
       </h1>
       <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 12 }}>
         {totalCount} processo{totalCount !== 1 ? 's' : ''}
-        {apenasAndamento && !semFiltroBanco ? ' em andamento' : ''}
+        {apenasAndamento ? ' em andamento' : ''}
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -169,15 +196,15 @@ export default function CronogramaPage() {
         ))}
       </div>
 
-      {semFiltroBanco && (
+      {semFiltroBanco && apenasAndamento && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)',
-          borderRadius: 10, padding: '10px 14px', marginBottom: 16,
-          fontSize: 12, color: '#fbbf24',
+          background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.2)',
+          borderRadius: 10, padding: '8px 12px', marginBottom: 16,
+          fontSize: 11, color: '#94a3b8',
         }}>
-          Exibindo todos os processos: o filtro por status exige a migration
-          20260811020000_cronograma_filtro_status no banco.
+          Filtro aplicado no navegador. Para que o banco faça esse trabalho,
+          aplique a migration 20260811020000_cronograma_filtro_status.
         </div>
       )}
 
