@@ -14,13 +14,6 @@ import {
   LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X, FileEdit, Contact2, StickyNote, Sun, FileSignature, Building2, CalendarClock,
 } from 'lucide-react'
 
-const DEFAULT_ALERTS = {
-  processos_atrasados: 0,
-  proximos_vencimentos: 0,
-  contratos_alertas: 0,
-  sem_colaborador: false,
-}
-
 const navItems = [
   { href: '/pmo-dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pmo-dashboard/processos', label: 'Processos', icon: FileText },
@@ -54,12 +47,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [layoutAlerts, setLayoutAlerts] = useState<{
-    processos_atrasados: number
-    proximos_vencimentos: number
-    contratos_alertas: number
-    sem_colaborador: boolean
-  }>(DEFAULT_ALERTS)
   const isMobile = useIsMobile()
   const sidebarOpen = isMobile ? mobileOpen : !desktopCollapsed
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
@@ -106,18 +93,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           return
         }
         setProfile(profileData as Profile)
-
-        const { data: alerts, error: alertsError } = await supabase.rpc('get_layout_alerts', { p_user_id: user.id })
-        if (alertsError) console.warn('Layout alerts unavailable:', alertsError)
-        if (!cancelled && alerts) {
-          const normalizedAlerts = alerts as {
-            processos_atrasados: number
-            proximos_vencimentos: number
-            contratos_alertas: number
-            sem_colaborador: boolean
-          }
-          setLayoutAlerts(normalizedAlerts)
-        }
       } catch (err) {
         console.error('Dashboard layout init error:', err)
         if (!cancelled) {
@@ -136,8 +111,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     await getSupabase().auth.signOut()
     router.push('/login')
   }
-
-  const alertas = layoutAlerts
 
   return (
     <div style={{ minHeight: '100vh', background: '#020617' }}>
@@ -182,15 +155,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }} title={!sidebarOpen ? item.label : undefined}>
                 <Icon size={18} />
                 {sidebarOpen && <span>{item.label}</span>}
-                {sidebarOpen && item.label === 'Processos' && alertas.processos_atrasados > 0 && (
-                  <span style={{ marginLeft: 'auto', background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, lineHeight: '1.4' }}>{alertas.processos_atrasados}</span>
-                )}
-                {sidebarOpen && item.label === 'Cronograma' && alertas.proximos_vencimentos > 0 && (
-                  <span style={{ marginLeft: 'auto', background: '#eab308', color: '#000', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, lineHeight: '1.4' }}>{alertas.proximos_vencimentos}</span>
-                )}
-                {sidebarOpen && item.label === 'Contratos' && alertas.contratos_alertas > 0 && (
-                  <span style={{ marginLeft: 'auto', background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, lineHeight: '1.4' }}>{alertas.contratos_alertas}</span>
-                )}
               </Link>
             )
           })}
