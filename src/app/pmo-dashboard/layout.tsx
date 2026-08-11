@@ -9,6 +9,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { ToastProvider } from '@/components/ui/toast'
 import { WebVitals } from '@/components/ui/web-vitals'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
+import { registrarNavegacao } from '@/lib/navegacao'
 import {
   LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X, FileEdit, Contact2, StickyNote, Sun, FileSignature, Building2, CalendarClock,
 } from 'lucide-react'
@@ -68,6 +69,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [])
   const router = useRouter()
   const pathname = usePathname()
+
+  // Alimenta o histórico interno que o botão "Voltar" das telas de detalhe
+  // consulta para saber de onde a pessoa veio.
+  useEffect(() => {
+    registrarNavegacao(pathname)
+  }, [pathname])
 
   useEffect(() => {
     let cancelled = false

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useVoltar } from '@/hooks/useVoltar'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { listContratos } from '@/lib/contratos'
@@ -19,6 +20,7 @@ const baseInput: React.CSSProperties = {
 
 function ContratosListContent() {
   const router = useRouter()
+  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/contratos')
   const searchParams = useSearchParams()
   const supabase = createClient()
   const isMobile = useIsMobile()
@@ -78,7 +80,9 @@ function ContratosListContent() {
         marginBottom: 20, gap: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => router.push('/pmo-dashboard/contratos')}
+          <button onClick={voltar}
+            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
             style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
             <ArrowLeft size={20} />
           </button>

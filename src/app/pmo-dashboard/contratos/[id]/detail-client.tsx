@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useVoltar } from '@/hooks/useVoltar'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getContrato, computeContratoAlertas, computeSaldoContrato, computeDiasRestantes, computeValoresBreakdown } from '@/lib/contratos'
@@ -63,7 +64,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 export default function ContratoDetailClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
   const paramsId = idOverride ?? (params ? use(params).id : '')
   const [id, setId] = useState(paramsId)
-  const router = useRouter()
+  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/contratos')
   const searchParams = useSearchParams()
   const supabase = createClient()
   const isMobile = useIsMobile()
@@ -564,7 +565,9 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
         marginBottom: 16, gap: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0, flex: 1 }}>
-          <button onClick={() => router.push('/pmo-dashboard/contratos')}
+          <button onClick={voltar}
+            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
             style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4, marginTop: 2 }}>
             <ArrowLeft size={20} />
           </button>

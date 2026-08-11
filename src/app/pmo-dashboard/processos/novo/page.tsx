@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useVoltar } from '@/hooks/useVoltar'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -11,6 +12,7 @@ import AtividadeAtualSelect from '@/components/ui/atividade-atual-select'
 
 export default function NovoProcessoPage() {
   const router = useRouter()
+  const { voltar } = useVoltar('/pmo-dashboard/processos')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
@@ -258,7 +260,7 @@ export default function NovoProcessoPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-          <button type="button" onClick={() => router.back()}
+          <button type="button" onClick={voltar}
             className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer border-none">
             Cancelar
           </button>

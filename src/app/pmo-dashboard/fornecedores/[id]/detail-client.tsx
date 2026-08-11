@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useVoltar } from '@/hooks/useVoltar'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getFornecedor } from '@/lib/fornecedores'
@@ -60,7 +61,7 @@ function DetailField({ label, children }: { label: string; children: React.React
 }
 
 export default function FornecedorDetailClient() {
-  const router = useRouter()
+  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/fornecedores')
   const searchParams = useSearchParams()
   const supabase = createClient()
   const isMobile = useIsMobile()
@@ -140,7 +141,9 @@ export default function FornecedorDetailClient() {
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => router.push('/pmo-dashboard/fornecedores')}
+        <button onClick={voltar}
+            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
           style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
           <ArrowLeft size={20} />
         </button>

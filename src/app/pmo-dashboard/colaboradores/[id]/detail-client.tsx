@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useVoltar } from '@/hooks/useVoltar'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateBR, formatDateInputBR, parseDateInputBR } from '@/lib/utils'
 import {
@@ -83,6 +84,7 @@ function Field({ label, value, displayValue, formKey, editing, form, setForm }: 
 export default function ColaboradorDetailClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
   const paramsId = idOverride ?? (params ? use(params).id : '')
   const router = useRouter()
+  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/colaboradores')
   const searchParams = useSearchParams()
   const queryId = searchParams.get('id')
   const id = useMemo(() => queryId || paramsId, [queryId, paramsId])
@@ -253,7 +255,9 @@ export default function ColaboradorDetailClient({ params, idOverride }: { params
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => router.push('/pmo-dashboard/colaboradores')}
+          <button onClick={voltar}
+            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
             style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
             <ArrowLeft size={20} />
           </button>

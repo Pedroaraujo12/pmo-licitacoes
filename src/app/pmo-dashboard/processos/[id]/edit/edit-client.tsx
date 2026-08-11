@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
+import { useVoltar } from '@/hooks/useVoltar'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -13,6 +14,7 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
   const paramsId = idOverride ?? (params ? use(params).id : '')
   const id = paramsId
   const router = useRouter()
+  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/processos')
   const [loading, setLoading] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
@@ -179,10 +181,10 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
         <div style={{ background: 'rgba(239,68,68,0.1)', borderRadius: 20, padding: 40, border: '1px solid rgba(239,68,68,0.2)' }}>
           <p style={{ color: '#fca5a5', fontSize: 16, fontWeight: 600, margin: '0 0 12px' }}>{error}</p>
           <button
-            onClick={() => router.push('/pmo-dashboard')}
+            onClick={voltar}
             className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer border-none"
           >
-            Voltar ao Dashboard
+            {rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
           </button>
         </div>
       </div>
@@ -288,7 +290,7 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-          <button type="button" onClick={() => router.back()}
+          <button type="button" onClick={voltar}
             className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer border-none">
             Cancelar
           </button>

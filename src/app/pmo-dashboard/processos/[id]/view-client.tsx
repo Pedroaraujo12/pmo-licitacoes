@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, use, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useVoltar } from '@/hooks/useVoltar'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Processo, Atividade, CronogramaAtividade } from '@/types/database'
@@ -25,6 +26,7 @@ function isOverdue(etapa: CronogramaAtividade) {
 export default function ProcessoViewClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
   const paramsId = idOverride ?? (params ? use(params).id : '')
   const router = useRouter()
+  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/processos')
   const searchParams = useSearchParams()
   const queryId = searchParams.get('id')
   const id = useMemo(() => queryId || paramsId, [queryId, paramsId])
@@ -207,7 +209,9 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
         justifyContent: 'space-between', marginBottom: 24, gap: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: isMobile ? '100%' : 'auto' }}>
-          <button onClick={() => router.push('/pmo-dashboard')}
+          <button onClick={voltar}
+            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
             className="cursor-pointer bg-transparent border-none text-slate-400 hover:text-slate-200 transition">
             <ArrowLeft size={20} />
           </button>

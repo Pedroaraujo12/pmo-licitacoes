@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useVoltar } from '@/hooks/useVoltar'
 import { createClient } from '@/lib/supabase/client'
 import { getOrdemServico } from '@/lib/ordens-servico'
 import { formatDateBR, formatBRL } from '@/lib/utils'
@@ -26,6 +27,7 @@ export default function OrdemServicoDetailClient({ params, idOverride }: { param
   const paramsId = idOverride ?? (params ? use(params).id : '')
   const [id, setId] = useState(paramsId)
   const router = useRouter()
+  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/ordens-servico')
   const searchParams = useSearchParams()
   const supabase = createClient()
   const [os, setOs] = useState<OrdemServico | null>(null)
@@ -81,7 +83,9 @@ export default function OrdemServicoDetailClient({ params, idOverride }: { param
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => router.push('/pmo-dashboard/ordens-servico')}
+          <button onClick={voltar}
+            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
             style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
             <ArrowLeft size={20} />
           </button>
