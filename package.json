@@ -4,14 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build --webpack",
+    "check:env": "node scripts/check-build-env.mjs",
+    "build": "npm run check:env && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "deploy": "npm run lint && npm run typecheck && next build --webpack && wrangler pages deploy out --project-name=pmo-licitacoes"
+    "deploy": "npm run lint && npm run typecheck && npm run build && wrangler pages deploy out --project-name=pmo-licitacoes"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
