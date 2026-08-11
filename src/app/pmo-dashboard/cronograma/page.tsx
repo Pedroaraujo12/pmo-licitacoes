@@ -6,7 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fetchAllSeiLinks, formatDate } from '@/lib/utils'
-import { listarCronograma, type LinhaCronograma } from '@/lib/cronograma-lista'
+import {
+  listarCronogramaCompleto, calcularDistribuicaoEtapas, SEM_CRONOGRAMA,
+  type LinhaCronograma, type EtapaContagem,
+} from '@/lib/cronograma-lista'
 
 import {
   CheckCircle2, Clock, Circle, ArrowRight, Search,
@@ -28,8 +31,6 @@ function statusBadge(pa: string) {
 
 export default function CronogramaPage() {
   const router = useRouter()
-  const [rows, setRows] = useState<CronogramaRow[]>([])
-  const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
   const perPage = 50
   const searchRef = useRef<HTMLInputElement>(null)
@@ -42,6 +43,8 @@ export default function CronogramaPage() {
   // padrão. Concluídos, cancelados e devolvidos ficam atrás do filtro.
   const [apenasAndamento, setApenasAndamento] = useState(true)
   const [semResultadoFiltrado, setSemResultadoFiltrado] = useState(false)
+  const [todasLinhas, setTodasLinhas] = useState<LinhaCronograma[]>([])
+  const [etapaFiltro, setEtapaFiltro] = useState<string | null>(null)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -61,22 +64,18 @@ export default function CronogramaPage() {
     async function load() {
       setLoading(true)
       try {
-        const { linhas, total } = await listarCronograma(supabase, {
+        const { linhas } = await listarCronogramaCompleto(supabase, {
           statusNomes: apenasAndamento ? STATUS_ANDAMENTO : null,
           busca: debouncedSearch || null,
-          limite: perPage,
-          offset: (page - 1) * perPage,
         })
 
         if (cancelled) return
 
-        setRows(linhas as CronogramaRow[])
-        setTotalCount(total)
-        // Filtro pedido, nenhum processo: pode ser cadastro sem esse status.
-        setSemResultadoFiltrado(apenasAndamento && total === 0)
+        setTodasLinhas(linhas)
+        setSemResultadoFiltrado(apenasAndamento && linhas.length === 0)
       } catch (err) {
         console.warn('Erro ao carregar cronograma:', err)
-        if (!cancelled) { setRows([]); setTotalCount(0) }
+        if (!cancelled) setTodasLinhas([])
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -84,16 +83,30 @@ export default function CronogramaPage() {
 
     load()
     return () => { cancelled = true }
-  }, [debouncedSearch, page, apenasAndamento])
+  }, [debouncedSearch, apenasAndamento])
+
+  // Distribuição sobre o conjunto inteiro, não sobre a página exibida
+  const distribuicao: EtapaContagem[] = useMemo(
+    () => calcularDistribuicaoEtapas(todasLinhas), [todasLinhas])
+
+  const linhasFiltradas = useMemo(
+    () => etapaFiltro
+      ? todasLinhas.filter(l => (l.etapa_atual ?? SEM_CRONOGRAMA) === etapaFiltro)
+      : todasLinhas,
+    [todasLinhas, etapaFiltro])
+
 
   useEffect(() => {
     const supabase = createClient()
     fetchAllSeiLinks(supabase).then(setSeiLinks)
   }, [])
 
+  const totalCount = linhasFiltradas.length
   const totalPages = useMemo(() => Math.ceil(totalCount / perPage) || 1, [totalCount])
 
-  const list = useMemo(() => rows, [rows])
+  const list = useMemo(
+    () => linhasFiltradas.slice((page - 1) * perPage, page * perPage) as CronogramaRow[],
+    [linhasFiltradas, page])
 
   if (loading) return (
     <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Carregando...</div>
@@ -133,6 +146,54 @@ export default function CronogramaPage() {
           </button>
         ))}
       </div>
+
+      {distribuicao.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
+          }}>
+            Em que etapa estão
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => { setEtapaFiltro(null); setPage(1) }}
+              style={{
+                padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 999,
+                cursor: 'pointer',
+                background: etapaFiltro === null ? 'rgba(56,189,248,0.15)' : 'transparent',
+                color: etapaFiltro === null ? '#38bdf8' : '#94a3b8',
+                border: `1px solid ${etapaFiltro === null ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              }}
+            >
+              Todas · {todasLinhas.length}
+            </button>
+            {distribuicao.map(d => {
+              const ativo = etapaFiltro === d.etapa
+              return (
+                <button
+                  key={d.etapa}
+                  type="button"
+                  onClick={() => { setEtapaFiltro(ativo ? null : d.etapa); setPage(1) }}
+                  title={d.etapa}
+                  style={{
+                    padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 999,
+                    cursor: 'pointer', maxWidth: 340, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    background: ativo ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.6)',
+                    color: ativo ? '#38bdf8' : '#cbd5e1',
+                    border: `1px solid ${ativo ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  }}
+                >
+                  {d.ordem < Number.MAX_SAFE_INTEGER ? `${d.ordem}. ` : ''}{d.etapa}
+                  <span style={{ marginLeft: 6, opacity: 0.75 }}>· {d.total}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {semResultadoFiltrado && (
         <div style={{

@@ -13,9 +13,10 @@ const processo = {
   status_processo: { nome: 'Em andamento' },
 }
 
-function etapa(over: Partial<{ processo_id: string; status: string; data_fim: string | null; fase: string | null; ordem: number }>) {
+function etapa(over: Partial<{ processo_id: string; status: string; data_fim: string | null; fase: string | null; descricao: string | null; ordem: number }>) {
   return {
-    processo_id: 'p1', status: 'nao_iniciado', data_fim: null, fase: 'Execução', ordem: 1,
+    processo_id: 'p1', status: 'nao_iniciado', data_fim: null, fase: 'Execução',
+    descricao: 'Etapa', ordem: 1,
     ...over,
   }
 }

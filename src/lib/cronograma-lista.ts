@@ -26,8 +26,17 @@ export interface LinhaCronograma {
   concluidas: number
   atrasadas: number
   ultima_fase: string | null
+  /** Etapa em que o processo está: a pendente de menor ordem. */
+  etapa_atual: string | null
+  etapa_atual_ordem: number | null
   progresso: number
   processo_atrasado: boolean
+}
+
+export interface EtapaContagem {
+  etapa: string
+  ordem: number
+  total: number
 }
 
 export interface ResultadoLista {
@@ -40,6 +49,7 @@ interface AtividadeResumo {
   status: string
   data_fim: string | null
   fase: string | null
+  descricao: string | null
   ordem: number
 }
 
@@ -81,6 +91,10 @@ export function agregarLinhas(
       .filter(a => a.status !== 'concluido')
       .sort((x, y) => y.ordem - x.ordem)
 
+    // Etapa atual = a pendente de MENOR ordem. É onde o processo está de
+    // fato, não a última que falta — a diferença importa para o filtro.
+    const etapaAtual = pendentes.length > 0 ? pendentes[pendentes.length - 1] : null
+
     const dataEntrega = (p.data_entrega as string | null) ?? null
 
     return {
@@ -95,6 +109,8 @@ export function agregarLinhas(
       concluidas,
       atrasadas,
       ultima_fase: pendentes[0]?.fase ?? null,
+      etapa_atual: etapaAtual?.descricao ?? null,
+      etapa_atual_ordem: etapaAtual?.ordem ?? null,
       progresso: total > 0 ? Math.floor((concluidas * 100) / total) : 0,
       processo_atrasado:
         atrasadas > 0 || (!!dataEntrega && dataEntrega < hoje && concluidas < total),
@@ -108,6 +124,52 @@ export function hojeISO(): string {
   const mes = String(d.getMonth() + 1).padStart(2, '0')
   const dia = String(d.getDate()).padStart(2, '0')
   return `${d.getFullYear()}-${mes}-${dia}`
+}
+
+/**
+ * Quantos processos há em cada etapa, ordenado pela sequência do rito.
+ * Processos sem cronograma ficam agrupados à parte.
+ */
+export function calcularDistribuicaoEtapas(linhas: LinhaCronograma[]): EtapaContagem[] {
+  const mapa = new Map<string, EtapaContagem>()
+
+  for (const l of linhas) {
+    const etapa = l.etapa_atual ?? SEM_CRONOGRAMA
+    const ordem = l.etapa_atual_ordem ?? Number.MAX_SAFE_INTEGER
+    const atual = mapa.get(etapa)
+    if (atual) {
+      atual.total += 1
+      atual.ordem = Math.min(atual.ordem, ordem)
+    } else {
+      mapa.set(etapa, { etapa, ordem, total: 1 })
+    }
+  }
+
+  return [...mapa.values()].sort((a, b) => a.ordem - b.ordem || a.etapa.localeCompare(b.etapa, 'pt-BR'))
+}
+
+/** Rótulo para processos que ainda não têm cronograma gerado. */
+export const SEM_CRONOGRAMA = 'Sem cronograma'
+
+/**
+ * Todos os processos do filtro, já agregados. A paginação acontece na tela.
+ *
+ * Nesta escala (dezenas de processos) trazer tudo de uma vez é barato e
+ * permite contar quantos estão em cada etapa sobre o conjunto inteiro — uma
+ * contagem feita só sobre a página exibida seria enganosa.
+ */
+export async function listarCronogramaCompleto(
+  supabase: SupabaseClient,
+  opcoes: { statusNomes: string[] | null; busca: string | null; teto?: number },
+): Promise<{ linhas: LinhaCronograma[]; truncado: boolean }> {
+  const teto = opcoes.teto ?? 500
+  const { linhas, total } = await listarCronograma(supabase, {
+    statusNomes: opcoes.statusNomes,
+    busca: opcoes.busca,
+    limite: teto,
+    offset: 0,
+  })
+  return { linhas, truncado: total > linhas.length }
 }
 
 export async function listarCronograma(
@@ -154,7 +216,7 @@ export async function listarCronograma(
 
   const { data: atividades } = await supabase
     .from('cronograma_atividades')
-    .select('processo_id, status, data_fim, fase, ordem')
+    .select('processo_id, status, data_fim, fase, descricao, ordem')
     .in('processo_id', lista.map(p => p.id as string))
 
   return {
