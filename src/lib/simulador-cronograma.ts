@@ -238,6 +238,18 @@ export async function listFeriados(supabase: SupabaseClient): Promise<Set<string
   return new Set(data.map(f => String((f as { data: string }).data)))
 }
 
+/**
+ * Soma das durações das etapas — o número que de fato gera as datas.
+ *
+ * Pode divergir de `modelo_cronograma.total_dias_uteis`, que é o total oficial
+ * declarado pela área. O DIOP de Concorrência, por exemplo, declara 107 dias
+ * mas suas etapas somam 99. A projeção usa sempre esta soma; a divergência é
+ * exibida ao usuário em vez de silenciada.
+ */
+export function somaDiasUteis(etapas: EtapaModelo[]): number {
+  return etapas.reduce((acc, e) => acc + e.duracao_dias_uteis, 0)
+}
+
 /** Último ano coberto pelo calendário de feriados (null se vazio). */
 export function ultimoAnoComFeriados(feriados: Set<string>): number | null {
   let maior: number | null = null

@@ -3,6 +3,7 @@ import {
   isDiaUtil,
   somarDiasUteis,
   projetarCronograma,
+  somaDiasUteis,
   ultimoAnoComFeriados,
   type EtapaModelo,
 } from '../simulador-cronograma'
@@ -115,6 +116,21 @@ describe('projetarCronograma', () => {
     expect(r.pendentes).toBe(0)
     expect(r.data_conclusao).toBeNull()
     expect(r.dias_corridos).toBe(0)
+  })
+})
+
+describe('somaDiasUteis', () => {
+  it('soma as durações das etapas', () => {
+    expect(somaDiasUteis(COTACAO)).toBe(10)
+  })
+
+  it('devolve zero para lista vazia', () => {
+    expect(somaDiasUteis([])).toBe(0)
+  })
+
+  it('bate com os dias úteis da projeção completa', () => {
+    const r = projetarCronograma(COTACAO, '2026-08-10', SEM_FERIADOS)
+    expect(r.dias_uteis).toBe(somaDiasUteis(COTACAO))
   })
 })
 

@@ -10,6 +10,7 @@ import {
   listEtapasDeModelos,
   listFeriados,
   projetarCronograma,
+  somaDiasUteis,
   ultimoAnoComFeriados,
   type EtapaModelo,
   type ModalidadeComModelo,
@@ -112,9 +113,20 @@ export default function SimuladorPage() {
     return modalidades.map(m => {
       const etapas = etapasPorModelo[m.modelo_id] ?? []
       const proj = etapas.length ? projetarCronograma(etapas, dataInicio, feriados, 1) : null
-      return { modalidade: m, projecao: proj }
+      return { modalidade: m, projecao: proj, diasReais: somaDiasUteis(etapas) }
     })
   }, [modalidades, etapasPorModelo, dataInicio, feriados])
+
+  // `total_dias_uteis` é o total oficial declarado; a projeção usa a soma das
+  // etapas. Quando divergem (Concorrência DIOP: 107 declarados x 99 nas
+  // etapas), o usuário precisa saber por que a data não fecha com o total.
+  const divergenciaTotal = useMemo(() => {
+    if (!modalidadeAtual || etapasAtuais.length === 0) return null
+    const real = somaDiasUteis(etapasAtuais)
+    const declarado = modalidadeAtual.total_dias_uteis
+    if (real === declarado) return null
+    return { real, declarado }
+  }, [modalidadeAtual, etapasAtuais])
 
   // A tabela `feriados` é semeada por período. Fora dele, só fins de semana
   // são descontados — o usuário precisa saber.
@@ -225,7 +237,7 @@ export default function SimuladorPage() {
           >
             {modalidades.map(m => (
               <option key={m.modalidade_id} value={m.modalidade_id}>
-                {m.modalidade_nome} · {m.total_dias_uteis} dias úteis
+                {m.modalidade_nome} · {somaDiasUteis(etapasPorModelo[m.modelo_id] ?? [])} dias úteis
               </option>
             ))}
           </select>
@@ -311,25 +323,33 @@ export default function SimuladorPage() {
         </div>
       )}
 
-      {avisoFeriados && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            background: 'rgba(245,158,11,0.1)',
-            border: '1px solid rgba(245,158,11,0.25)',
-            borderRadius: 10,
-            padding: '10px 14px',
-            marginBottom: 20,
-            fontSize: 12,
-            color: '#fbbf24',
-          }}
-        >
-          <AlertTriangle size={14} style={{ flexShrink: 0 }} />
-          {avisoFeriados}
-        </div>
-      )}
+      {[
+        divergenciaTotal
+          ? `Este rito declara ${divergenciaTotal.declarado} dias úteis, mas suas etapas somam ${divergenciaTotal.real}. A projeção usa a soma das etapas.`
+          : null,
+        avisoFeriados,
+      ]
+        .filter((msg): msg is string => Boolean(msg))
+        .map(msg => (
+          <div
+            key={msg}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'rgba(245,158,11,0.1)',
+              border: '1px solid rgba(245,158,11,0.25)',
+              borderRadius: 10,
+              padding: '10px 14px',
+              marginBottom: 12,
+              fontSize: 12,
+              color: '#fbbf24',
+            }}
+          >
+            <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+            {msg}
+          </div>
+        ))}
 
       {/* --- comparativo entre modalidades --- */}
       <h2 style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', margin: '0 0 4px' }}>
@@ -348,7 +368,7 @@ export default function SimuladorPage() {
           marginBottom: 24,
         }}
       >
-        {comparativo.map(({ modalidade, projecao: proj }) => {
+        {comparativo.map(({ modalidade, projecao: proj, diasReais }) => {
           const ativo = modalidade.modalidade_id === modalidadeId
           return (
             <button
@@ -374,7 +394,7 @@ export default function SimuladorPage() {
                 {formatDateBR(proj?.data_conclusao ?? null)}
               </span>
               <span style={{ fontSize: 11, color: '#64748b' }}>
-                {modalidade.total_dias_uteis} dias úteis · {proj?.dias_corridos ?? 0} corridos
+                {diasReais} dias úteis · {proj?.dias_corridos ?? 0} corridos
               </span>
             </button>
           )
