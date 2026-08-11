@@ -37,6 +37,8 @@ export interface EtapaContagem {
   etapa: string
   ordem: number
   total: number
+  /** Falso quando a etapa não pertence ao rito atual da modalidade. */
+  noModelo?: boolean
 }
 
 export interface ResultadoLista {
@@ -150,6 +152,60 @@ export function calcularDistribuicaoEtapas(linhas: LinhaCronograma[]): EtapaCont
 
 /** Rótulo para processos que ainda não têm cronograma gerado. */
 export const SEM_CRONOGRAMA = 'Sem cronograma'
+
+/**
+ * Distribuição sobre o rito completo da modalidade: todas as etapas do
+ * modelo aparecem, inclusive as que hoje não têm nenhum processo — é o que
+ * mostra onde a fila está vazia e onde acumula.
+ *
+ * Etapas presentes nos processos mas ausentes do modelo (cronogramas antigos,
+ * anteriores aos modelos por modalidade) entram ao final, marcadas, em vez de
+ * desaparecerem da contagem.
+ */
+export function distribuicaoComModelo(
+  linhas: LinhaCronograma[],
+  etapasModelo: { ordem: number; descricao: string }[],
+): EtapaContagem[] {
+  const contagem = new Map<string, number>()
+  for (const l of linhas) {
+    const etapa = l.etapa_atual ?? SEM_CRONOGRAMA
+    contagem.set(etapa, (contagem.get(etapa) ?? 0) + 1)
+  }
+
+  const doModelo: EtapaContagem[] = [...etapasModelo]
+    .sort((a, b) => a.ordem - b.ordem)
+    .map(e => ({
+      etapa: e.descricao,
+      ordem: e.ordem,
+      total: contagem.get(e.descricao) ?? 0,
+      noModelo: true,
+    }))
+
+  const nomesDoModelo = new Set(doModelo.map(e => e.etapa))
+
+  const foraDoModelo: EtapaContagem[] = [...contagem.entries()]
+    .filter(([etapa]) => !nomesDoModelo.has(etapa))
+    .map(([etapa, total]) => ({
+      etapa,
+      ordem: Number.MAX_SAFE_INTEGER,
+      total,
+      noModelo: false,
+    }))
+    .sort((a, b) => {
+      if (a.etapa === SEM_CRONOGRAMA) return 1
+      if (b.etapa === SEM_CRONOGRAMA) return -1
+      return a.etapa.localeCompare(b.etapa, 'pt-BR')
+    })
+
+  return [...doModelo, ...foraDoModelo]
+}
+
+/** Modalidades presentes na lista, para o seletor. */
+export function modalidadesPresentes(linhas: LinhaCronograma[]): string[] {
+  const nomes = new Set<string>()
+  for (const l of linhas) if (l.modalidade_nome) nomes.add(l.modalidade_nome)
+  return [...nomes].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+}
 
 /**
  * Todos os processos do filtro, já agregados. A paginação acontece na tela.

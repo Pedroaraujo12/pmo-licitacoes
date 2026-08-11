@@ -7,9 +7,11 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fetchAllSeiLinks, formatDate } from '@/lib/utils'
 import {
-  listarCronogramaCompleto, calcularDistribuicaoEtapas, SEM_CRONOGRAMA,
+  listarCronogramaCompleto, calcularDistribuicaoEtapas, distribuicaoComModelo,
+  modalidadesPresentes, SEM_CRONOGRAMA,
   type LinhaCronograma, type EtapaContagem,
 } from '@/lib/cronograma-lista'
+import { listModalidadesComModelo, listEtapasDeModelos, type EtapaModelo } from '@/lib/simulador-cronograma'
 
 import {
   CheckCircle2, Clock, Circle, ArrowRight, Search,
@@ -45,6 +47,8 @@ export default function CronogramaPage() {
   const [semResultadoFiltrado, setSemResultadoFiltrado] = useState(false)
   const [todasLinhas, setTodasLinhas] = useState<LinhaCronograma[]>([])
   const [etapaFiltro, setEtapaFiltro] = useState<string | null>(null)
+  const [modalidadeFiltro, setModalidadeFiltro] = useState<string | null>(null)
+  const [etapasPorModalidade, setEtapasPorModalidade] = useState<Record<string, EtapaModelo[]>>({})
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -85,15 +89,52 @@ export default function CronogramaPage() {
     return () => { cancelled = true }
   }, [debouncedSearch, apenasAndamento])
 
+  // Ritos cadastrados, para exibir o cronograma completo da modalidade —
+  // inclusive as etapas onde não há nenhum processo no momento.
+  useEffect(() => {
+    let cancelado = false
+
+    async function carregarRitos() {
+      const supabase = createClient()
+      const mods = await listModalidadesComModelo(supabase)
+      if (mods.length === 0 || cancelado) return
+
+      const porModelo = await listEtapasDeModelos(supabase, mods.map(m => m.modelo_id))
+      if (cancelado) return
+
+      const porModalidade: Record<string, EtapaModelo[]> = {}
+      for (const m of mods) {
+        const etapas = porModelo[m.modelo_id]
+        if (etapas?.length) porModalidade[m.modalidade_nome] = etapas
+      }
+      setEtapasPorModalidade(porModalidade)
+    }
+
+    carregarRitos()
+    return () => { cancelado = true }
+  }, [])
+
+  const modalidades = useMemo(() => modalidadesPresentes(todasLinhas), [todasLinhas])
+
+  const linhasDaModalidade = useMemo(
+    () => modalidadeFiltro
+      ? todasLinhas.filter(l => l.modalidade_nome === modalidadeFiltro)
+      : todasLinhas,
+    [todasLinhas, modalidadeFiltro])
+
   // Distribuição sobre o conjunto inteiro, não sobre a página exibida
-  const distribuicao: EtapaContagem[] = useMemo(
-    () => calcularDistribuicaoEtapas(todasLinhas), [todasLinhas])
+  const distribuicao: EtapaContagem[] = useMemo(() => {
+    const doRito = modalidadeFiltro ? etapasPorModalidade[modalidadeFiltro] : null
+    return doRito
+      ? distribuicaoComModelo(linhasDaModalidade, doRito)
+      : calcularDistribuicaoEtapas(linhasDaModalidade)
+  }, [linhasDaModalidade, modalidadeFiltro, etapasPorModalidade])
 
   const linhasFiltradas = useMemo(
     () => etapaFiltro
-      ? todasLinhas.filter(l => (l.etapa_atual ?? SEM_CRONOGRAMA) === etapaFiltro)
-      : todasLinhas,
-    [todasLinhas, etapaFiltro])
+      ? linhasDaModalidade.filter(l => (l.etapa_atual ?? SEM_CRONOGRAMA) === etapaFiltro)
+      : linhasDaModalidade,
+    [linhasDaModalidade, etapaFiltro])
 
 
   useEffect(() => {
@@ -147,13 +188,54 @@ export default function CronogramaPage() {
         ))}
       </div>
 
+      {modalidades.length > 1 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
+          }}>
+            Modalidade
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[null, ...modalidades].map(m => {
+              const ativo = modalidadeFiltro === m
+              const qtd = m ? todasLinhas.filter(l => l.modalidade_nome === m).length : todasLinhas.length
+              return (
+                <button
+                  key={m ?? 'todas'}
+                  type="button"
+                  onClick={() => { setModalidadeFiltro(m); setEtapaFiltro(null); setPage(1) }}
+                  style={{
+                    padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 999,
+                    cursor: 'pointer',
+                    background: ativo ? 'rgba(167,139,250,0.15)' : 'transparent',
+                    color: ativo ? '#a78bfa' : '#94a3b8',
+                    border: `1px solid ${ativo ? 'rgba(167,139,250,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  }}
+                >
+                  {m ?? 'Todas'} <span style={{ opacity: 0.7 }}>· {qtd}</span>
+                </button>
+              )
+            })}
+          </div>
+          {modalidadeFiltro && !etapasPorModalidade[modalidadeFiltro] && (
+            <p style={{ fontSize: 11, color: '#fbbf24', margin: '6px 0 0' }}>
+              Esta modalidade não tem modelo de cronograma cadastrado — as etapas
+              abaixo vêm apenas dos processos existentes.
+            </p>
+          )}
+        </div>
+      )}
+
       {distribuicao.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
             textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
           }}>
-            Em que etapa estão
+            {modalidadeFiltro && etapasPorModalidade[modalidadeFiltro]
+              ? `Etapas do rito · ${modalidadeFiltro}`
+              : 'Em que etapa estão'}
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
@@ -167,22 +249,25 @@ export default function CronogramaPage() {
                 border: `1px solid ${etapaFiltro === null ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.1)'}`,
               }}
             >
-              Todas · {todasLinhas.length}
+              Todas · {linhasDaModalidade.length}
             </button>
             {distribuicao.map(d => {
               const ativo = etapaFiltro === d.etapa
+              const vazio = d.total === 0
               return (
                 <button
                   key={d.etapa}
                   type="button"
-                  onClick={() => { setEtapaFiltro(ativo ? null : d.etapa); setPage(1) }}
-                  title={d.etapa}
+                  onClick={() => { if (!vazio) { setEtapaFiltro(ativo ? null : d.etapa); setPage(1) } }}
+                  disabled={vazio}
+                  title={vazio ? `${d.etapa} — nenhum processo nesta etapa` : d.etapa}
                   style={{
                     padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 999,
-                    cursor: 'pointer', maxWidth: 340, overflow: 'hidden',
+                    cursor: vazio ? 'default' : 'pointer', maxWidth: 340, overflow: 'hidden',
                     textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    opacity: vazio ? 0.4 : 1,
                     background: ativo ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.6)',
-                    color: ativo ? '#38bdf8' : '#cbd5e1',
+                    color: ativo ? '#38bdf8' : (d.noModelo === false ? '#fbbf24' : '#cbd5e1'),
                     border: `1px solid ${ativo ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.08)'}`,
                   }}
                 >
