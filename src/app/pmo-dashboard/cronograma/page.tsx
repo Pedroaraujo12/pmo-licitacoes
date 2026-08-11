@@ -12,6 +12,9 @@ import {
   ChevronLeft, ChevronRight
 } from 'lucide-react'
 
+/** Status de `status_processo` que representam execução em curso. */
+const STATUS_ANDAMENTO = ['Em andamento']
+
 interface CronogramaRow {
   id: string
   id_processo: string | null
@@ -19,6 +22,7 @@ interface CronogramaRow {
   data_entrada: string | null
   data_entrega: string | null
   modalidade_nome: string | null
+  status_nome: string | null
   total_atividades: number
   concluidas: number
   atrasadas: number
@@ -48,6 +52,10 @@ export default function CronogramaPage() {
   const [seiLinks, setSeiLinks] = useState<Record<string, string>>({})
   const isMobile = useIsMobile()
   const debouncedSearch = useDebounce(search, 300)
+  // A tela existe para acompanhar execução: só processos em andamento por
+  // padrão. Concluídos, cancelados e devolvidos ficam atrás do filtro.
+  const [apenasAndamento, setApenasAndamento] = useState(true)
+  const [semFiltroBanco, setSemFiltroBanco] = useState(false)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -63,21 +71,38 @@ export default function CronogramaPage() {
   useEffect(() => {
     let cancelled = false
     const supabase = createClient()
+
     async function load() {
       setLoading(true)
       try {
         const offset = (page - 1) * perPage
-        const rpcPromise = supabase.rpc('get_cronograma_page', {
-          p_search: debouncedSearch || null,
-          p_limit: perPage,
-          p_offset: offset,
-        })
         const timeoutPromise = new Promise<null>((resolve) => {
           window.setTimeout(() => resolve(null), 10000)
         })
-        const rpcResult = await Promise.race([rpcPromise, timeoutPromise]) as { data?: CronogramaRow[] } | null
+
+        type RpcResult = { data?: CronogramaRow[]; error?: { message?: string } } | null
+
+        const chamar = (comStatus: boolean) => supabase.rpc('get_cronograma_page', {
+          p_search: debouncedSearch || null,
+          p_limit: perPage,
+          p_offset: offset,
+          ...(comStatus ? { p_status: STATUS_ANDAMENTO } : {}),
+        })
+
+        let semFiltroNoBanco = false
+        let rpcResult = await Promise.race([chamar(apenasAndamento), timeoutPromise]) as RpcResult
+
+        // Banco ainda sem o parâmetro p_status (migration não aplicada):
+        // repete sem o filtro e avisa, em vez de listar tudo em silêncio.
+        if (apenasAndamento && rpcResult?.error) {
+          semFiltroNoBanco = true
+          rpcResult = await Promise.race([chamar(false), timeoutPromise]) as RpcResult
+        }
+
         const data = rpcResult?.data
         if (cancelled) return
+
+        setSemFiltroBanco(semFiltroNoBanco)
         if (data) {
           setRows(data as CronogramaRow[])
           setTotalCount(data[0]?.total_count ?? 0)
@@ -91,9 +116,10 @@ export default function CronogramaPage() {
         if (!cancelled) setLoading(false)
       }
     }
+
     load()
     return () => { cancelled = true }
-  }, [debouncedSearch, page])
+  }, [debouncedSearch, page, apenasAndamento])
 
   useEffect(() => {
     const supabase = createClient()
@@ -113,9 +139,47 @@ export default function CronogramaPage() {
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: '#f1f5f9' }}>
         Cronograma de Processos
       </h1>
-      <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 20 }}>
+      <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 12 }}>
         {totalCount} processo{totalCount !== 1 ? 's' : ''}
+        {apenasAndamento && !semFiltroBanco ? ' em andamento' : ''}
       </p>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {[
+          { label: 'Em andamento', ativo: apenasAndamento, valor: true },
+          { label: 'Todos os processos', ativo: !apenasAndamento, valor: false },
+        ].map(opt => (
+          <button
+            key={opt.label}
+            type="button"
+            onClick={() => { setApenasAndamento(opt.valor); setPage(1) }}
+            style={{
+              padding: '6px 14px',
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: 999,
+              cursor: 'pointer',
+              background: opt.ativo ? 'rgba(56,189,248,0.15)' : 'transparent',
+              color: opt.ativo ? '#38bdf8' : '#94a3b8',
+              border: `1px solid ${opt.ativo ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.1)'}`,
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {semFiltroBanco && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)',
+          borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+          fontSize: 12, color: '#fbbf24',
+        }}>
+          Exibindo todos os processos: o filtro por status exige a migration
+          20260811020000_cronograma_filtro_status no banco.
+        </div>
+      )}
 
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20,
