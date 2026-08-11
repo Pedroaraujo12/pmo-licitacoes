@@ -26,7 +26,7 @@ function isOverdue(etapa: CronogramaAtividade) {
 export default function ProcessoViewClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
   const paramsId = idOverride ?? (params ? use(params).id : '')
   const router = useRouter()
-  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/processos')
+  const { voltar } = useVoltar('/pmo-dashboard/processos')
   const searchParams = useSearchParams()
   const queryId = searchParams.get('id')
   const id = useMemo(() => queryId || paramsId, [queryId, paramsId])
@@ -210,8 +210,8 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: isMobile ? '100%' : 'auto' }}>
           <button onClick={voltar}
-            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
-            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            aria-label="Voltar"
+            title="Voltar"
             className="cursor-pointer bg-transparent border-none text-slate-400 hover:text-slate-200 transition">
             <ArrowLeft size={20} />
           </button>

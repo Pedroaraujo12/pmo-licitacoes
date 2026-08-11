@@ -22,7 +22,7 @@ const PERIODO_COLORS: Record<string, string> = {
 
 export default function AniversariantesPage() {
   const router = useRouter()
-  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/colaboradores')
+  const { voltar } = useVoltar('/pmo-dashboard/colaboradores')
   const supabase = createClient()
   const [aniversariantes, setAniversariantes] = useState<ColaboradorAniversariante[]>([])
   const [unidades, setUnidades] = useState<string[]>([])
@@ -56,8 +56,8 @@ export default function AniversariantesPage() {
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <button onClick={voltar}
-            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
-            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            aria-label="Voltar"
+            title="Voltar"
           style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
           <ArrowLeft size={20} />
         </button>

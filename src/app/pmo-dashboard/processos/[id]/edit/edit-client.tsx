@@ -14,7 +14,7 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
   const paramsId = idOverride ?? (params ? use(params).id : '')
   const id = paramsId
   const router = useRouter()
-  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/processos')
+  const { voltar } = useVoltar('/pmo-dashboard/processos')
   const [loading, setLoading] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
@@ -184,7 +184,7 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
             onClick={voltar}
             className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition cursor-pointer border-none"
           >
-            {rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            Voltar
           </button>
         </div>
       </div>

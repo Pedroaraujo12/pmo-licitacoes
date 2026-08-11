@@ -1,11 +1,8 @@
 'use client'
 
-import { useCallback, useSyncExternalStore } from 'react'
+import { useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { temHistoricoInterno, rotaAnterior, nomeDaRota } from '@/lib/navegacao'
-
-/** Sem subscrição: o histórico não muda enquanto a tela está aberta. */
-const semAssinatura = () => () => {}
+import { temHistoricoInterno } from '@/lib/navegacao'
 
 /**
  * Botão "Voltar" que respeita a origem.
@@ -14,20 +11,14 @@ const semAssinatura = () => () => {}
  * fato. Se abriu a URL direto (link colado, favorito, F5), vai para o destino
  * padrão — porque aí `router.back()` a tiraria do sistema.
  *
- * `rotulo` traz o nome da tela anterior quando reconhecido, para o botão
- * poder dizer "Voltar ao Cronograma" em vez de só "Voltar".
+ * A decisão é tomada no clique, não na renderização. Uma versão anterior
+ * expunha o nome da tela de origem para rotular o botão, lendo sessionStorage
+ * durante o render; como o layout grava nesse mesmo storage a cada navegação,
+ * o valor mudava entre renders e derrubava a página. O rótulo não valia o
+ * risco: o que importa é o botão levar ao lugar certo.
  */
 export function useVoltar(destinoPadrao: string) {
   const router = useRouter()
-
-  // O rótulo vem do sessionStorage, que só existe no navegador. Ler por
-  // useSyncExternalStore evita divergência entre o HTML pré-renderizado e a
-  // hidratação — no servidor o valor é nulo, no cliente é o nome da tela.
-  const rotulo = useSyncExternalStore(
-    semAssinatura,
-    () => nomeDaRota(rotaAnterior()) ?? nomeDaRota(destinoPadrao),
-    () => null,
-  )
 
   const voltar = useCallback(() => {
     if (temHistoricoInterno()) {
@@ -37,5 +28,5 @@ export function useVoltar(destinoPadrao: string) {
     }
   }, [router, destinoPadrao])
 
-  return { voltar, rotulo }
+  return { voltar }
 }

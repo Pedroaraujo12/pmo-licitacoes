@@ -61,7 +61,7 @@ function DetailField({ label, children }: { label: string; children: React.React
 }
 
 export default function FornecedorDetailClient() {
-  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/fornecedores')
+  const { voltar } = useVoltar('/pmo-dashboard/fornecedores')
   const searchParams = useSearchParams()
   const supabase = createClient()
   const isMobile = useIsMobile()
@@ -142,8 +142,8 @@ export default function FornecedorDetailClient() {
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <button onClick={voltar}
-            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
-            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            aria-label="Voltar"
+            title="Voltar"
           style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
           <ArrowLeft size={20} />
         </button>

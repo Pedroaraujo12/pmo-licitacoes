@@ -64,7 +64,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 export default function ContratoDetailClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
   const paramsId = idOverride ?? (params ? use(params).id : '')
   const [id, setId] = useState(paramsId)
-  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/contratos')
+  const { voltar } = useVoltar('/pmo-dashboard/contratos')
   const searchParams = useSearchParams()
   const supabase = createClient()
   const isMobile = useIsMobile()
@@ -566,8 +566,8 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0, flex: 1 }}>
           <button onClick={voltar}
-            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
-            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            aria-label="Voltar"
+            title="Voltar"
             style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4, marginTop: 2 }}>
             <ArrowLeft size={20} />
           </button>

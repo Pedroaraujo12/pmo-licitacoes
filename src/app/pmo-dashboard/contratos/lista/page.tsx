@@ -20,7 +20,7 @@ const baseInput: React.CSSProperties = {
 
 function ContratosListContent() {
   const router = useRouter()
-  const { voltar, rotulo: rotuloVoltar } = useVoltar('/pmo-dashboard/contratos')
+  const { voltar } = useVoltar('/pmo-dashboard/contratos')
   const searchParams = useSearchParams()
   const supabase = createClient()
   const isMobile = useIsMobile()
@@ -81,8 +81,8 @@ function ContratosListContent() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={voltar}
-            aria-label={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
-            title={rotuloVoltar ? `Voltar para ${rotuloVoltar}` : 'Voltar'}
+            aria-label="Voltar"
+            title="Voltar"
             style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
             <ArrowLeft size={20} />
           </button>
