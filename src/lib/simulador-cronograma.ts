@@ -195,6 +195,28 @@ export async function listEtapasModelo(
 }
 
 /**
+ * Etapas do modelo ativo de uma modalidade, em ordem.
+ * Usado pelos formulários de processo para que "Atividade Atual" ofereça as
+ * etapas do rito real, e não uma lista fixa.
+ */
+export async function listEtapasPorModalidade(
+  supabase: SupabaseClient,
+  modalidadeId: string,
+): Promise<EtapaModelo[]> {
+  const { data, error } = await supabase
+    .from('modelo_cronograma')
+    .select('id')
+    .eq('modalidade_id', modalidadeId)
+    .eq('ativo', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data?.id) return []
+  return listEtapasModelo(supabase, data.id as string)
+}
+
+/**
  * Etapas de vários modelos de uma vez, agrupadas por modelo.
  * Evita uma consulta por modalidade ao montar o comparativo entre ritos.
  */

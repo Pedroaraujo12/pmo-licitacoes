@@ -7,6 +7,7 @@ import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso }
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cleanNum, upsertSeiLink } from '@/lib/utils'
 import { PT_BR } from '@/lib/pt-br'
+import AtividadeAtualSelect from '@/components/ui/atividade-atual-select'
 
 export default function NovoProcessoPage() {
   const router = useRouter()
@@ -26,25 +27,8 @@ export default function NovoProcessoPage() {
   const [demandantes, setDemandantes] = useState<Demandante[]>([])
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
   const [statusList, setStatusList] = useState<StatusProcesso[]>([])
-  const atividadesAtuais = [
-    'Análise do Termo de Referência e anexos',
-    'Pesquisa de Preços e levantamento do custo estimado da Contratação',
-    'Relatório de Pesquisa Preços',
-    'Disponibilidade orçamentária',
-    'Designação da Comissão de Seleção',
-    'Elaboração Da Minuta de Edital e Anexos. Envio à UJUR/AGSUS',
-    'Análise jurídica e Emissão de Parecer',
-    'Adequações e atendimento ao Parecer Jurídico quanto aos aspectos técnicos do Edital e Anexos e Autorização de Governança publicação do Edital',
-    'Publicação do Edital (prazos legais: 3 dias úteis - Cotação de Preços,  8 dias úteis - Pregão bens e materiais, 10 dias úteis - Pregão serviços e 15 dias úteis concorrência)',
-    'Abertura e Fase de Lances',
-    'Fase de Julgamento das Propostas, Aceitação e Habilitação',
-    'Envio da proposta e documentação de qualificação técnica para análise da área demandante',
-    'Resposta da Área demandante',
-    'Prazo recursal (3 DIAS ÚTEIS)',
-    'Prazo contrarrazões (3 DIAS ÚTEIS)',
-    'Decisão quanto ao recurso (5 dias úteis)',
-    'Envio do Recurso ao Jurídico e Ratificação autoridade competente da decisão do pregoeiro',
-  ]
+  const [modalidadeId, setModalidadeId] = useState('')
+  const [atividadeAtual, setAtividadeAtual] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -158,11 +142,21 @@ export default function NovoProcessoPage() {
     outline: 'none',
   } as const
 
-  function renderSelect(name: string, label: string, options: { id: string; nome: string }[]) {
+  function renderSelect(
+    name: string,
+    label: string,
+    options: { id: string; nome: string }[],
+    onChange?: (value: string) => void,
+  ) {
     return (
       <div>
         <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
-        <select name={name} defaultValue="" style={{ ...baseInput, cursor: 'pointer' }}>
+        <select
+          name={name}
+          defaultValue=""
+          onChange={onChange ? e => onChange(e.target.value) : undefined}
+          style={{ ...baseInput, cursor: 'pointer' }}
+        >
           <option value="">Selecione...</option>
           {options.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
@@ -223,7 +217,7 @@ export default function NovoProcessoPage() {
           {renderInput('qtd_itens', 'Qtd Itens', 'number')}
           {renderSelect('responsavel_id', 'Responsável', responsaveis)}
           {renderSelect('demandante_id', 'Demandante', demandantes)}
-          {renderSelect('modalidade_id', 'Modalidade', modalidades)}
+          {renderSelect('modalidade_id', 'Modalidade', modalidades, v => { setModalidadeId(v); setAtividadeAtual('') })}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prioridade</label>
             <select name="prioridade" defaultValue="" style={{ ...baseInput, cursor: 'pointer' }}>
@@ -245,10 +239,11 @@ export default function NovoProcessoPage() {
         </div>
         <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atividade Atual</label>
-          <select name="atividade_atual" defaultValue="" style={{ ...baseInput, cursor: 'pointer' }}>
-            <option value="">Selecione...</option>
-            {atividadesAtuais.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
+          <AtividadeAtualSelect
+            modalidadeId={modalidadeId || null}
+            value={atividadeAtual}
+            onChange={setAtividadeAtual}
+          />
         </div>
         <div style={{ marginBottom: 24 }}>
           {renderTextarea('observacoes', 'Observações')}

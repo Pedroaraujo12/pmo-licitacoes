@@ -7,6 +7,7 @@ import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso }
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cleanNum, formatBRL, upsertSeiLink, fetchSeiLink } from '@/lib/utils'
 import { PT_BR } from '@/lib/pt-br'
+import AtividadeAtualSelect from '@/components/ui/atividade-atual-select'
 
 export default function EditProcessoClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
   const paramsId = idOverride ?? (params ? use(params).id : '')
@@ -30,26 +31,6 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
   const [statusList, setStatusList] = useState<StatusProcesso[]>([])
 
   const [form, setForm] = useState<Record<string, string>>({})
-
-  const atividadesAtuais = [
-    'Análise do Termo de Referência e anexos',
-    'Pesquisa de Preços e levantamento do custo estimado da Contratação',
-    'Relatório de Pesquisa Preços',
-    'Disponibilidade orçamentária',
-    'Designação da Comissão de Seleção',
-    'Elaboração Da Minuta de Edital e Anexos. Envio à UJUR/AGSUS',
-    'Análise jurídica e Emissão de Parecer',
-    'Adequações e atendimento ao Parecer Jurídico quanto aos aspectos técnicos do Edital e Anexos e Autorização de Governança publicação do Edital',
-    'Publicação do Edital (prazos legais: 3 dias úteis - Cotação de Preços,  8 dias úteis - Pregão bens e materiais, 10 dias úteis - Pregão serviços e 15 dias úteis concorrência)',
-    'Abertura e Fase de Lances',
-    'Fase de Julgamento das Propostas, Aceitação e Habilitação',
-    'Envio da proposta e documentação de qualificação técnica para análise da área demandante',
-    'Resposta da Área demandante',
-    'Prazo recursal (3 DIAS ÚTEIS)',
-    'Prazo contrarrazões (3 DIAS ÚTEIS)',
-    'Decisão quanto ao recurso (5 dias úteis)',
-    'Envio do Recurso ao Jurídico e Ratificação autoridade competente da decisão do pregoeiro',
-  ]
 
   useEffect(() => {
     async function load() {
@@ -264,14 +245,12 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
 
         <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atividade Atual</label>
-          <select
+          <AtividadeAtualSelect
+            modalidadeId={form.modalidade_id || null}
             value={form.atividade_atual || ''}
-            onChange={e => setForm(fm => ({ ...fm, atividade_atual: e.target.value }))}
-            style={{ ...baseInput, cursor: 'pointer' }}
-          >
-            <option value="">Selecione...</option>
-            {atividadesAtuais.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
+            onChange={v => setForm(fm => ({ ...fm, atividade_atual: v }))}
+            processoId={id}
+          />
         </div>
 
         <div style={{ marginBottom: 24 }}>
