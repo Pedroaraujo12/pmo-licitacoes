@@ -162,51 +162,52 @@ export default function CronogramaPage() {
   const responsaveis = useMemo(() => valoresDistintos(todasLinhas, 'responsavel_nome'), [todasLinhas])
   const prioridades = useMemo(() => valoresDistintos(todasLinhas, 'prioridade'), [todasLinhas])
 
-  // Processos da modalidade escolhida cujo cronograma não corresponde ao rito
-  // cadastrado — são os que a ação em lote vai regerar.
+  // Processos cujo cronograma não corresponde ao rito cadastrado da sua
+  // modalidade. Sem filtro de modalidade, considera todas de uma vez — é o
+  // caminho para regenerar o sistema inteiro sem percorrer uma a uma.
   const foraDoRito = useMemo(() => {
-    if (!modalidadeFiltro) return []
-    const etapas = etapasPorModalidade[modalidadeFiltro]
-    if (!etapas?.length) return []
-
     return linhasDaModalidade.filter(l => {
-      const doProcesso = l.etapa_atual
-        ? [{ id: l.id, ordem: l.etapa_atual_ordem ?? 0, descricao: l.etapa_atual }]
-        : []
-      // Divergência por contagem já basta como sinal; a comparação detalhada
-      // acontece dentro de aplicarRitoDaModalidade, com as etapas completas.
-      return l.total_atividades !== etapas.length || (doProcesso.length > 0 &&
-        !etapas.some(e => e.descricao === doProcesso[0].descricao))
+      if (!l.modalidade_nome || !l.modalidade_id || !l.data_entrada) return false
+      const etapas = etapasPorModalidade[l.modalidade_nome]
+      if (!etapas?.length) return false
+
+      // Contagem diferente do rito, ou etapa atual que não existe nele
+      if (l.total_atividades !== etapas.length) return true
+      if (l.etapa_atual && !etapas.some(e => e.descricao === l.etapa_atual)) return true
+      return false
     })
-  }, [modalidadeFiltro, etapasPorModalidade, linhasDaModalidade])
+  }, [linhasDaModalidade, etapasPorModalidade])
+
+  const foraDoRitoPorModalidade = useMemo(
+    () => contarPor(foraDoRito, 'modalidade_nome'), [foraDoRito])
 
   async function aplicarRitoEmLote() {
-    if (!modalidadeFiltro || foraDoRito.length === 0) return
+    if (foraDoRito.length === 0) return
 
-    const alvo = foraDoRito.filter(l => l.modalidade_id && l.data_entrada)
-    const semDados = foraDoRito.length - alvo.length
+    const escopo = modalidadeFiltro
+      ? `${foraDoRito.length} processo(s) de ${modalidadeFiltro}`
+      : `${foraDoRito.length} processo(s) de ${foraDoRitoPorModalidade.length} modalidade(s)`
 
     if (!confirm(
-      `Regerar o cronograma de ${alvo.length} processo(s) de ${modalidadeFiltro} ` +
-      `com as etapas do rito cadastrado?
+      `Regerar o cronograma de ${escopo} com as etapas do rito cadastrado?
 
 ` +
       `Status, responsável e datas reais das etapas já trabalhadas são preservados. ` +
-      `Prazos ajustados manualmente voltam ao padrão do modelo.` +
-      (semDados > 0 ? `
+      `Prazos ajustados manualmente voltam ao padrão do modelo.
 
-${semDados} processo(s) sem data de entrada ficarão de fora.` : '')
+` +
+      `Recomendado conferir um processo antes de aplicar a todos.`
     )) return
 
     setAplicandoLote(true)
-    setProgressoLote({ feitos: 0, total: alvo.length, erros: 0 })
+    setProgressoLote({ feitos: 0, total: foraDoRito.length, erros: 0 })
 
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     let erros = 0
 
-    for (let i = 0; i < alvo.length; i++) {
-      const linha = alvo[i]
+    for (let i = 0; i < foraDoRito.length; i++) {
+      const linha = foraDoRito[i]
       try {
         const { data: atividades } = await supabase
           .from('cronograma_atividades')
@@ -225,7 +226,7 @@ ${semDados} processo(s) sem data de entrada ficarão de fora.` : '')
         console.warn('Falha ao aplicar rito em', linha.id_processo, err)
         erros++
       }
-      setProgressoLote({ feitos: i + 1, total: alvo.length, erros })
+      setProgressoLote({ feitos: i + 1, total: foraDoRito.length, erros })
     }
 
     setAplicandoLote(false)
@@ -358,8 +359,8 @@ ${semDados} processo(s) sem data de entrada ficarão de fora.` : '')
         </div>
       )}
 
-      {/* Processos com cronograma fora do rito da modalidade */}
-      {modalidadeFiltro && foraDoRito.length > 0 && (
+      {/* Processos com cronograma fora do rito cadastrado */}
+      {foraDoRito.length > 0 && (
         <div style={{
           background: 'rgba(245,158,11,0.1)',
           border: '1px solid rgba(245,158,11,0.25)',
@@ -373,7 +374,11 @@ ${semDados} processo(s) sem data de entrada ficarão de fora.` : '')
               {foraDoRito.length} processo{foraDoRito.length > 1 ? 's' : ''} com cronograma fora do rito
             </div>
             <div style={{ fontSize: 12, color: '#94a3b8' }}>
-              O rito de {modalidadeFiltro} tem {etapasPorModalidade[modalidadeFiltro]?.length} etapas.
+              {modalidadeFiltro
+                ? `O rito de ${modalidadeFiltro} tem ${etapasPorModalidade[modalidadeFiltro]?.length} etapas.`
+                : foraDoRitoPorModalidade.map(m => `${m.valor}: ${m.total}`).join(' · ')}
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
               Aplicar substitui as etapas gravadas pelas do modelo, preservando status,
               responsável e datas reais do que já foi trabalhado.
             </div>
@@ -396,7 +401,11 @@ ${semDados} processo(s) sem data de entrada ficarão de fora.` : '')
               whiteSpace: 'nowrap',
             }}
           >
-            {aplicandoLote ? 'Aplicando…' : `Aplicar rito a ${foraDoRito.length}`}
+            {aplicandoLote
+              ? 'Aplicando…'
+              : modalidadeFiltro
+                ? `Aplicar rito a ${foraDoRito.length}`
+                : `Regenerar todos (${foraDoRito.length})`}
           </button>
         </div>
       )}
