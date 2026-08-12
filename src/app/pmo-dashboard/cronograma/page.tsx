@@ -12,6 +12,7 @@ import {
   type LinhaCronograma, type EtapaContagem,
 } from '@/lib/cronograma-lista'
 import { listModalidadesComModelo, listEtapasDeModelos, type EtapaModelo } from '@/lib/simulador-cronograma'
+import { aplicarRitoDaModalidade } from '@/lib/aplicar-rito'
 
 import {
   CheckCircle2, Clock, Circle, ArrowRight, Search,
@@ -53,6 +54,9 @@ export default function CronogramaPage() {
   const [coordenacaoFiltro, setCoordenacaoFiltro] = useState<string | null>(null)
   const [responsavelFiltro, setResponsavelFiltro] = useState<string | null>(null)
   const [prioridadeFiltro, setPrioridadeFiltro] = useState<string | null>(null)
+  const [aplicandoLote, setAplicandoLote] = useState(false)
+  const [progressoLote, setProgressoLote] = useState({ feitos: 0, total: 0, erros: 0 })
+  const [recarregar, setRecarregar] = useState(0)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -99,7 +103,7 @@ export default function CronogramaPage() {
 
     load()
     return () => { cancelled = true }
-  }, [debouncedSearch, apenasAndamento])
+  }, [debouncedSearch, apenasAndamento, recarregar])
 
   // Ritos cadastrados, para exibir o cronograma completo da modalidade —
   // inclusive as etapas onde não há nenhum processo no momento.
@@ -157,6 +161,76 @@ export default function CronogramaPage() {
 
   const responsaveis = useMemo(() => valoresDistintos(todasLinhas, 'responsavel_nome'), [todasLinhas])
   const prioridades = useMemo(() => valoresDistintos(todasLinhas, 'prioridade'), [todasLinhas])
+
+  // Processos da modalidade escolhida cujo cronograma não corresponde ao rito
+  // cadastrado — são os que a ação em lote vai regerar.
+  const foraDoRito = useMemo(() => {
+    if (!modalidadeFiltro) return []
+    const etapas = etapasPorModalidade[modalidadeFiltro]
+    if (!etapas?.length) return []
+
+    return linhasDaModalidade.filter(l => {
+      const doProcesso = l.etapa_atual
+        ? [{ id: l.id, ordem: l.etapa_atual_ordem ?? 0, descricao: l.etapa_atual }]
+        : []
+      // Divergência por contagem já basta como sinal; a comparação detalhada
+      // acontece dentro de aplicarRitoDaModalidade, com as etapas completas.
+      return l.total_atividades !== etapas.length || (doProcesso.length > 0 &&
+        !etapas.some(e => e.descricao === doProcesso[0].descricao))
+    })
+  }, [modalidadeFiltro, etapasPorModalidade, linhasDaModalidade])
+
+  async function aplicarRitoEmLote() {
+    if (!modalidadeFiltro || foraDoRito.length === 0) return
+
+    const alvo = foraDoRito.filter(l => l.modalidade_id && l.data_entrada)
+    const semDados = foraDoRito.length - alvo.length
+
+    if (!confirm(
+      `Regerar o cronograma de ${alvo.length} processo(s) de ${modalidadeFiltro} ` +
+      `com as etapas do rito cadastrado?
+
+` +
+      `Status, responsável e datas reais das etapas já trabalhadas são preservados. ` +
+      `Prazos ajustados manualmente voltam ao padrão do modelo.` +
+      (semDados > 0 ? `
+
+${semDados} processo(s) sem data de entrada ficarão de fora.` : '')
+    )) return
+
+    setAplicandoLote(true)
+    setProgressoLote({ feitos: 0, total: alvo.length, erros: 0 })
+
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    let erros = 0
+
+    for (let i = 0; i < alvo.length; i++) {
+      const linha = alvo[i]
+      try {
+        const { data: atividades } = await supabase
+          .from('cronograma_atividades')
+          .select('*')
+          .eq('processo_id', linha.id)
+          .order('ordem', { ascending: true })
+
+        await aplicarRitoDaModalidade(supabase, {
+          processoId: linha.id,
+          modalidadeId: linha.modalidade_id as string,
+          dataEntrada: linha.data_entrada as string,
+          atividades: (atividades ?? []) as never,
+          userId: user?.id ?? null,
+        })
+      } catch (err) {
+        console.warn('Falha ao aplicar rito em', linha.id_processo, err)
+        erros++
+      }
+      setProgressoLote({ feitos: i + 1, total: alvo.length, erros })
+    }
+
+    setAplicandoLote(false)
+    setRecarregar(v => v + 1)
+  }
 
   function limparFiltros() {
     setModalidadeFiltro(null); setCoordenacaoFiltro(null)
@@ -280,6 +354,49 @@ export default function CronogramaPage() {
             }}
           >
             Limpar filtros
+          </button>
+        </div>
+      )}
+
+      {/* Processos com cronograma fora do rito da modalidade */}
+      {modalidadeFiltro && foraDoRito.length > 0 && (
+        <div style={{
+          background: 'rgba(245,158,11,0.1)',
+          border: '1px solid rgba(245,158,11,0.25)',
+          borderRadius: 12,
+          padding: '14px 16px',
+          marginBottom: 14,
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fbbf24', marginBottom: 2 }}>
+              {foraDoRito.length} processo{foraDoRito.length > 1 ? 's' : ''} com cronograma fora do rito
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>
+              O rito de {modalidadeFiltro} tem {etapasPorModalidade[modalidadeFiltro]?.length} etapas.
+              Aplicar substitui as etapas gravadas pelas do modelo, preservando status,
+              responsável e datas reais do que já foi trabalhado.
+            </div>
+            {aplicandoLote && (
+              <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 6 }}>
+                Aplicando… {progressoLote.feitos} de {progressoLote.total}
+                {progressoLote.erros > 0 ? ` · ${progressoLote.erros} com falha` : ''}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={aplicarRitoEmLote}
+            disabled={aplicandoLote}
+            style={{
+              padding: '8px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+              border: '1px solid rgba(245,158,11,0.4)',
+              cursor: aplicandoLote ? 'not-allowed' : 'pointer',
+              background: 'rgba(245,158,11,0.15)', color: '#e2e8f0',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {aplicandoLote ? 'Aplicando…' : `Aplicar rito a ${foraDoRito.length}`}
           </button>
         </div>
       )}
