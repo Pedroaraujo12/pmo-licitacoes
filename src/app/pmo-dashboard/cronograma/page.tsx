@@ -57,6 +57,8 @@ export default function CronogramaPage() {
   const [aplicandoLote, setAplicandoLote] = useState(false)
   const [progressoLote, setProgressoLote] = useState({ feitos: 0, total: 0, erros: 0 })
   const [erroLote, setErroLote] = useState('')
+  const [diagnostico, setDiagnostico] = useState('')
+  const [verificando, setVerificando] = useState(false)
   const [recarregar, setRecarregar] = useState(0)
 
   useEffect(() => {
@@ -240,6 +242,73 @@ export default function CronogramaPage() {
     setRecarregar(v => v + 1)
   }
 
+  /**
+   * Verifica, no próprio banco, se a sessão atual consegue gravar em
+   * cronograma_atividades. Escrever uma etapa com o valor que ela já tem é
+   * inócuo e revela o que nenhuma mensagem de sucesso revela: se a linha foi
+   * de fato alcançada.
+   */
+  async function verificarPermissoes() {
+    setVerificando(true)
+    setDiagnostico('')
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        setDiagnostico('Sessão não encontrada. Faça login novamente.')
+        return
+      }
+
+      const { data: perfil } = await supabase
+        .from('profiles').select('name, email, role').eq('id', user.id).maybeSingle()
+
+      const partes = [
+        `Usuário: ${(perfil as { email?: string })?.email || user.email || user.id}`,
+        `Papel: ${(perfil as { role?: string })?.role || '(sem perfil em profiles)'}`,
+      ]
+
+      const alvo = foraDoRito[0] ?? todasLinhas[0]
+      if (!alvo) {
+        partes.push('Nenhum processo para testar a gravação.')
+        setDiagnostico(partes.join(' · '))
+        return
+      }
+
+      const { data: etapa } = await supabase
+        .from('cronograma_atividades')
+        .select('id, ordem').eq('processo_id', alvo.id).order('ordem').limit(1).maybeSingle()
+
+      if (!etapa) {
+        partes.push('Processo de teste sem etapas.')
+        setDiagnostico(partes.join(' · '))
+        return
+      }
+
+      const linha = etapa as { id: string; ordem: number }
+      const { data: gravado, error } = await supabase
+        .from('cronograma_atividades')
+        .update({ ordem: linha.ordem })   // mesmo valor: não altera nada
+        .eq('id', linha.id)
+        .select('id')
+
+      if (error) {
+        partes.push(`Gravação recusada: ${error.message}`)
+      } else if (!gravado || gravado.length === 0) {
+        partes.push('Gravação SEM EFEITO — o banco aceitou e não alterou nenhuma linha. Falta política de escrita para este papel em cronograma_atividades.')
+      } else {
+        partes.push('Gravação OK — a permissão está correta.')
+      }
+
+      setDiagnostico(partes.join(' · '))
+    } catch (err) {
+      setDiagnostico(`Falha no teste: ${(err as Error)?.message || 'desconhecida'}`)
+    } finally {
+      setVerificando(false)
+    }
+  }
+
   function limparFiltros() {
     setModalidadeFiltro(null); setCoordenacaoFiltro(null)
     setResponsavelFiltro(null); setPrioridadeFiltro(null)
@@ -402,6 +471,15 @@ export default function CronogramaPage() {
                   : `${progressoLote.total} processo(s) regenerado(s)`}
               </div>
             )}
+            {diagnostico && (
+              <div style={{
+                fontSize: 11, color: '#cbd5e1', marginTop: 6,
+                wordBreak: 'break-word', background: 'rgba(148,163,184,0.1)',
+                border: '1px solid rgba(148,163,184,0.25)', borderRadius: 6, padding: '6px 8px',
+              }}>
+                {diagnostico}
+              </div>
+            )}
             {erroLote && (
               <div style={{
                 fontSize: 11, color: '#fca5a5', marginTop: 6,
@@ -412,6 +490,19 @@ export default function CronogramaPage() {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            onClick={verificarPermissoes}
+            disabled={verificando || aplicandoLote}
+            style={{
+              padding: '8px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.15)',
+              cursor: verificando ? 'not-allowed' : 'pointer',
+              background: 'transparent', color: '#e2e8f0', whiteSpace: 'nowrap',
+            }}
+          >
+            {verificando ? 'Verificando…' : 'Verificar permissões'}
+          </button>
           <button
             type="button"
             onClick={aplicarRitoEmLote}
