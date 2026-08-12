@@ -57,6 +57,43 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const pathname = usePathname()
 
+  // Um chunk que chega pela metade — comum em rede móvel instável — deixa o
+  // carregador de módulos sem o que executar, e a tela inteira cai. Recarregar
+  // uma vez resolve, porque o arquivo é buscado de novo. A trava em
+  // sessionStorage impede laço de recarga quando a causa for outra.
+  useEffect(() => {
+    const CHAVE = 'pmo_recarga_chunk'
+
+    function ehFalhaDeModulo(mensagem: string) {
+      return /Loading chunk|ChunkLoadError|is not a function.*exports|Importing a module script failed|error loading dynamically imported module/i.test(mensagem)
+    }
+
+    function tratar(mensagem: string) {
+      if (!ehFalhaDeModulo(mensagem)) return
+      if (window.sessionStorage.getItem(CHAVE)) return
+      window.sessionStorage.setItem(CHAVE, '1')
+      window.location.reload()
+    }
+
+    function onErro(e: ErrorEvent) { tratar(e.message || '') }
+    function onRejeicao(e: PromiseRejectionEvent) {
+      tratar(String((e.reason as Error)?.message ?? e.reason ?? ''))
+    }
+
+    window.addEventListener('error', onErro)
+    window.addEventListener('unhandledrejection', onRejeicao)
+    return () => {
+      window.removeEventListener('error', onErro)
+      window.removeEventListener('unhandledrejection', onRejeicao)
+    }
+  }, [])
+
+  // Carga completa: libera a trava de recarga para a próxima sessão.
+  useEffect(() => {
+    const t = window.setTimeout(() => window.sessionStorage.removeItem('pmo_recarga_chunk'), 8000)
+    return () => window.clearTimeout(t)
+  }, [])
+
   // Alimenta o histórico interno que o botão "Voltar" das telas de detalhe
   // consulta para saber de onde a pessoa veio.
   useEffect(() => {
@@ -172,7 +209,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const Icon = item.icon
             const active = pathname === item.href || (item.href !== '/pmo-dashboard' && pathname.startsWith(item.href + '/'))
             return (
-              <Link key={item.href} href={item.href} onClick={() => { if (isMobile) setMobileOpen(false) }}
+              <Link key={item.href} href={item.href} prefetch={false} onClick={() => { if (isMobile) setMobileOpen(false) }}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: sidebarOpen ? 'flex-start' : 'center',
                   gap: 12, padding: '10px 8px', borderRadius: 8, textDecoration: 'none',
