@@ -496,6 +496,33 @@ export default function CronogramaPage() {
                       {p.ultima_fase ? (
                         <span style={{ color: '#64748b' }}> · {p.ultima_fase}</span>
                       ) : null}
+
+                      {/* Tempo parado na etapa além do previsto, em dias úteis */}
+                      {p.dias_uteis_atraso > 0 ? (
+                        <div style={{ marginTop: 4 }}>
+                          <span style={{
+                            display: 'inline-block',
+                            background: 'rgba(239,68,68,0.12)',
+                            border: '1px solid rgba(239,68,68,0.3)',
+                            borderRadius: 6,
+                            padding: '2px 8px',
+                            fontSize: 12,
+                            color: '#fca5a5',
+                            fontWeight: 600,
+                          }}>
+                            Parada há {p.dias_uteis_atraso} {p.dias_uteis_atraso === 1 ? 'dia útil' : 'dias úteis'}
+                          </span>
+                          {p.etapa_atual_data_fim ? (
+                            <span style={{ color: '#64748b', fontSize: 12, marginLeft: 8 }}>
+                              prazo era {formatDate(p.etapa_atual_data_fim)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : p.etapa_atual_data_fim ? (
+                        <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+                          Prazo da etapa: {formatDate(p.etapa_atual_data_fim)}
+                        </div>
+                      ) : null}
                     </div>
                   ) : p.total_atividades > 0 ? (
                     <div style={{ color: '#22c55e', fontSize: 13, marginTop: 4 }}>

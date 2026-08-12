@@ -33,6 +33,13 @@ export interface LinhaCronograma {
   /** Etapa em que o processo está: a pendente de menor ordem. */
   etapa_atual: string | null
   etapa_atual_ordem: number | null
+  /** Prazo previsto da etapa atual. */
+  etapa_atual_data_fim: string | null
+  /**
+   * Dias úteis decorridos desde o vencimento da etapa atual — o tempo que o
+   * processo está parado nela além do previsto. Zero quando dentro do prazo.
+   */
+  dias_uteis_atraso: number
   progresso: number
   processo_atrasado: boolean
 }
@@ -74,6 +81,7 @@ export function agregarLinhas(
   processos: Record<string, unknown>[],
   atividades: AtividadeResumo[],
   hoje: string,
+  feriados: Set<string> = new Set(),
 ): LinhaCronograma[] {
   const porProcesso = new Map<string, AtividadeResumo[]>()
   for (const a of atividades) {
@@ -123,11 +131,43 @@ export function agregarLinhas(
       ultima_fase: pendentes[0]?.fase ?? null,
       etapa_atual: etapaAtual?.descricao ?? null,
       etapa_atual_ordem: etapaAtual?.ordem ?? null,
+      etapa_atual_data_fim: etapaAtual?.data_fim ?? null,
+      dias_uteis_atraso: etapaAtual?.data_fim && etapaAtual.data_fim < hoje
+        ? contarDiasUteis(etapaAtual.data_fim, hoje, feriados)
+        : 0,
       progresso: total > 0 ? Math.floor((concluidas * 100) / total) : 0,
       processo_atrasado:
         atrasadas > 0 || (!!dataEntrega && dataEntrega < hoje && concluidas < total),
     }
   })
+}
+
+/**
+ * Dias úteis decorridos entre o dia seguinte a `de` e `ate`, inclusive.
+ * Fins de semana e feriados cadastrados não contam — mesma régua que o
+ * cronograma usa para projetar os prazos.
+ */
+export function contarDiasUteis(de: string, ate: string, feriados: Set<string>): number {
+  if (!de || !ate || ate <= de) return 0
+
+  const [ay, am, ad] = de.split('-').map(Number)
+  const cursor = new Date(ay, am - 1, ad)
+  const [by, bm, bd] = ate.split('-').map(Number)
+  const limite = new Date(by, bm - 1, bd)
+
+  let uteis = 0
+  let guarda = 0
+
+  cursor.setDate(cursor.getDate() + 1) // o próprio dia do prazo não é atraso
+  while (cursor <= limite && guarda < 3000) {
+    const dow = cursor.getDay()
+    const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
+    if (dow !== 0 && dow !== 6 && !feriados.has(iso)) uteis++
+    cursor.setDate(cursor.getDate() + 1)
+    guarda++
+  }
+
+  return uteis
 }
 
 /** Data de hoje em YYYY-MM-DD, hora local. */
@@ -333,13 +373,18 @@ export async function listarCronograma(
   const lista = (processos ?? []) as Record<string, unknown>[]
   if (lista.length === 0) return { linhas: [], total: count ?? 0 }
 
-  const { data: atividades } = await supabase
-    .from('cronograma_atividades')
-    .select('processo_id, status, data_fim, fase, descricao, ordem')
-    .in('processo_id', lista.map(p => p.id as string))
+  const [{ data: atividades }, { data: feriadosData }] = await Promise.all([
+    supabase
+      .from('cronograma_atividades')
+      .select('processo_id, status, data_fim, fase, descricao, ordem')
+      .in('processo_id', lista.map(p => p.id as string)),
+    supabase.from('feriados').select('data'),
+  ])
+
+  const feriados = new Set((feriadosData ?? []).map(f => String((f as { data: string }).data)))
 
   return {
-    linhas: agregarLinhas(lista, (atividades ?? []) as unknown as AtividadeResumo[], hojeISO()),
+    linhas: agregarLinhas(lista, (atividades ?? []) as unknown as AtividadeResumo[], hojeISO(), feriados),
     total: count ?? lista.length,
   }
 }
