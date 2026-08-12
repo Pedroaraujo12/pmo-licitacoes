@@ -127,3 +127,30 @@ html, body {
     padding-right: 12px !important;
   }
 }
+
+/* ==========================================================================
+   Controles nativos em tema escuro
+   --------------------------------------------------------------------------
+   As <option> de um <select> são desenhadas pelo sistema operacional, não
+   herdam o estilo do campo: abriam brancas sobre texto claro, ilegíveis.
+   `color-scheme: dark` faz o navegador desenhar menus, seletores de data e
+   barras de rolagem já no tema escuro — inclusive no Safari, que ignora boa
+   parte da estilização direta de option.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+/* Opção destacada pelo teclado ou pelo ponteiro */
+select option:checked,
+select option:hover {
+  background-color: #334155;
+  color: #f8fafc;
+}
