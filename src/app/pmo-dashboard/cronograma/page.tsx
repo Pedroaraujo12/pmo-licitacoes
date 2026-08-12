@@ -255,13 +255,13 @@ export default function CronogramaPage() {
               onChange={e => { f.definir(e.target.value || null); setEtapaFiltro(null); setPage(1) }}
               style={{
                 width: '100%', padding: '8px 10px', borderRadius: 8,
-                border: `1px solid ${f.valor ? 'rgba(167,139,250,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                background: 'rgba(15,23,42,0.5)',
-                color: f.valor ? '#a78bfa' : '#cbd5e1',
+                border: `1px solid ${f.valor ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                background: f.valor ? 'rgba(56,189,248,0.08)' : 'rgba(15,23,42,0.5)',
+                color: '#e2e8f0',
                 fontSize: 13, outline: 'none', cursor: 'pointer',
               }}
             >
-              <option value="">Todas{f.rotulo === 'Responsável' ? 'os' : ''}</option>
+              <option value="">{f.rotulo === 'Responsável' ? 'Todos' : 'Todas'}</option>
               {f.opcoes.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
@@ -306,9 +306,9 @@ export default function CronogramaPage() {
                     padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 999,
                     cursor: 'pointer', maxWidth: 300, overflow: 'hidden',
                     textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    background: ativo ? 'rgba(52,211,153,0.15)' : 'rgba(30,41,59,0.6)',
-                    color: ativo ? '#34d399' : '#cbd5e1',
-                    border: `1px solid ${ativo ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                    background: ativo ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.6)',
+                    color: '#e2e8f0',
+                    border: `1px solid ${ativo ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.08)'}`,
                   }}
                 >
                   {c.valor} <span style={{ opacity: 0.75 }}>· {c.total}</span>
