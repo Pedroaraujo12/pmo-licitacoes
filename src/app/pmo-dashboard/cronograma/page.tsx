@@ -321,46 +321,34 @@ export default function CronogramaPage() {
     setDiagnostico('')
 
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      const ler = async () => {
-        const { data } = await supabase
-          .from('cronograma_atividades')
-          .select('id, ordem, descricao')
-          .eq('processo_id', alvo.id)
-          .order('ordem', { ascending: true })
-        return (data ?? []) as { id: string; ordem: number; descricao: string }[]
-      }
-
-      const antes = await ler()
       const doRito = etapasPorModalidade[alvo.modalidade_nome as string] ?? []
+      const doProcesso = alvo.etapas_descricoes
 
-      const resultado = await aplicarRitoDaModalidade(supabase, {
-        processoId: alvo.id,
-        modalidadeId: alvo.modalidade_id as string,
-        dataEntrada: alvo.data_entrada as string,
-        atividades: antes as never,
-        userId: user?.id ?? null,
-      })
+      // Mostra exatamente onde processo e rito divergem — é o que separa
+      // "cronograma errado" de "comparação errada".
+      const rito = [...doRito].sort((a, b) => a.ordem - b.ordem)
+      const divergencias: string[] = []
+      const limite = Math.max(doProcesso.length, rito.length)
 
-      const depois = await ler()
+      for (let i = 0; i < limite && divergencias.length < 3; i++) {
+        const noProcesso = doProcesso[i]
+        const noRito = rito[i]?.descricao
+        if (noProcesso !== noRito) {
+          divergencias.push(`#${i + 1} processo="${noProcesso ?? '(ausente)'}" rito="${noRito ?? '(ausente)'}"`)
+        }
+      }
 
       setDiagnostico([
         `Processo ${alvo.id_processo || alvo.id} (${alvo.modalidade_nome})`,
-        `Rito cadastrado: ${doRito.length} etapas`,
-        `Antes: ${antes.length} etapas — 1ª: "${antes[0]?.descricao ?? '—'}"`,
-        `Depois: ${depois.length} etapas — 1ª: "${depois[0]?.descricao ?? '—'}"`,
-        `Função relatou: ${resultado.etapas} aplicadas, ${resultado.preservadas} preservadas, ${resultado.removidas} removidas`,
-        depois.length === doRito.length && depois[0]?.descricao === doRito[0]?.descricao
-          ? 'RESULTADO: gravou corretamente'
-          : 'RESULTADO: o banco não reflete o rito — copie este texto e envie',
+        `Etapas no processo: ${doProcesso.length} · no rito: ${rito.length}`,
+        divergencias.length > 0
+          ? `Divergências: ${divergencias.join(' ;; ')}`
+          : 'Nenhuma divergência textual — o alarme é falso positivo',
       ].join(' | '))
     } catch (err) {
       setDiagnostico(`Falha: ${(err as Error)?.message || 'desconhecida'}`)
     } finally {
       setVerificando(false)
-      setRecarregar(v => v + 1)
     }
   }
 
@@ -569,7 +557,7 @@ export default function CronogramaPage() {
               background: 'transparent', color: '#e2e8f0', whiteSpace: 'nowrap',
             }}
           >
-            Testar em 1 processo
+            Comparar com o rito
           </button>
           <button
             type="button"
