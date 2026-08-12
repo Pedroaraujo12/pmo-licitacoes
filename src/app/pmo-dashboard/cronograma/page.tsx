@@ -237,7 +237,7 @@ export default function CronogramaPage() {
               ? `Etapas do rito · ${modalidadeFiltro}`
               : 'Em que etapa estão'}
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="filtro-rolavel" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => { setEtapaFiltro(null); setPage(1) }}

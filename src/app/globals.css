@@ -67,3 +67,63 @@ body {
   background: rgba(59,130,246,0.15);
   color: #60a5fa;
 }
+
+/* ==========================================================================
+   Responsividade em telas pequenas
+   --------------------------------------------------------------------------
+   As telas usam estilos inline, que vencem qualquer regra externa — daí o
+   !important aqui. É o ponto único onde o comportamento em celular é ajustado,
+   em vez de espalhar condicionais de largura por dezenas de componentes.
+   ========================================================================== */
+
+/* Nada deve empurrar a página para os lados: o que não couber rola dentro do
+   próprio contêiner, não arrastando a tela inteira junto. */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  /* Grades de formulário e de ficha empilham em vez de espremer campos.
+     Cobre as dezenas de grids com colunas fixas espalhados pelas telas. */
+  main [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tabelas largas rolam na horizontal dentro da própria caixa. */
+  main table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Diálogos ocupam a largura útil e rolam quando o conteúdo passa da tela. */
+  main [style*="position: fixed"][style*="inset"] > div,
+  body > div[style*="position: fixed"][style*="inset"] > div {
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Alvos de toque não podem ficar menores que o dedo. */
+  main button, main select, main input[type="date"] {
+    min-height: 36px;
+  }
+
+  /* Faixas de filtro com muitos itens ganham altura máxima e rolagem, para
+     não empurrarem a lista para fora da primeira dobra. */
+  .filtro-rolavel {
+    max-height: 168px;
+    overflow-y: auto;
+  }
+}
+
+/* Telas muito estreitas (360px e abaixo) */
+@media (max-width: 380px) {
+  main {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+}

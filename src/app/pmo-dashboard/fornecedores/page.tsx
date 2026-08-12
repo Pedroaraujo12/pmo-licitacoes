@@ -116,7 +116,7 @@ export default function FornecedoresPage() {
         <div style={{
           background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',
           borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)',
-          overflow: 'hidden',
+          overflow: 'hidden', overflowX: 'auto',
         }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
