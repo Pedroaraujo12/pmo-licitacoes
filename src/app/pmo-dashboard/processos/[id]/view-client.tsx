@@ -183,6 +183,9 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
   const canDelete = profile?.role && ['admin', 'gestor'].includes(profile.role)
   const etapasConcluidas = cronograma.filter(e => e.status === 'concluido').length
   const totalEtapas = cronograma.length
+  // Soma das durações — o rótulo antes usava a quantidade de etapas como se
+  // fossem dias úteis, mostrando 20 onde o Pregão leva 69.
+  const totalDiasUteis = cronograma.reduce((acc, e) => acc + (e.dias_uteis ?? 0), 0)
   const progressoPct = totalEtapas > 0 ? Math.round((etapasConcluidas / totalEtapas) * 100) : 0
   const etapasAtrasadas = cronograma.filter(isOverdue).length
 
@@ -392,7 +395,7 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
               {etapasAtrasadas} etapa{etapasAtrasadas > 1 ? 's' : ''} em atraso
             </p>
             <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>
-              Prazo original estimado em {totalEtapas} dias úteis
+              Prazo original estimado em {totalDiasUteis} dias úteis
             </p>
           </div>
         </div>

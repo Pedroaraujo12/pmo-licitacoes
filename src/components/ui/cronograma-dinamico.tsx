@@ -446,13 +446,13 @@ export default function CronogramaDinamico({
     setSaving(false)
   }
 
-  // Group by fase
-  const fases = [...new Set(atividades.map(a => a.fase))]
-  const grouped = fases.map(fase => ({
-    fase,
-    label: getFaseAgrupada(fase),
-    atividades: atividades.filter(a => a.fase === fase),
-  }))
+  // Um cronograma se lê na ordem em que acontece. Agrupar por fase embaralhava
+  // a sequência, porque as fases se intercalam ao longo do rito: no Pregão a
+  // etapa 4 é Revisão, a 5 volta a ser Produção e a 6 é Análise. A tela
+  // mostrava 1,2,3,5,7,8 → 4 → 6,12,14,15,16 → 9,10,11,13.
+  // A fase agora aparece como etiqueta de cada etapa, e um cabeçalho marca
+  // onde a fase muda.
+  const sequencia = [...atividades].sort((a, b) => a.ordem - b.ordem)
 
   return (
     <div>
@@ -564,89 +564,95 @@ export default function CronogramaDinamico({
         <span>🔸 Data ajustada</span>
       </div>
 
-      {/* Activities by Phase */}
-      {grouped.map(group => (
-        <div key={group.fase} style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: getAtividadeBadgeColor(group.fase), marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {group.label}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {group.atividades.map(a => {
-              const vi = getAtividadeIcon(a.status, a.data_fim)
-              const isOverridden = !!(a.observacao && a.observacao.includes('override'))
-              const dataImpactada = a.data_inicio_real && a.status !== 'concluido'
+      {/* Etapas na ordem do rito */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
+        {sequencia.map((a, indice) => {
+          const vi = getAtividadeIcon(a.status, a.data_fim)
+          const isOverridden = !!(a.observacao && a.observacao.includes('override'))
+          const dataImpactada = a.data_inicio_real && a.status !== 'concluido'
+          const mudouDeFase = indice === 0 || sequencia[indice - 1].fase !== a.fase
 
-              return (
-                <div key={a.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 14px',
-                  background: a.status === 'concluido' ? 'rgba(34,197,94,0.06)' :
-                    vi.icon === '🔴' ? 'rgba(239,68,68,0.08)' : 'rgba(30,41,59,0.4)',
-                  borderRadius: 10,
-                  borderLeft: `3px solid ${vi.color}`,
-                  border: `1px solid ${
-                    vi.icon === '🔴' ? 'rgba(239,68,68,0.2)' :
-                    vi.icon === '🟡' ? 'rgba(234,179,8,0.2)' : 'rgba(255,255,255,0.06)'
-                  }`,
-                  opacity: a.status === 'concluido' ? 0.7 : 1,
+          return (
+            <div key={a.id}>
+              {mudouDeFase && (
+                <div style={{
+                  fontSize: 12, fontWeight: 700, color: getAtividadeBadgeColor(a.fase),
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                  margin: indice === 0 ? '0 0 8px' : '14px 0 8px',
                 }}>
-                  {/* Icon */}
-                  <span style={{ fontSize: 14 }}>{vi.icon}</span>
+                  {getFaseAgrupada(a.fase)}
+                </div>
+              )}
 
-                  {/* Number */}
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', minWidth: 20 }}>#{a.ordem}</span>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                background: a.status === 'concluido' ? 'rgba(34,197,94,0.06)'
+                  : vi.icon === '🔴' ? 'rgba(239,68,68,0.08)' : 'rgba(30,41,59,0.4)',
+                borderRadius: 10,
+                borderLeft: `3px solid ${vi.color}`,
+                border: `1px solid ${vi.icon === '🔴' ? 'rgba(239,68,68,0.2)'
+                  : vi.icon === '🟡' ? 'rgba(234,179,8,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                opacity: a.status === 'concluido' ? 0.7 : 1,
+                flexWrap: 'wrap',
+              }}>
+                <span style={{ fontSize: 14 }}>{vi.icon}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', minWidth: 20 }}>
+                  #{a.ordem}
+                </span>
 
-                  {/* Description */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: 500, color: a.status === 'concluido' ? '#64748b' : '#e2e8f0',
-                      textDecoration: a.status === 'concluido' ? 'line-through' : 'none',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {a.descricao}
-                      {isOverridden && <span style={{ color: '#f59e0b', fontSize: 10, marginLeft: 4 }}>✏️</span>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                      <span>{a.setor}</span>
-                      {a.dias_uteis !== null && a.dias_uteis !== undefined && (
-                        <span>{a.dias_uteis > 0 ? `${a.dias_uteis}d úteis` : 'Marco'}</span>
-                      )}
-                      {a.data_inicio && <span>{formatDate(a.data_inicio)} → {a.data_fim ? formatDate(a.data_fim) : '—'}</span>}
-                      {dataImpactada && <span style={{ color: '#f97316' }}>🔸 Data ajustada</span>}
-                    </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 500,
+                    color: a.status === 'concluido' ? '#64748b' : '#e2e8f0',
+                    textDecoration: a.status === 'concluido' ? 'line-through' : 'none',
+                  }}>
+                    {a.descricao}
+                    {isOverridden && <span style={{ color: '#f59e0b', fontSize: 10, marginLeft: 4 }}>✏️</span>}
                   </div>
-
-                  {/* Status and Actions */}
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    {a.status === 'nao_iniciado' && canEdit && (
-                      <>
-                        <button onClick={() => handleStatusChange(a, 'em_andamento')}
-                          className="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer border-none"
-                        >Iniciar</button>
-                        {a.dias_uteis !== null && a.dias_uteis !== undefined && a.dias_uteis > 0 && (
-                          <button onClick={() => { setOverrideTarget(a); setOverrideDays(String(a.dias_uteis)) }}
-                            className="bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer border-none"
-                          >✏️ Ajustar</button>
-                        )}
-                      </>
+                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b', marginTop: 2, flexWrap: 'wrap' }}>
+                    <span>{a.setor}</span>
+                    {a.dias_uteis !== null && a.dias_uteis !== undefined && (
+                      <span>{a.dias_uteis > 0 ? `${a.dias_uteis}d úteis` : 'Marco'}</span>
                     )}
-                    {a.status === 'em_andamento' && canEdit && (
-                      <button onClick={() => handleStatusChange(a, 'concluido')}
-                        className="bg-green-600/20 hover:bg-green-600/40 text-green-400 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer border-none"
-                      >Concluir</button>
+                    {a.data_inicio && (
+                      <span>{formatDate(a.data_inicio)} → {a.data_fim ? formatDate(a.data_fim) : '—'}</span>
                     )}
-                    {a.status === 'concluido' && (
-                      <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>
-                        {a.data_fim_real ? `Concluído ${formatDate(a.data_fim_real)}` : 'Concluído'}
-                      </span>
-                    )}
+                    {dataImpactada && <span style={{ color: '#f97316' }}>🔸 Data ajustada</span>}
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      ))}
+
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  {a.status === 'nao_iniciado' && canEdit && (
+                    <>
+                      <button onClick={() => handleStatusChange(a, 'em_andamento')}
+                        className="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer border-none">
+                        Iniciar
+                      </button>
+                      {a.dias_uteis !== null && a.dias_uteis !== undefined && a.dias_uteis > 0 && (
+                        <button onClick={() => { setOverrideTarget(a); setOverrideDays(String(a.dias_uteis)) }}
+                          className="bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer border-none">
+                          ✏️ Ajustar
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {a.status === 'em_andamento' && canEdit && (
+                    <button onClick={() => handleStatusChange(a, 'concluido')}
+                      className="bg-green-600/20 hover:bg-green-600/40 text-green-400 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer border-none">
+                      Concluir
+                    </button>
+                  )}
+                  {a.status === 'concluido' && (
+                    <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>
+                      {a.data_fim_real ? `Concluído ${formatDate(a.data_fim_real)}` : 'Concluído'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
 
       {/* Reposicionamento Modal */}
       {reposOpen && (
