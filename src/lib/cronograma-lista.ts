@@ -22,6 +22,8 @@ export interface LinhaCronograma {
   data_entrega: string | null
   modalidade_nome: string | null
   status_nome: string | null
+  responsavel_nome: string | null
+  valor_estimado: number | null
   total_atividades: number
   concluidas: number
   atrasadas: number
@@ -107,6 +109,10 @@ export function agregarLinhas(
       data_entrega: dataEntrega,
       modalidade_nome: nomeDaRelacao(p.modalidades),
       status_nome: nomeDaRelacao(p.status_processo),
+      responsavel_nome: nomeDaRelacao(p.responsaveis),
+      valor_estimado: p.valor_estimado === null || p.valor_estimado === undefined
+        ? null
+        : Number(p.valor_estimado),
       total_atividades: total,
       concluidas,
       atrasadas,
@@ -280,7 +286,7 @@ export async function listarCronograma(
   let query = supabase
     .from('processos')
     .select(
-      'id, id_processo, objeto_resumido, data_entrada, data_entrega, modalidades(nome), status_processo(nome)',
+      'id, id_processo, objeto_resumido, data_entrada, data_entrega, valor_estimado, modalidades(nome), status_processo(nome), responsaveis(nome)',
       { count: 'exact' },
     )
 

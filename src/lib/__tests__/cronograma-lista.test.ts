@@ -106,3 +106,31 @@ describe('agregarLinhas', () => {
     expect(linhas[1].progresso).toBe(0)
   })
 })
+
+describe('responsável e valor estimado', () => {
+  it('lê o responsável da relação e converte o valor', () => {
+    const comDados = {
+      ...processo,
+      responsaveis: { nome: 'Maria Souza' },
+      valor_estimado: '125000.50',
+    }
+    const [linha] = agregarLinhas([comDados], [], HOJE)
+
+    expect(linha.responsavel_nome).toBe('Maria Souza')
+    expect(linha.valor_estimado).toBe(125000.5)
+  })
+
+  it('processo sem responsável ou sem valor não quebra', () => {
+    const semDados = { ...processo, responsaveis: null, valor_estimado: null }
+    const [linha] = agregarLinhas([semDados], [], HOJE)
+
+    expect(linha.responsavel_nome).toBeNull()
+    expect(linha.valor_estimado).toBeNull()
+  })
+
+  it('valor zero é preservado, não confundido com ausente', () => {
+    const zerado = { ...processo, valor_estimado: 0 }
+    const [linha] = agregarLinhas([zerado], [], HOJE)
+    expect(linha.valor_estimado).toBe(0)
+  })
+})

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useDebounce } from '@/hooks/useDebounce'
-import { fetchAllSeiLinks, formatDate } from '@/lib/utils'
+import { fetchAllSeiLinks, formatDate, formatBRL } from '@/lib/utils'
 import {
   listarCronogramaCompleto, calcularDistribuicaoEtapas, distribuicaoComModelo,
   modalidadesPresentes, chaveEtapa, chaveEtapaDaLinha,
@@ -383,6 +383,24 @@ export default function CronogramaPage() {
                     {p.total_atividades > 0 ? ` · ${p.concluidas}/${p.total_atividades} etapas` : ' · Sem cronograma'}
                     {p.progresso > 0 ? ` · ${p.progresso}%` : ''}
                     {p.atrasadas ? ` · ${p.atrasadas} atrasada(s)` : ''}
+                  </div>
+
+                  <div style={{
+                    display: 'flex', flexWrap: 'wrap', gap: isMobile ? 4 : 12,
+                    marginTop: 4, fontSize: 12,
+                  }}>
+                    <span style={{ color: '#94a3b8' }}>
+                      Responsável:{' '}
+                      <span style={{ color: '#cbd5e1', fontWeight: 500 }}>
+                        {p.responsavel_nome || 'não atribuído'}
+                      </span>
+                    </span>
+                    <span style={{ color: '#94a3b8' }}>
+                      Valor estimado:{' '}
+                      <span style={{ color: '#cbd5e1', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                        {p.valor_estimado ? formatBRL(p.valor_estimado) : '—'}
+                      </span>
+                    </span>
                   </div>
                   {p.ultima_fase && (
                     <div style={{ color: '#cbd5e1', fontSize: 13, marginTop: 4 }}>
