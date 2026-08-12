@@ -14,6 +14,7 @@ import {
 } from '@/lib/cronograma-lista'
 import { listModalidadesComModelo, listEtapasDeModelos, type EtapaModelo } from '@/lib/simulador-cronograma'
 import { aplicarRitoDaModalidade } from '@/lib/aplicar-rito'
+import { sincronizarTextosDoRito, TEXTOS_PREGAO } from '@/lib/rito-textos'
 
 import {
   CheckCircle2, Clock, Circle, ArrowRight, Search,
@@ -352,6 +353,84 @@ export default function CronogramaPage() {
     }
   }
 
+  /**
+   * Alinha a redação do rito de Pregão à planilha oficial e, em seguida,
+   * regenera os cronogramas para propagar o texto aos processos. Exige papel
+   * admin ou gestor — é o mesmo que a migration faria, feito pelo app.
+   */
+  async function corrigirTudo() {
+    if (!confirm(
+      'Serão feitas duas coisas:\n\n' +
+      '1) Ajustar a redação das etapas do Pregão para o texto da planilha\n' +
+      '2) Regenerar os cronogramas fora do rito, em todas as modalidades\n\n' +
+      'Status, responsável e datas reais são preservados. Prazos ajustados à ' +
+      'mão voltam ao padrão do modelo. Continuar?'
+    )) return
+
+    setAplicandoLote(true)
+    setErroLote('')
+    setDiagnostico('')
+
+    try {
+      const supabase = createClient()
+      const r = await sincronizarTextosDoRito(supabase, 'preg', TEXTOS_PREGAO)
+      setDiagnostico(
+        `Textos do Pregão: ${r.ajustadas} ajustada(s), ${r.jaCorretas} já corretas. ` +
+        `Regenerando cronogramas…`,
+      )
+
+      // Os ritos em memória ficaram desatualizados após mudar as descrições
+      const mods = await listModalidadesComModelo(supabase)
+      const porModelo = await listEtapasDeModelos(supabase, mods.map(m => m.modelo_id))
+      const atualizado: Record<string, EtapaModelo[]> = {}
+      for (const m of mods) {
+        const etapas = porModelo[m.modelo_id]
+        if (etapas?.length) atualizado[m.modalidade_nome] = etapas
+      }
+      setEtapasPorModalidade(atualizado)
+
+      const { data: { user } } = await supabase.auth.getUser()
+      const alvo = todasLinhas.filter(l => l.modalidade_id && l.data_entrada)
+      setProgressoLote({ feitos: 0, total: alvo.length, erros: 0 })
+
+      let erros = 0
+      for (let i = 0; i < alvo.length; i++) {
+        const linha = alvo[i]
+        try {
+          const { data: atividades } = await supabase
+            .from('cronograma_atividades')
+            .select('*')
+            .eq('processo_id', linha.id)
+            .order('ordem', { ascending: true })
+
+          await aplicarRitoDaModalidade(supabase, {
+            processoId: linha.id,
+            modalidadeId: linha.modalidade_id as string,
+            dataEntrada: linha.data_entrada as string,
+            atividades: (atividades ?? []) as never,
+            userId: user?.id ?? null,
+          })
+        } catch (err) {
+          erros++
+          if (erros === 1) {
+            setErroLote(`${linha.id_processo || linha.id}: ${(err as Error)?.message || 'falha'}`)
+          }
+        }
+        setProgressoLote({ feitos: i + 1, total: alvo.length, erros })
+      }
+
+      setDiagnostico(
+        `Concluído. Textos do Pregão: ${r.ajustadas} ajustada(s). ` +
+        `Cronogramas: ${alvo.length - erros} de ${alvo.length} regenerado(s).`,
+      )
+    } catch (err) {
+      setErroLote((err as Error)?.message || 'Falha ao aplicar as correções.')
+    } finally {
+      setAplicandoLote(false)
+      setRecarregar(v => v + 1)
+    }
+  }
+
   function limparFiltros() {
     setModalidadeFiltro(null); setCoordenacaoFiltro(null)
     setResponsavelFiltro(null); setPrioridadeFiltro(null)
@@ -533,6 +612,19 @@ export default function CronogramaPage() {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            onClick={corrigirTudo}
+            disabled={aplicandoLote || verificando}
+            style={{
+              padding: '8px 14px', fontSize: 12, fontWeight: 700, borderRadius: 8,
+              border: '1px solid rgba(56,189,248,0.5)',
+              cursor: aplicandoLote ? 'not-allowed' : 'pointer',
+              background: 'rgba(56,189,248,0.18)', color: '#e2e8f0', whiteSpace: 'nowrap',
+            }}
+          >
+            {aplicandoLote ? 'Corrigindo…' : 'Corrigir tudo'}
+          </button>
           <button
             type="button"
             onClick={verificarPermissoes}
