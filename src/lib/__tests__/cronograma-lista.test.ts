@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { agregarLinhas } from '../cronograma-lista'
+import { agregarLinhas, contarPor, valoresDistintos } from '../cronograma-lista'
 
 const HOJE = '2026-08-11'
 
@@ -132,5 +132,45 @@ describe('responsável e valor estimado', () => {
     const zerado = { ...processo, valor_estimado: 0 }
     const [linha] = agregarLinhas([zerado], [], HOJE)
     expect(linha.valor_estimado).toBe(0)
+  })
+})
+
+describe('contagens por atributo', () => {
+  function comAtributos(id: string, over: Record<string, unknown>) {
+    return { ...processo, id, ...over }
+  }
+
+  it('conta processos por coordenação, do maior para o menor', () => {
+    const linhas = agregarLinhas([
+      comAtributos('1', { coordenacoes: { nome: 'CCS' } }),
+      comAtributos('2', { coordenacoes: { nome: 'CCS' } }),
+      comAtributos('3', { coordenacoes: { nome: 'UAC' } }),
+    ], [], HOJE)
+
+    const contagem = contarPor(linhas, 'coordenacao_nome')
+    expect(contagem[0]).toEqual({ valor: 'CCS', total: 2 })
+    expect(contagem[1]).toEqual({ valor: 'UAC', total: 1 })
+  })
+
+  it('agrupa ausentes sob um rótulo em vez de descartar', () => {
+    const linhas = agregarLinhas([
+      comAtributos('1', { coordenacoes: null }),
+      comAtributos('2', { coordenacoes: { nome: 'CCS' } }),
+    ], [], HOJE)
+
+    const contagem = contarPor(linhas, 'coordenacao_nome', 'Não informado')
+    expect(contagem.reduce((a, c) => a + c.total, 0)).toBe(2)
+    expect(contagem.some(c => c.valor === 'Não informado')).toBe(true)
+  })
+
+  it('lista valores distintos ordenados, ignorando vazios', () => {
+    const linhas = agregarLinhas([
+      comAtributos('1', { prioridade: 'Urgente' }),
+      comAtributos('2', { prioridade: 'Alta' }),
+      comAtributos('3', { prioridade: null }),
+      comAtributos('4', { prioridade: 'Alta' }),
+    ], [], HOJE)
+
+    expect(valoresDistintos(linhas, 'prioridade')).toEqual(['Alta', 'Urgente'])
   })
 })

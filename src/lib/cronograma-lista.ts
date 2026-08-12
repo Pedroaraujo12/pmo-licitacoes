@@ -23,6 +23,8 @@ export interface LinhaCronograma {
   modalidade_nome: string | null
   status_nome: string | null
   responsavel_nome: string | null
+  coordenacao_nome: string | null
+  prioridade: string | null
   valor_estimado: number | null
   total_atividades: number
   concluidas: number
@@ -110,6 +112,8 @@ export function agregarLinhas(
       modalidade_nome: nomeDaRelacao(p.modalidades),
       status_nome: nomeDaRelacao(p.status_processo),
       responsavel_nome: nomeDaRelacao(p.responsaveis),
+      coordenacao_nome: nomeDaRelacao(p.coordenacoes),
+      prioridade: (p.prioridade as string | null) || null,
       valor_estimado: p.valor_estimado === null || p.valor_estimado === undefined
         ? null
         : Number(p.valor_estimado),
@@ -230,6 +234,35 @@ export function distribuicaoComModelo(
   return [...doModelo, ...foraDoModelo]
 }
 
+/** Quantos processos há em cada valor de um atributo, do maior para o menor. */
+export function contarPor(
+  linhas: LinhaCronograma[],
+  campo: 'coordenacao_nome' | 'responsavel_nome' | 'modalidade_nome' | 'prioridade',
+  rotuloVazio = 'Não informado',
+): { valor: string; total: number }[] {
+  const mapa = new Map<string, number>()
+  for (const l of linhas) {
+    const chave = (l[campo] as string | null) || rotuloVazio
+    mapa.set(chave, (mapa.get(chave) ?? 0) + 1)
+  }
+  return [...mapa.entries()]
+    .map(([valor, total]) => ({ valor, total }))
+    .sort((a, b) => b.total - a.total || a.valor.localeCompare(b.valor, 'pt-BR'))
+}
+
+/** Valores distintos de um atributo, para alimentar seletores. */
+export function valoresDistintos(
+  linhas: LinhaCronograma[],
+  campo: 'coordenacao_nome' | 'responsavel_nome' | 'modalidade_nome' | 'prioridade',
+): string[] {
+  const vistos = new Set<string>()
+  for (const l of linhas) {
+    const v = l[campo] as string | null
+    if (v) vistos.add(v)
+  }
+  return [...vistos].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+}
+
 /** Modalidades presentes na lista, para o seletor. */
 export function modalidadesPresentes(linhas: LinhaCronograma[]): string[] {
   const nomes = new Set<string>()
@@ -286,7 +319,7 @@ export async function listarCronograma(
   let query = supabase
     .from('processos')
     .select(
-      'id, id_processo, objeto_resumido, data_entrada, data_entrega, valor_estimado, modalidades(nome), status_processo(nome), responsaveis(nome)',
+      'id, id_processo, objeto_resumido, data_entrada, data_entrega, valor_estimado, prioridade, modalidades(nome), status_processo(nome), responsaveis(nome), coordenacoes(nome)',
       { count: 'exact' },
     )
 

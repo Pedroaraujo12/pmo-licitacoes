@@ -8,7 +8,7 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { fetchAllSeiLinks, formatDate, formatBRL } from '@/lib/utils'
 import {
   listarCronogramaCompleto, calcularDistribuicaoEtapas, distribuicaoComModelo,
-  modalidadesPresentes, chaveEtapa, chaveEtapaDaLinha,
+  modalidadesPresentes, chaveEtapa, chaveEtapaDaLinha, contarPor, valoresDistintos,
   type LinhaCronograma, type EtapaContagem,
 } from '@/lib/cronograma-lista'
 import { listModalidadesComModelo, listEtapasDeModelos, type EtapaModelo } from '@/lib/simulador-cronograma'
@@ -50,6 +50,9 @@ export default function CronogramaPage() {
   const [modalidadeFiltro, setModalidadeFiltro] = useState<string | null>(null)
   const [etapasPorModalidade, setEtapasPorModalidade] = useState<Record<string, EtapaModelo[]>>({})
   const [erroCarga, setErroCarga] = useState('')
+  const [coordenacaoFiltro, setCoordenacaoFiltro] = useState<string | null>(null)
+  const [responsavelFiltro, setResponsavelFiltro] = useState<string | null>(null)
+  const [prioridadeFiltro, setPrioridadeFiltro] = useState<string | null>(null)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -131,11 +134,37 @@ export default function CronogramaPage() {
 
   const modalidades = useMemo(() => modalidadesPresentes(todasLinhas), [todasLinhas])
 
-  const linhasDaModalidade = useMemo(
-    () => modalidadeFiltro
-      ? todasLinhas.filter(l => l.modalidade_nome === modalidadeFiltro)
-      : todasLinhas,
-    [todasLinhas, modalidadeFiltro])
+  // Filtros combinam entre si: cada um estreita o conjunto do anterior.
+  const linhasDaModalidade = useMemo(() => {
+    return todasLinhas.filter(l =>
+      (!modalidadeFiltro || l.modalidade_nome === modalidadeFiltro) &&
+      (!coordenacaoFiltro || (l.coordenacao_nome || 'Não informado') === coordenacaoFiltro) &&
+      (!responsavelFiltro || (l.responsavel_nome || 'Não atribuído') === responsavelFiltro) &&
+      (!prioridadeFiltro || (l.prioridade || 'Sem prioridade') === prioridadeFiltro),
+    )
+  }, [todasLinhas, modalidadeFiltro, coordenacaoFiltro, responsavelFiltro, prioridadeFiltro])
+
+  // Contagens sobre o conjunto sem o próprio filtro de coordenação, para os
+  // números continuarem visíveis depois de escolher uma.
+  const porCoordenacao = useMemo(() => {
+    const base = todasLinhas.filter(l =>
+      (!modalidadeFiltro || l.modalidade_nome === modalidadeFiltro) &&
+      (!responsavelFiltro || (l.responsavel_nome || 'Não atribuído') === responsavelFiltro) &&
+      (!prioridadeFiltro || (l.prioridade || 'Sem prioridade') === prioridadeFiltro),
+    )
+    return contarPor(base, 'coordenacao_nome', 'Não informado')
+  }, [todasLinhas, modalidadeFiltro, responsavelFiltro, prioridadeFiltro])
+
+  const responsaveis = useMemo(() => valoresDistintos(todasLinhas, 'responsavel_nome'), [todasLinhas])
+  const prioridades = useMemo(() => valoresDistintos(todasLinhas, 'prioridade'), [todasLinhas])
+
+  function limparFiltros() {
+    setModalidadeFiltro(null); setCoordenacaoFiltro(null)
+    setResponsavelFiltro(null); setPrioridadeFiltro(null)
+    setEtapaFiltro(null); setPage(1)
+  }
+
+  const temFiltro = !!(modalidadeFiltro || coordenacaoFiltro || responsavelFiltro || prioridadeFiltro || etapaFiltro)
 
   // Distribuição sobre o conjunto inteiro, não sobre a página exibida
   const distribuicao: EtapaContagem[] = useMemo(() => {
@@ -203,42 +232,90 @@ export default function CronogramaPage() {
         ))}
       </div>
 
-      {modalidades.length > 1 && (
+      {/* Filtros combináveis */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(190px, 1fr))',
+        gap: 8, marginBottom: 14,
+      }}>
+        {([
+          { rotulo: 'Modalidade', valor: modalidadeFiltro, definir: setModalidadeFiltro, opcoes: modalidades },
+          { rotulo: 'Responsável', valor: responsavelFiltro, definir: setResponsavelFiltro, opcoes: responsaveis },
+          { rotulo: 'Prioridade', valor: prioridadeFiltro, definir: setPrioridadeFiltro, opcoes: prioridades },
+        ] as const).map(f => (
+          <div key={f.rotulo}>
+            <label style={{
+              display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: '#64748b', marginBottom: 4,
+            }}>
+              {f.rotulo}
+            </label>
+            <select
+              value={f.valor ?? ''}
+              onChange={e => { f.definir(e.target.value || null); setEtapaFiltro(null); setPage(1) }}
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: 8,
+                border: `1px solid ${f.valor ? 'rgba(167,139,250,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                background: 'rgba(15,23,42,0.5)',
+                color: f.valor ? '#a78bfa' : '#cbd5e1',
+                fontSize: 13, outline: 'none', cursor: 'pointer',
+              }}
+            >
+              <option value="">Todas{f.rotulo === 'Responsável' ? 'os' : ''}</option>
+              {f.opcoes.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      {temFiltro && (
+        <div style={{ marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={limparFiltros}
+            style={{
+              padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 999,
+              cursor: 'pointer', background: 'transparent', color: '#94a3b8',
+              border: '1px solid rgba(255,255,255,0.15)',
+            }}
+          >
+            Limpar filtros
+          </button>
+        </div>
+      )}
+
+      {/* Total por coordenação */}
+      {porCoordenacao.length > 0 && (
         <div style={{ marginBottom: 14 }}>
           <div style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
             textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
           }}>
-            Modalidade
+            Processos por coordenação
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {[null, ...modalidades].map(m => {
-              const ativo = modalidadeFiltro === m
-              const qtd = m ? todasLinhas.filter(l => l.modalidade_nome === m).length : todasLinhas.length
+          <div className="filtro-rolavel" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {porCoordenacao.map(c => {
+              const ativo = coordenacaoFiltro === c.valor
               return (
                 <button
-                  key={m ?? 'todas'}
+                  key={c.valor}
                   type="button"
-                  onClick={() => { setModalidadeFiltro(m); setEtapaFiltro(null); setPage(1) }}
+                  onClick={() => { setCoordenacaoFiltro(ativo ? null : c.valor); setEtapaFiltro(null); setPage(1) }}
+                  title={c.valor}
                   style={{
                     padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 999,
-                    cursor: 'pointer',
-                    background: ativo ? 'rgba(167,139,250,0.15)' : 'transparent',
-                    color: ativo ? '#a78bfa' : '#94a3b8',
-                    border: `1px solid ${ativo ? 'rgba(167,139,250,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                    cursor: 'pointer', maxWidth: 300, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    background: ativo ? 'rgba(52,211,153,0.15)' : 'rgba(30,41,59,0.6)',
+                    color: ativo ? '#34d399' : '#cbd5e1',
+                    border: `1px solid ${ativo ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.08)'}`,
                   }}
                 >
-                  {m ?? 'Todas'} <span style={{ opacity: 0.7 }}>· {qtd}</span>
+                  {c.valor} <span style={{ opacity: 0.75 }}>· {c.total}</span>
                 </button>
               )
             })}
           </div>
-          {modalidadeFiltro && !etapasPorModalidade[modalidadeFiltro] && (
-            <p style={{ fontSize: 11, color: '#fbbf24', margin: '6px 0 0' }}>
-              Esta modalidade não tem modelo de cronograma cadastrado — as etapas
-              abaixo vêm apenas dos processos existentes.
-            </p>
-          )}
         </div>
       )}
 
@@ -252,6 +329,12 @@ export default function CronogramaPage() {
               ? `Etapas do rito · ${modalidadeFiltro}`
               : 'Em que etapa estão'}
           </div>
+          {modalidadeFiltro && !etapasPorModalidade[modalidadeFiltro] && (
+            <p style={{ fontSize: 11, color: '#fbbf24', margin: '0 0 8px' }}>
+              Esta modalidade não tem modelo de cronograma cadastrado — as etapas
+              abaixo vêm apenas dos processos existentes.
+            </p>
+          )}
           <div className="filtro-rolavel" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
               type="button"
