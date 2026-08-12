@@ -309,6 +309,62 @@ export default function CronogramaPage() {
     }
   }
 
+  /**
+   * Aplica o rito em um único processo e relata o antes e o depois, lendo do
+   * banco nos dois momentos. Serve para separar "não gravou" de "gravou e a
+   * tela não reflete" — dois sintomas idênticos para quem olha a lista.
+   */
+  async function testarEmUmProcesso() {
+    const alvo = foraDoRito[0]
+    if (!alvo) { setDiagnostico('Nenhum processo fora do rito para testar.'); return }
+
+    setVerificando(true)
+    setDiagnostico('')
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const ler = async () => {
+        const { data } = await supabase
+          .from('cronograma_atividades')
+          .select('id, ordem, descricao')
+          .eq('processo_id', alvo.id)
+          .order('ordem', { ascending: true })
+        return (data ?? []) as { id: string; ordem: number; descricao: string }[]
+      }
+
+      const antes = await ler()
+      const doRito = etapasPorModalidade[alvo.modalidade_nome as string] ?? []
+
+      const resultado = await aplicarRitoDaModalidade(supabase, {
+        processoId: alvo.id,
+        modalidadeId: alvo.modalidade_id as string,
+        dataEntrada: alvo.data_entrada as string,
+        atividades: antes as never,
+        userId: user?.id ?? null,
+      })
+
+      const depois = await ler()
+
+      setDiagnostico([
+        `Processo ${alvo.id_processo || alvo.id} (${alvo.modalidade_nome})`,
+        `Rito cadastrado: ${doRito.length} etapas`,
+        `Antes: ${antes.length} etapas — 1ª: "${antes[0]?.descricao ?? '—'}"`,
+        `Depois: ${depois.length} etapas — 1ª: "${depois[0]?.descricao ?? '—'}"`,
+        `Função relatou: ${resultado.etapas} aplicadas, ${resultado.preservadas} preservadas, ${resultado.removidas} removidas`,
+        depois.length === doRito.length && depois[0]?.descricao === doRito[0]?.descricao
+          ? 'RESULTADO: gravou corretamente'
+          : 'RESULTADO: o banco não reflete o rito — copie este texto e envie',
+      ].join(' | '))
+    } catch (err) {
+      setDiagnostico(`Falha: ${(err as Error)?.message || 'desconhecida'}`)
+    } finally {
+      setVerificando(false)
+      setRecarregar(v => v + 1)
+    }
+  }
+
   function limparFiltros() {
     setModalidadeFiltro(null); setCoordenacaoFiltro(null)
     setResponsavelFiltro(null); setPrioridadeFiltro(null)
@@ -502,6 +558,19 @@ export default function CronogramaPage() {
             }}
           >
             {verificando ? 'Verificando…' : 'Verificar permissões'}
+          </button>
+          <button
+            type="button"
+            onClick={testarEmUmProcesso}
+            disabled={verificando || aplicandoLote}
+            style={{
+              padding: '8px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.15)',
+              cursor: verificando ? 'not-allowed' : 'pointer',
+              background: 'transparent', color: '#e2e8f0', whiteSpace: 'nowrap',
+            }}
+          >
+            Testar em 1 processo
           </button>
           <button
             type="button"
