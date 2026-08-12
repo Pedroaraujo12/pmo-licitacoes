@@ -49,6 +49,7 @@ export default function CronogramaPage() {
   const [etapaFiltro, setEtapaFiltro] = useState<string | null>(null)
   const [modalidadeFiltro, setModalidadeFiltro] = useState<string | null>(null)
   const [etapasPorModalidade, setEtapasPorModalidade] = useState<Record<string, EtapaModelo[]>>({})
+  const [erroCarga, setErroCarga] = useState('')
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -63,11 +64,15 @@ export default function CronogramaPage() {
 
   useEffect(() => {
     let cancelled = false
-    const supabase = createClient()
 
     async function load() {
       setLoading(true)
       try {
+        // Dentro do try: se a configuração do Supabase estiver ausente — o que
+        // acontece quando o navegador serve um bundle antigo em cache —,
+        // createClient() lança, e fora daqui esse erro derrubaria a tela
+        // inteira em vez de virar uma mensagem.
+        const supabase = createClient()
         const { linhas } = await listarCronogramaCompleto(supabase, {
           statusNomes: apenasAndamento ? STATUS_ANDAMENTO : null,
           busca: debouncedSearch || null,
@@ -76,10 +81,14 @@ export default function CronogramaPage() {
         if (cancelled) return
 
         setTodasLinhas(linhas)
+        setErroCarga('')
         setSemResultadoFiltrado(apenasAndamento && linhas.length === 0)
       } catch (err) {
         console.warn('Erro ao carregar cronograma:', err)
-        if (!cancelled) setTodasLinhas([])
+        if (!cancelled) {
+          setTodasLinhas([])
+          setErroCarga((err as Error)?.message || 'Não foi possível carregar o cronograma.')
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -95,19 +104,25 @@ export default function CronogramaPage() {
     let cancelado = false
 
     async function carregarRitos() {
-      const supabase = createClient()
-      const mods = await listModalidadesComModelo(supabase)
-      if (mods.length === 0 || cancelado) return
+      try {
+        const supabase = createClient()
+        const mods = await listModalidadesComModelo(supabase)
+        if (mods.length === 0 || cancelado) return
 
-      const porModelo = await listEtapasDeModelos(supabase, mods.map(m => m.modelo_id))
-      if (cancelado) return
+        const porModelo = await listEtapasDeModelos(supabase, mods.map(m => m.modelo_id))
+        if (cancelado) return
 
-      const porModalidade: Record<string, EtapaModelo[]> = {}
-      for (const m of mods) {
-        const etapas = porModelo[m.modelo_id]
-        if (etapas?.length) porModalidade[m.modalidade_nome] = etapas
+        const porModalidade: Record<string, EtapaModelo[]> = {}
+        for (const m of mods) {
+          const etapas = porModelo[m.modelo_id]
+          if (etapas?.length) porModalidade[m.modalidade_nome] = etapas
+        }
+        setEtapasPorModalidade(porModalidade)
+      } catch (err) {
+        // Sem os ritos a tela ainda funciona: a faixa cai para as etapas
+        // presentes nos processos.
+        console.warn('Ritos indisponíveis:', err)
       }
-      setEtapasPorModalidade(porModalidade)
     }
 
     carregarRitos()
@@ -278,6 +293,16 @@ export default function CronogramaPage() {
               )
             })}
           </div>
+        </div>
+      )}
+
+      {erroCarga && (
+        <div style={{
+          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+          borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+          fontSize: 12, color: '#fca5a5', wordBreak: 'break-word',
+        }}>
+          {erroCarga}
         </div>
       )}
 
