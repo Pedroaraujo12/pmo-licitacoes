@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   agregarLinhas, distribuicaoComModelo, modalidadesPresentes, SEM_CRONOGRAMA,
+  cronogramaForaDoRito,
 } from '../cronograma-lista'
 
 const HOJE = '2026-08-11'
@@ -142,5 +143,49 @@ describe('etapas de mesmo nome no rito', () => {
     const dist = distribuicaoComModelo([], RITO_COM_REPETICAO)
     const chaves = dist.map(d => `${d.ordem}|${d.etapa}`)
     expect(new Set(chaves).size).toBe(chaves.length)
+  })
+})
+
+describe('cronogramaForaDoRito', () => {
+  const RITO = [
+    { ordem: 1, descricao: 'Analisar a Solicitação de Compras e anexos' },
+    { ordem: 2, descricao: 'Emissão de Parecer jurídico (UJUR)' },
+  ]
+
+  it('não acusa divergência quando o cronograma já corresponde', () => {
+    expect(cronogramaForaDoRito(
+      ['Analisar a Solicitação de Compras e anexos', 'Emissão de Parecer jurídico (UJUR)'],
+      RITO,
+    )).toBe(false)
+  })
+
+  it('tolera diferenças de espaço, acento e caixa', () => {
+    // Foi o que fazia processos corretos aparecerem como fora do rito
+    expect(cronogramaForaDoRito(
+      ['Analisar a  Solicitacao de Compras e anexos', 'EMISSÃO DE PARECER JURIDICO (UJUR)'],
+      RITO,
+    )).toBe(false)
+  })
+
+  it('acusa quando a quantidade difere', () => {
+    expect(cronogramaForaDoRito(['Analisar a Solicitação de Compras e anexos'], RITO)).toBe(true)
+  })
+
+  it('acusa quando uma etapa é outra', () => {
+    expect(cronogramaForaDoRito(
+      ['Analisar a Solicitação de Compras e anexos', 'Abertura e Fase de Lances'],
+      RITO,
+    )).toBe(true)
+  })
+
+  it('acusa quando a ordem está trocada', () => {
+    expect(cronogramaForaDoRito(
+      ['Emissão de Parecer jurídico (UJUR)', 'Analisar a Solicitação de Compras e anexos'],
+      RITO,
+    )).toBe(true)
+  })
+
+  it('rito vazio não gera acusação', () => {
+    expect(cronogramaForaDoRito(['qualquer'], [])).toBe(false)
   })
 })

@@ -36,6 +36,8 @@ export interface LinhaCronograma {
   etapa_atual_ordem: number | null
   /** Prazo previsto da etapa atual. */
   etapa_atual_data_fim: string | null
+  /** Descrições das etapas, em ordem — usadas para comparar com o rito. */
+  etapas_descricoes: string[]
   /**
    * Dias úteis decorridos desde o vencimento da etapa atual — o tempo que o
    * processo está parado nela além do previsto. Zero quando dentro do prazo.
@@ -134,6 +136,9 @@ export function agregarLinhas(
       etapa_atual: etapaAtual?.descricao ?? null,
       etapa_atual_ordem: etapaAtual?.ordem ?? null,
       etapa_atual_data_fim: etapaAtual?.data_fim ?? null,
+      etapas_descricoes: [...doProcesso]
+        .sort((x, y) => x.ordem - y.ordem)
+        .map(a => a.descricao ?? ''),
       dias_uteis_atraso: etapaAtual?.data_fim && etapaAtual.data_fim < hoje
         ? contarDiasUteis(etapaAtual.data_fim, hoje, feriados)
         : 0,
@@ -305,6 +310,35 @@ export function valoresDistintos(
   return [...vistos].sort((a, b) => a.localeCompare(b, 'pt-BR'))
 }
 
+/** Compara descrições ignorando caixa, acentos, pontuação e espaços extras. */
+function equivalente(a: string, b: string): boolean {
+  const limpar = (t: string) => t
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+  return limpar(a) === limpar(b)
+}
+
+/**
+ * O cronograma do processo corresponde ao rito da modalidade?
+ *
+ * Compara etapa a etapa, na ordem, com tolerância a diferenças de grafia —
+ * comparar por igualdade exata acusava divergência em processos já corretos,
+ * bastando um espaço a mais gravado em algum momento.
+ */
+export function cronogramaForaDoRito(
+  descricoesDoProcesso: string[],
+  etapasDoRito: { ordem: number; descricao: string }[],
+): boolean {
+  if (etapasDoRito.length === 0) return false
+  if (descricoesDoProcesso.length !== etapasDoRito.length) return true
+
+  const rito = [...etapasDoRito].sort((a, b) => a.ordem - b.ordem)
+  return descricoesDoProcesso.some((d, i) => !equivalente(d, rito[i].descricao))
+}
+
 /** Modalidades presentes na lista, para o seletor. */
 export function modalidadesPresentes(linhas: LinhaCronograma[]): string[] {
   const nomes = new Set<string>()
@@ -379,7 +413,8 @@ export async function listarCronograma(
     supabase
       .from('cronograma_atividades')
       .select('processo_id, status, data_fim, fase, descricao, ordem')
-      .in('processo_id', lista.map(p => p.id as string)),
+      .in('processo_id', lista.map(p => p.id as string))
+      .limit(20000),
     supabase.from('feriados').select('data'),
   ])
 

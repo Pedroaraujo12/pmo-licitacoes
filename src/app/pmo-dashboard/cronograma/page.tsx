@@ -9,6 +9,7 @@ import { fetchAllSeiLinks, formatDate, formatBRL } from '@/lib/utils'
 import {
   listarCronogramaCompleto, calcularDistribuicaoEtapas, distribuicaoComModelo,
   modalidadesPresentes, chaveEtapa, chaveEtapaDaLinha, contarPor, valoresDistintos,
+  cronogramaForaDoRito,
   type LinhaCronograma, type EtapaContagem,
 } from '@/lib/cronograma-lista'
 import { listModalidadesComModelo, listEtapasDeModelos, type EtapaModelo } from '@/lib/simulador-cronograma'
@@ -175,9 +176,7 @@ export default function CronogramaPage() {
       if (!etapas?.length) return false
 
       // Contagem diferente do rito, ou etapa atual que não existe nele
-      if (l.total_atividades !== etapas.length) return true
-      if (l.etapa_atual && !etapas.some(e => e.descricao === l.etapa_atual)) return true
-      return false
+      return cronogramaForaDoRito(l.etapas_descricoes, etapas)
     })
   }, [linhasDaModalidade, etapasPorModalidade])
 
