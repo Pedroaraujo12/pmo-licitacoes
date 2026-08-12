@@ -402,11 +402,23 @@ export default function CronogramaPage() {
                       </span>
                     </span>
                   </div>
-                  {p.ultima_fase && (
+                  {/* A etapa em que o processo está: a pendente de menor ordem,
+                      a mesma que a faixa de filtros usa. O campo ultima_fase,
+                      herdado da RPC, trazia a fase da última etapa pendente —
+                      rotulada como "Atual" sem ser a atual. */}
+                  {p.etapa_atual ? (
                     <div style={{ color: '#cbd5e1', fontSize: 13, marginTop: 4 }}>
-                      Atual: {p.ultima_fase}
+                      <span style={{ color: '#94a3b8' }}>Etapa atual: </span>
+                      {p.etapa_atual_ordem ? `${p.etapa_atual_ordem}. ` : ''}{p.etapa_atual}
+                      {p.ultima_fase ? (
+                        <span style={{ color: '#64748b' }}> · {p.ultima_fase}</span>
+                      ) : null}
                     </div>
-                  )}
+                  ) : p.total_atividades > 0 ? (
+                    <div style={{ color: '#22c55e', fontSize: 13, marginTop: 4 }}>
+                      Todas as etapas concluídas
+                    </div>
+                  ) : null}
                 </div>
 
                 {p.total_atividades > 0 && (
