@@ -56,6 +56,7 @@ export default function CronogramaPage() {
   const [prioridadeFiltro, setPrioridadeFiltro] = useState<string | null>(null)
   const [aplicandoLote, setAplicandoLote] = useState(false)
   const [progressoLote, setProgressoLote] = useState({ feitos: 0, total: 0, erros: 0 })
+  const [erroLote, setErroLote] = useState('')
   const [recarregar, setRecarregar] = useState(0)
 
   useEffect(() => {
@@ -200,6 +201,7 @@ export default function CronogramaPage() {
     )) return
 
     setAplicandoLote(true)
+    setErroLote('')
     setProgressoLote({ feitos: 0, total: foraDoRito.length, erros: 0 })
 
     const supabase = createClient()
@@ -225,6 +227,11 @@ export default function CronogramaPage() {
       } catch (err) {
         console.warn('Falha ao aplicar rito em', linha.id_processo, err)
         erros++
+        // A primeira falha é mostrada na tela: sem isso, a operação parecia
+        // não ter efeito e o motivo ficava só no console.
+        if (!erros || erros === 1) {
+          setErroLote(`${linha.id_processo || linha.id}: ${(err as Error)?.message || 'falha desconhecida'}`)
+        }
       }
       setProgressoLote({ feitos: i + 1, total: foraDoRito.length, erros })
     }
@@ -386,6 +393,22 @@ export default function CronogramaPage() {
               <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 6 }}>
                 Aplicando… {progressoLote.feitos} de {progressoLote.total}
                 {progressoLote.erros > 0 ? ` · ${progressoLote.erros} com falha` : ''}
+              </div>
+            )}
+            {!aplicandoLote && progressoLote.total > 0 && (
+              <div style={{ fontSize: 12, color: progressoLote.erros > 0 ? '#fca5a5' : '#86efac', marginTop: 6 }}>
+                {progressoLote.erros > 0
+                  ? `${progressoLote.erros} de ${progressoLote.total} falharam`
+                  : `${progressoLote.total} processo(s) regenerado(s)`}
+              </div>
+            )}
+            {erroLote && (
+              <div style={{
+                fontSize: 11, color: '#fca5a5', marginTop: 6,
+                wordBreak: 'break-word', background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: '6px 8px',
+              }}>
+                {erroLote}
               </div>
             )}
           </div>

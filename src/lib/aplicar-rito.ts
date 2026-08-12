@@ -171,18 +171,27 @@ export async function aplicarRitoDaModalidade(
       data_fim_real: herdado?.data_fim_real ?? null,
     }
 
+    // O retorno de erro precisa ser verificado: uma escrita recusada pelo
+    // banco (permissão, coluna, tipo) não lança exceção no supabase-js. Sem
+    // esta checagem a função terminava anunciando sucesso sem ter gravado
+    // nada — exatamente o sintoma de "apliquei e não mudou".
     const existente = porOrdem.get(etapa.ordem)
-    if (existente) {
-      await supabase.from('cronograma_atividades').update(dados).eq('id', existente.id)
-    } else {
-      await supabase.from('cronograma_atividades').insert({ ...dados, processo_id: processoId })
+    const { error } = existente
+      ? await supabase.from('cronograma_atividades').update(dados).eq('id', existente.id)
+      : await supabase.from('cronograma_atividades').insert({ ...dados, processo_id: processoId })
+
+    if (error) {
+      throw new Error(
+        `Etapa ${etapa.ordem} (${existente ? 'atualizar' : 'inserir'}): ${error.message}`,
+      )
     }
   }
 
   // Sobras do rito anterior (rito novo mais curto que o antigo)
   const sobras = atividades.filter(a => a.ordem > projecao.etapas.length)
   for (const sobra of sobras) {
-    await supabase.from('cronograma_atividades').delete().eq('id', sobra.id)
+    const { error } = await supabase.from('cronograma_atividades').delete().eq('id', sobra.id)
+    if (error) throw new Error(`Remover etapa ${sobra.ordem}: ${error.message}`)
   }
 
   if (projecao.data_conclusao) {
