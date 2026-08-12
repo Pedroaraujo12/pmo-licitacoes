@@ -171,18 +171,28 @@ export async function aplicarRitoDaModalidade(
       data_fim_real: herdado?.data_fim_real ?? null,
     }
 
-    // O retorno de erro precisa ser verificado: uma escrita recusada pelo
-    // banco (permissão, coluna, tipo) não lança exceção no supabase-js. Sem
-    // esta checagem a função terminava anunciando sucesso sem ter gravado
-    // nada — exatamente o sintoma de "apliquei e não mudou".
+    // Duas verificações são necessárias, e a segunda é a que pega o caso
+    // difícil. O supabase-js não lança exceção quando o banco recusa uma
+    // escrita — devolve { error }. E, com RLS, um UPDATE que não alcança
+    // nenhuma linha volta como SUCESSO com zero linhas afetadas: nenhum erro,
+    // nenhuma gravação. Pedir as linhas de volta com .select() é o que
+    // distingue "gravou" de "fingiu que gravou".
     const existente = porOrdem.get(etapa.ordem)
-    const { error } = existente
-      ? await supabase.from('cronograma_atividades').update(dados).eq('id', existente.id)
-      : await supabase.from('cronograma_atividades').insert({ ...dados, processo_id: processoId })
+    const { data: gravado, error } = existente
+      ? await supabase.from('cronograma_atividades').update(dados).eq('id', existente.id).select('id')
+      : await supabase.from('cronograma_atividades').insert({ ...dados, processo_id: processoId }).select('id')
 
     if (error) {
       throw new Error(
         `Etapa ${etapa.ordem} (${existente ? 'atualizar' : 'inserir'}): ${error.message}`,
+      )
+    }
+
+    if (!gravado || gravado.length === 0) {
+      throw new Error(
+        `Etapa ${etapa.ordem}: o banco aceitou a operação mas não gravou nada. ` +
+        `Normalmente é permissão: o seu perfil não tem autorização de escrita ` +
+        `em cronograma_atividades.`,
       )
     }
   }
@@ -190,8 +200,12 @@ export async function aplicarRitoDaModalidade(
   // Sobras do rito anterior (rito novo mais curto que o antigo)
   const sobras = atividades.filter(a => a.ordem > projecao.etapas.length)
   for (const sobra of sobras) {
-    const { error } = await supabase.from('cronograma_atividades').delete().eq('id', sobra.id)
+    const { data: removido, error } = await supabase
+      .from('cronograma_atividades').delete().eq('id', sobra.id).select('id')
     if (error) throw new Error(`Remover etapa ${sobra.ordem}: ${error.message}`)
+    if (!removido || removido.length === 0) {
+      throw new Error(`Etapa ${sobra.ordem} não pôde ser removida — sem permissão de escrita.`)
+    }
   }
 
   if (projecao.data_conclusao) {
