@@ -8,7 +8,7 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { fetchAllSeiLinks, formatDate } from '@/lib/utils'
 import {
   listarCronogramaCompleto, calcularDistribuicaoEtapas, distribuicaoComModelo,
-  modalidadesPresentes, SEM_CRONOGRAMA,
+  modalidadesPresentes, chaveEtapa, chaveEtapaDaLinha,
   type LinhaCronograma, type EtapaContagem,
 } from '@/lib/cronograma-lista'
 import { listModalidadesComModelo, listEtapasDeModelos, type EtapaModelo } from '@/lib/simulador-cronograma'
@@ -132,7 +132,7 @@ export default function CronogramaPage() {
 
   const linhasFiltradas = useMemo(
     () => etapaFiltro
-      ? linhasDaModalidade.filter(l => (l.etapa_atual ?? SEM_CRONOGRAMA) === etapaFiltro)
+      ? linhasDaModalidade.filter(l => chaveEtapaDaLinha(l) === etapaFiltro)
       : linhasDaModalidade,
     [linhasDaModalidade, etapaFiltro])
 
@@ -252,13 +252,14 @@ export default function CronogramaPage() {
               Todas · {linhasDaModalidade.length}
             </button>
             {distribuicao.map(d => {
-              const ativo = etapaFiltro === d.etapa
+              const chave = chaveEtapa(d.ordem === Number.MAX_SAFE_INTEGER ? null : d.ordem, d.etapa)
+              const ativo = etapaFiltro === chave
               const vazio = d.total === 0
               return (
                 <button
-                  key={d.etapa}
+                  key={chave}
                   type="button"
-                  onClick={() => { if (!vazio) { setEtapaFiltro(ativo ? null : d.etapa); setPage(1) } }}
+                  onClick={() => { if (!vazio) { setEtapaFiltro(ativo ? null : chave); setPage(1) } }}
                   disabled={vazio}
                   title={vazio ? `${d.etapa} — nenhum processo nesta etapa` : d.etapa}
                   style={{

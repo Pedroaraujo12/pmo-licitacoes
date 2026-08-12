@@ -154,6 +154,21 @@ export function calcularDistribuicaoEtapas(linhas: LinhaCronograma[]): EtapaCont
 export const SEM_CRONOGRAMA = 'Sem cronograma'
 
 /**
+ * Identidade de uma etapa: posição + nome.
+ * Só o nome não basta — ritos repetem descrições em fases diferentes.
+ */
+export function chaveEtapa(ordem: number | null, descricao: string): string {
+  return `${ordem ?? 'x'}|${descricao}`
+}
+
+/** Chave da etapa em que o processo está. */
+export function chaveEtapaDaLinha(linha: LinhaCronograma): string {
+  return linha.etapa_atual
+    ? chaveEtapa(linha.etapa_atual_ordem, linha.etapa_atual)
+    : chaveEtapa(null, SEM_CRONOGRAMA)
+}
+
+/**
  * Distribuição sobre o rito completo da modalidade: todas as etapas do
  * modelo aparecem, inclusive as que hoje não têm nenhum processo — é o que
  * mostra onde a fila está vazia e onde acumula.
@@ -166,10 +181,14 @@ export function distribuicaoComModelo(
   linhas: LinhaCronograma[],
   etapasModelo: { ordem: number; descricao: string }[],
 ): EtapaContagem[] {
+  // Ritos repetem descrições: a Concorrência tem "Prazo Recursal" duas vezes,
+  // na fase de habilitação e na de julgamento. Identificar etapa por nome
+  // somaria as duas na mesma linha e duplicaria a contagem. A identidade é
+  // posição + nome.
   const contagem = new Map<string, number>()
   for (const l of linhas) {
-    const etapa = l.etapa_atual ?? SEM_CRONOGRAMA
-    contagem.set(etapa, (contagem.get(etapa) ?? 0) + 1)
+    const k = chaveEtapaDaLinha(l)
+    contagem.set(k, (contagem.get(k) ?? 0) + 1)
   }
 
   const doModelo: EtapaContagem[] = [...etapasModelo]
@@ -177,24 +196,29 @@ export function distribuicaoComModelo(
     .map(e => ({
       etapa: e.descricao,
       ordem: e.ordem,
-      total: contagem.get(e.descricao) ?? 0,
+      total: contagem.get(chaveEtapa(e.ordem, e.descricao)) ?? 0,
       noModelo: true,
     }))
 
-  const nomesDoModelo = new Set(doModelo.map(e => e.etapa))
+  const chavesDoModelo = new Set(etapasModelo.map(e => chaveEtapa(e.ordem, e.descricao)))
 
   const foraDoModelo: EtapaContagem[] = [...contagem.entries()]
-    .filter(([etapa]) => !nomesDoModelo.has(etapa))
-    .map(([etapa, total]) => ({
-      etapa,
-      ordem: Number.MAX_SAFE_INTEGER,
-      total,
-      noModelo: false,
-    }))
+    .filter(([k]) => !chavesDoModelo.has(k))
+    .map(([k, total]) => {
+      const separador = k.indexOf('|')
+      const ordemBruta = k.slice(0, separador)
+      const etapa = k.slice(separador + 1)
+      return {
+        etapa,
+        ordem: ordemBruta === 'x' ? Number.MAX_SAFE_INTEGER : Number(ordemBruta),
+        total,
+        noModelo: false,
+      }
+    })
     .sort((a, b) => {
       if (a.etapa === SEM_CRONOGRAMA) return 1
       if (b.etapa === SEM_CRONOGRAMA) return -1
-      return a.etapa.localeCompare(b.etapa, 'pt-BR')
+      return a.ordem - b.ordem || a.etapa.localeCompare(b.etapa, 'pt-BR')
     })
 
   return [...doModelo, ...foraDoModelo]

@@ -108,3 +108,39 @@ describe('modalidadesPresentes', () => {
     expect(modalidadesPresentes(linhas)).toEqual([])
   })
 })
+
+describe('etapas de mesmo nome no rito', () => {
+  // A Concorrência tem "Prazo Recursal" na habilitação e no julgamento.
+  const RITO_COM_REPETICAO = [
+    { ordem: 1, descricao: 'Análise do TR' },
+    { ordem: 2, descricao: 'Prazo Recursal (3 dias úteis)' },
+    { ordem: 3, descricao: 'Julgamento' },
+    { ordem: 4, descricao: 'Prazo Recursal (3 dias úteis)' },
+  ]
+
+  it('não soma as duas ocorrências na mesma linha', () => {
+    const linhas = agregarLinhas([proc('1'), proc('2')], [
+      // p1 no primeiro Prazo Recursal (ordem 2)
+      etapa('1', 1, 'Análise do TR', 'concluido'),
+      etapa('1', 2, 'Prazo Recursal (3 dias úteis)'),
+      // p2 no segundo (ordem 4)
+      etapa('2', 1, 'Análise do TR', 'concluido'),
+      etapa('2', 2, 'Prazo Recursal (3 dias úteis)', 'concluido'),
+      etapa('2', 3, 'Julgamento', 'concluido'),
+      etapa('2', 4, 'Prazo Recursal (3 dias úteis)'),
+    ], HOJE)
+
+    const dist = distribuicaoComModelo(linhas, RITO_COM_REPETICAO)
+
+    expect(dist).toHaveLength(4)
+    expect(dist[1]).toMatchObject({ ordem: 2, total: 1 })
+    expect(dist[3]).toMatchObject({ ordem: 4, total: 1 })
+    expect(dist.reduce((acc, d) => acc + d.total, 0)).toBe(2)
+  })
+
+  it('cada ocorrência tem identidade própria', () => {
+    const dist = distribuicaoComModelo([], RITO_COM_REPETICAO)
+    const chaves = dist.map(d => `${d.ordem}|${d.etapa}`)
+    expect(new Set(chaves).size).toBe(chaves.length)
+  })
+})
