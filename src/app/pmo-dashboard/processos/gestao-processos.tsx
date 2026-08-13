@@ -276,6 +276,35 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered.length])
 
+  // Quantos processos há em cada coordenação. Considera os demais filtros,
+  // mas ignora o próprio filtro de coordenação: depois de escolher uma, os
+  // números das outras precisam continuar à vista para comparação.
+  const porCoordenacao = useMemo(() => {
+    const base = processos.filter(p => {
+      if (debouncedSearch) {
+        const alvo = `${p.id_processo || ''} ${p.objeto_resumido || ''} ${p.coordenacoes?.nome || ''} ${p.responsaveis?.nome || ''}`.toLowerCase()
+        if (!alvo.includes(debouncedSearch.toLowerCase())) return false
+      }
+      if (statusFilter && (p.status_processo?.nome || '') !== statusFilter) return false
+      if (modalidadeFilter && (p.modalidades?.nome || '') !== modalidadeFilter) return false
+      if (prioridadeFilter && (p.prioridade || '') !== prioridadeFilter) return false
+      if (responsavelFilter && (p.responsaveis?.nome || '') !== responsavelFilter) return false
+      return true
+    })
+
+    const mapa = new Map<string, number>()
+    for (const p of base) {
+      // Sem coordenação vira rótulo próprio: descartar faria a soma dos chips
+      // deixar de bater com o total de processos.
+      const nome = (p.coordenacoes?.nome || '').trim() || 'Sem coordenação'
+      mapa.set(nome, (mapa.get(nome) ?? 0) + 1)
+    }
+
+    return [...mapa.entries()]
+      .map(([nome, total]) => ({ nome, total }))
+      .sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [processos, debouncedSearch, statusFilter, modalidadeFilter, prioridadeFilter, responsavelFilter])
+
   return (
     <div>
       {/* Header */}
@@ -464,6 +493,50 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
           )
         })()}
       </div>
+
+      {/* Total por coordenação — clique para filtrar */}
+      {porCoordenacao.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
+          }}>
+            Processos por coordenação
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {porCoordenacao.map(c => {
+              const ativo = coordenacaoFilter === c.nome
+              return (
+                <button
+                  key={c.nome}
+                  type="button"
+                  onClick={() => { setCoordenacaoFilter(ativo ? '' : c.nome); setPage(1) }}
+                  title={`${c.nome} — ${c.total} processo(s)`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '6px 12px', fontSize: 12, fontWeight: 600,
+                    borderRadius: 999, cursor: 'pointer',
+                    maxWidth: 320, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    background: ativo ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.6)',
+                    color: '#e2e8f0',
+                    border: `1px solid ${ativo ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nome}</span>
+                  <span style={{
+                    fontWeight: 700, fontSize: 12,
+                    background: 'rgba(15,23,42,0.6)', borderRadius: 999,
+                    padding: '1px 8px', color: ativo ? '#38bdf8' : '#94a3b8',
+                  }}>
+                    {c.total}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Table View */}
       {viewMode === 'table' && (
