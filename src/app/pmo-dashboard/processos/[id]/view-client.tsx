@@ -16,6 +16,9 @@ import type { DocumentGenerated } from '@/types/documentos'
 import { useToast } from '@/components/ui/toast'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import RelatedNotes from '@/components/ui/notes/related-notes'
+import {
+  separarRegistros, descreverRegistroDeSistema, MARCADOR_SEI_LINK,
+} from '@/lib/registro-atividades'
 
 function isOverdue(etapa: CronogramaAtividade) {
   if (etapa.status === 'concluido') return false
@@ -35,10 +38,17 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
   const [atividades, setAtividades] = useState<Atividade[]>([])
+  const [verTrilha, setVerTrilha] = useState(false)
   const [linkSei, setLinkSei] = useState<string | null>(null)
   const [profile, setProfile] = useState<{ role: string } | null>(null)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const isMobile = useIsMobile()
+
+  // O diário do processo e a trilha de auditoria dividem a tabela `atividades`.
+  const { manuais: registrosManuais, sistema: registrosDeSistema } = useMemo(
+    () => separarRegistros(atividades),
+    [atividades],
+  )
   const [showDocModal, setShowDocModal] = useState(false)
   const [documentos, setDocumentos] = useState<DocumentGenerated[]>([])
   const [responsavelColaborador, setResponsavelColaborador] = useState<{ id: string; nome_completo: string; cargo: string | null; unidade: string | null; email_institucional: string | null; telefone_institucional: string | null } | null>(null)
@@ -112,7 +122,7 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
         setAtividades(atv || [])
         const { data: docs } = await listGeneratedDocuments(supabase, id)
         if (docs) setDocumentos(docs)
-        const seiLink = (atv || []).find((a: { atividade: string }) => a.atividade === '__SEI_LINK__')
+        const seiLink = (atv || []).find((a: { atividade: string }) => a.atividade === MARCADOR_SEI_LINK)
         setLinkSei(seiLink?.observacao || null)
         const { data: { session } } = await supabase.auth.getSession()
         const user = session?.user
@@ -485,14 +495,15 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
         </form>
       </div>
 
-      {/* Histórico de Atividades */}
+      {/* Histórico de Atividades — só o que foi digitado em "Registrar Atividade".
+          O que o sistema grava sozinho fica na trilha, recolhida abaixo. */}
       <div style={cardStyle}>
         <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Histórico de Atividades</h3>
-        {atividades.length === 0 ? (
+        {registrosManuais.length === 0 ? (
           <p style={{ fontSize: 13, color: '#64748b' }}>Nenhuma atividade registrada</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {atividades.map(a => (
+            {registrosManuais.map(a => (
               <div key={a.id} style={{ padding: '12px', background: 'rgba(30,41,59,0.5)', borderRadius: 8, borderLeft: '3px solid #3b82f6' }}>
                 <div style={{
                   display: 'flex', flexDirection: isMobile ? 'column' : 'row',
@@ -507,6 +518,46 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
                 {a.observacao && <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{a.observacao}</p>}
               </div>
             ))}
+          </div>
+        )}
+
+        {registrosDeSistema.length > 0 && (
+          <div style={{ marginTop: registrosManuais.length ? 16 : 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <button
+              type="button"
+              onClick={() => setVerTrilha(v => !v)}
+              style={{
+                background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+                fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              {verTrilha ? '▾' : '▸'} Alterações registradas pelo sistema ({registrosDeSistema.length})
+            </button>
+
+            {verTrilha && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                {registrosDeSistema.map(a => {
+                  const r = descreverRegistroDeSistema(a)
+                  return (
+                    <div key={a.id} style={{ padding: '10px 12px', background: 'rgba(15,23,42,0.5)', borderRadius: 8, borderLeft: '3px solid #475569' }}>
+                      <div style={{
+                        display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+                        justifyContent: 'space-between', marginBottom: 2, gap: 2,
+                      }}>
+                        <span style={{ fontWeight: 600, fontSize: 12, color: '#cbd5e1' }}>{r.titulo}</span>
+                        <span style={{ fontSize: 11, color: '#64748b' }}>{a.data ? formatDate(a.data) : ''}</span>
+                      </div>
+                      {r.detalhe && <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{r.detalhe}</p>}
+                      {r.justificativa && (
+                        <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0', fontStyle: 'italic' }}>
+                          &ldquo;{r.justificativa}&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
