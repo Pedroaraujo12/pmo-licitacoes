@@ -39,6 +39,7 @@ export default function CronogramaDinamico({
   const [reposOrdem, setReposOrdem] = useState('')
   const [reposData, setReposData] = useState('')
   const [reposConcluirAnteriores, setReposConcluirAnteriores] = useState(true)
+  const [reposReabrir, setReposReabrir] = useState(false)
   const [reposJustificativa, setReposJustificativa] = useState('')
   const [repositioning, setRepositioning] = useState(false)
 
@@ -108,11 +109,16 @@ export default function CronogramaDinamico({
     }
   }
 
+  const tudoConcluido = ordenadas.length > 0 && ordenadas.every(a => a.status === 'concluido')
+
   function abrirReposicionamento() {
     const atual = ordenadas.find(a => a.status !== 'concluido') || ordenadas[0]
-    setReposOrdem(String(atual?.ordem ?? 1))
+    // Processo inteiro concluído: a intenção quase certa é recomeçar, então
+    // já abre na etapa 1 com a reabertura marcada.
+    setReposOrdem(tudoConcluido ? '1' : String(atual?.ordem ?? 1))
     setReposData(new Date().toISOString().split('T')[0])
-    setReposConcluirAnteriores(true)
+    setReposConcluirAnteriores(!tudoConcluido)
+    setReposReabrir(tudoConcluido)
     setReposJustificativa('')
     setReposOpen(true)
   }
@@ -146,12 +152,29 @@ export default function CronogramaDinamico({
       }
     }
 
-    // 2. Reencadeia da etapa alvo em diante, a partir da data informada
+    // 2. Reabertura: etapas concluídas a partir do alvo voltam a pendentes.
+    //    Sem isso não há como recomeçar um processo inteiramente concluído —
+    //    o reencadeamento pula tudo que está concluído e nada muda.
+    const reabertasIds: string[] = []
+    if (reposReabrir) {
+      for (const a of aPartirDe) {
+        if (a.status === 'nao_iniciado') continue
+        const { error } = await supabase.from('cronograma_atividades').update({
+          status: 'nao_iniciado',
+          data_inicio_real: null,
+          data_fim_real: null,
+        }).eq('id', a.id)
+        if (!error) reabertasIds.push(a.id)
+      }
+    }
+
+    // 3. Reencadeia da etapa alvo em diante, a partir da data informada
     let dataCorrente = reposData
     const updates: { id: string; data_inicio: string; data_fim: string | null }[] = []
 
     for (const a of aPartirDe) {
-      if (a.status === 'concluido') {
+      const foiReaberta = reabertasIds.includes(a.id)
+      if (a.status === 'concluido' && !foiReaberta) {
         const ancora = a.data_fim_real || a.data_fim
         if (ancora) {
           const d = new Date(ancora)
@@ -203,6 +226,7 @@ export default function CronogramaDinamico({
         data_base: reposData,
         etapas_reagendadas: updates.length,
         anteriores_concluidas: concluidasIds.length,
+        etapas_reabertas: reabertasIds.length,
         justificativa: reposJustificativa.trim(),
         por: user?.id,
       }),
@@ -213,7 +237,15 @@ export default function CronogramaDinamico({
     // 4. Estado local
     const atualizadas = atividades.map(a => {
       const u = updates.find(x => x.id === a.id)
-      if (u) return { ...a, data_inicio: u.data_inicio, data_fim: u.data_fim }
+      const reaberta = reabertasIds.includes(a.id)
+      if (u) {
+        return {
+          ...a,
+          data_inicio: u.data_inicio,
+          data_fim: u.data_fim,
+          ...(reaberta ? { status: 'nao_iniciado', data_inicio_real: null, data_fim_real: null } : {}),
+        } as CronogramaAtividade
+      }
       if (concluidasIds.includes(a.id)) return { ...a, status: 'concluido' } as CronogramaAtividade
       return a
     })
@@ -537,8 +569,10 @@ export default function CronogramaDinamico({
               border: '1px solid rgba(56,189,248,0.3)', cursor: repositioning ? 'not-allowed' : 'pointer',
               background: 'rgba(56,189,248,0.12)', color: '#38bdf8',
               transition: 'background 0.15s',
-            }} title="Informar em que etapa o processo está hoje e recalcular a partir dela">
-              📍 Etapa atual
+            }} title={tudoConcluido
+              ? 'Reabrir etapas e reiniciar a contagem de prazos'
+              : 'Informar em que etapa o processo está hoje e recalcular a partir dela'}>
+              {tudoConcluido ? '🔄 Recomeçar cronograma' : '📍 Etapa atual'}
             </button>
             {status.atrasadas > 0 && (
               <button onClick={handleReiniciarPrazos} disabled={resetting} style={{
@@ -667,10 +701,12 @@ export default function CronogramaDinamico({
             maxHeight: '90vh', overflowY: 'auto',
           }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', margin: '0 0 4px' }}>
-              📍 Em que etapa o processo está?
+              {tudoConcluido ? '🔄 Recomeçar o cronograma' : '📍 Em que etapa o processo está?'}
             </h3>
             <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 16px' }}>
-              A contagem recomeça nessa etapa, na data informada, e segue as durações do modelo.
+              {tudoConcluido
+                ? 'Todas as etapas estão concluídas. Reabra a partir da etapa escolhida para reiniciar a contagem na data informada.'
+                : 'A contagem recomeça nessa etapa, na data informada, e segue as durações do modelo.'}
             </p>
 
             <form onSubmit={handleReposicionar}>
@@ -702,12 +738,26 @@ export default function CronogramaDinamico({
                 </p>
               </div>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 12, color: '#cbd5e1', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 12, color: '#cbd5e1', cursor: 'pointer' }}>
                 <input type="checkbox" checked={reposConcluirAnteriores}
                   onChange={e => setReposConcluirAnteriores(e.target.checked)}
                   style={{ width: 15, height: 15, accentColor: '#38bdf8', cursor: 'pointer' }}
                 />
                 Marcar as etapas anteriores como concluídas
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 16, fontSize: 12, color: '#cbd5e1', cursor: 'pointer' }}>
+                <input type="checkbox" checked={reposReabrir}
+                  onChange={e => setReposReabrir(e.target.checked)}
+                  style={{ width: 15, height: 15, accentColor: '#38bdf8', cursor: 'pointer', marginTop: 2 }}
+                />
+                <span>
+                  Reabrir etapas já concluídas a partir desta
+                  <span style={{ display: 'block', fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                    Elas voltam a pendentes e perdem as datas reais registradas.
+                    Necessário para recomeçar um processo inteiramente concluído.
+                  </span>
+                </span>
               </label>
 
               <div style={{ marginBottom: 16 }}>
