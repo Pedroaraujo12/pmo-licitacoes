@@ -14,8 +14,23 @@ import {
 } from '@/types/colaboradores'
 import { Plus, Star, Search, Phone, Mail, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useRecorteDeTela } from '@/hooks/useRecorteDeTela'
+import { AvisoRecorte } from '@/components/ui/aviso-recorte'
 
 const PAGE_SIZE = 50
+
+const RECORTE_PADRAO = {
+  search: '',
+  filtroUnidade: '',
+  filtroCargo: '',
+  filtroSituacao: '',
+  page: 1,
+}
+
+const RECORTE_ROTULOS = {
+  search: 'busca',
+  filtroSituacao: 'situação',
+}
 
 export default function ColaboradoresListPage() {
   const router = useRouter()
@@ -45,6 +60,27 @@ export default function ColaboradoresListPage() {
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
+  const { hidratado, restaurado, dispensar, esquecer, aoSair } = useRecorteDeTela({
+    chave: 'pmo_colaboradores_filtros',
+    padrao: RECORTE_PADRAO,
+    valores: { search, filtroUnidade, filtroCargo, filtroSituacao, page },
+    aplicar: r => {
+      setSearch(r.search)
+      setFiltroUnidade(r.filtroUnidade)
+      setFiltroCargo(r.filtroCargo)
+      setFiltroSituacao(r.filtroSituacao)
+      setPage(r.page)
+    },
+    rotulos: RECORTE_ROTULOS,
+    ignorar: ['page'],
+    carregando: loadingList,
+  })
+
+  function limparFiltros() {
+    setSearch(''); setFiltroUnidade(''); setFiltroCargo(''); setFiltroSituacao('')
+    setPage(1); esquecer()
+  }
+
   // Fetch profile + static data once
   useEffect(() => {
     let cancelled = false
@@ -68,6 +104,10 @@ export default function ColaboradoresListPage() {
 
   // Fetch list + favoritos on filter/page change
   useEffect(() => {
+    // Espera a restauração do recorte e o debounce assentar: sem isso a
+    // primeira consulta viria sem filtro e a lista piscaria inteira.
+    if (!hidratado || search !== debouncedSearch) return
+
     let cancelled = false
     const supabase = getSupabase()
     async function load() {
@@ -108,7 +148,7 @@ export default function ColaboradoresListPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [debouncedSearch, filtroUnidade, filtroCargo, filtroSituacao, page]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hidratado, search, debouncedSearch, filtroUnidade, filtroCargo, filtroSituacao, page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleFavorito(colaboradorId: string, e: React.MouseEvent) {
     e.stopPropagation()
@@ -175,6 +215,8 @@ export default function ColaboradoresListPage() {
           )}
         </div>
       </div>
+
+      <AvisoRecorte descricao={restaurado} onVerTodos={limparFiltros} onManter={dispensar} />
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -269,7 +311,7 @@ export default function ColaboradoresListPage() {
           </div>
         ) : (
           colaboradores.map(c => (
-            <div key={c.id} onClick={() => router.push(`/pmo-dashboard/colaboradores/detalhe?id=${c.id}`)}
+            <div key={c.id} onClick={() => { aoSair(); router.push(`/pmo-dashboard/colaboradores/detalhe?id=${c.id}`) }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 16px', background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',

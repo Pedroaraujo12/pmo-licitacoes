@@ -9,6 +9,11 @@ import { listTemplates, listFavorites, toggleFavorite } from '@/lib/documentos'
 import { TIPO_DOCUMENTO_LABELS, CATEGORIA_LABELS, TEMPLATE_STATUS_LABELS, TEMPLATE_STATUS_COLORS } from '@/types/documentos'
 import { PT_BR } from '@/lib/pt-br'
 import type { DocumentTemplate } from '@/types/documentos'
+import { useRecorteDeTela } from '@/hooks/useRecorteDeTela'
+import { AvisoRecorte } from '@/components/ui/aviso-recorte'
+
+const RECORTE_PADRAO = { search: '', filtroTipo: '', filtroCategoria: '', filtroStatus: '' }
+const RECORTE_ROTULOS = { search: 'busca', filtroStatus: 'status' }
 
 export default function DocumentosListPage() {
   const router = useRouter()
@@ -20,6 +25,25 @@ export default function DocumentosListPage() {
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
+
+  const { hidratado, restaurado, dispensar, esquecer, aoSair } = useRecorteDeTela({
+    chave: 'pmo_documentos_filtros',
+    padrao: RECORTE_PADRAO,
+    valores: { search, filtroTipo, filtroCategoria, filtroStatus },
+    aplicar: r => {
+      setSearch(r.search)
+      setFiltroTipo(r.filtroTipo)
+      setFiltroCategoria(r.filtroCategoria)
+      setFiltroStatus(r.filtroStatus)
+    },
+    rotulos: RECORTE_ROTULOS,
+    carregando: loading,
+  })
+
+  function limparFiltros() {
+    setSearch(''); setFiltroTipo(''); setFiltroCategoria(''); setFiltroStatus('')
+    esquecer()
+  }
 
   async function load() {
     setLoading(true)
@@ -43,7 +67,7 @@ export default function DocumentosListPage() {
     }
   }
 
-  useEffect(() => { load() }, [filtroTipo, filtroCategoria, filtroStatus]) // eslint-disable-line react-hooks/set-state-in-effect,react-hooks/exhaustive-deps
+  useEffect(() => { if (hidratado) load() }, [hidratado, filtroTipo, filtroCategoria, filtroStatus]) // eslint-disable-line react-hooks/set-state-in-effect,react-hooks/exhaustive-deps
 
   function handleSearch() { load() }
 
@@ -75,6 +99,8 @@ export default function DocumentosListPage() {
           <Plus size={16} /> Novo Modelo
         </Link>
       </div>
+
+      <AvisoRecorte descricao={restaurado} onVerTodos={limparFiltros} onManter={dispensar} />
 
       {/* Filtros */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -114,7 +140,7 @@ export default function DocumentosListPage() {
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {templates.map(t => (
-            <div key={t.id} onClick={() => router.push(`/pmo-dashboard/documentos/detalhe?id=${t.id}`)}
+            <div key={t.id} onClick={() => { aoSair(); router.push(`/pmo-dashboard/documentos/detalhe?id=${t.id}`) }}
               style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 18px', background: 'rgba(30,41,59,0.7)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', transition: 'border-color 0.15s' }}
               onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}
               onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}>

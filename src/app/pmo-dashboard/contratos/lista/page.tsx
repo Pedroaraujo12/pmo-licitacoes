@@ -12,6 +12,22 @@ import { CONTRATO_STATUS_RECORDS } from '@/types/contratos'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { Search, Plus, FileText, ArrowLeft, X } from 'lucide-react'
 import { Suspense } from 'react'
+import { useRecorteDeTela } from '@/hooks/useRecorteDeTela'
+import { AvisoRecorte } from '@/components/ui/aviso-recorte'
+
+const RECORTE_PADRAO = {
+  search: '',
+  statusFilter: '',
+  semFiscal: false,
+  vigenciaFilter: '',
+}
+
+const RECORTE_ROTULOS = {
+  search: 'busca',
+  statusFilter: 'status',
+  semFiscal: 'sem fiscal',
+  vigenciaFilter: 'vigência',
+}
 
 const baseInput: React.CSSProperties = {
   padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
@@ -31,11 +47,29 @@ function ContratosListContent() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [semFiscal, setSemFiscal] = useState(false)
-  const [vigenciaFilter, setVigenciaFilter] = useState<string>(
-    () => searchParams?.get('vigencia') || ''
-  )
+  const vigenciaDaUrl = searchParams?.get('vigencia') || ''
+  const [vigenciaFilter, setVigenciaFilter] = useState<string>(vigenciaDaUrl)
+
+  const { hidratado, restaurado, dispensar, esquecer, aoSair } = useRecorteDeTela({
+    chave: 'pmo_contratos_lista',
+    padrao: RECORTE_PADRAO,
+    valores: { search, statusFilter, semFiscal, vigenciaFilter },
+    aplicar: r => {
+      setSearch(r.search)
+      setStatusFilter(r.statusFilter)
+      setSemFiscal(r.semFiscal)
+      setVigenciaFilter(r.vigenciaFilter)
+    },
+    rotulos: RECORTE_ROTULOS,
+    // Chegar por "Vencimentos" no painel é uma intenção explícita: o link
+    // manda, e o recorte guardado não pode sobrescrevê-lo.
+    ignorarRestauracao: !!vigenciaDaUrl,
+    carregando: loading,
+  })
 
   useEffect(() => {
+    if (!hidratado) return
+
     let cancelled = false
     async function load() {
       setLoading(true)
@@ -56,7 +90,7 @@ function ContratosListContent() {
     load()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, semFiscal, vigenciaFilter])
+  }, [hidratado, search, statusFilter, semFiscal, vigenciaFilter])
 
   function getStatusBadge(status: keyof typeof CONTRATO_STATUS_RECORDS) {
     const rec = CONTRATO_STATUS_RECORDS[status]
@@ -113,6 +147,12 @@ function ContratosListContent() {
         </div>
       </div>
 
+      <AvisoRecorte
+        descricao={restaurado}
+        onVerTodos={() => { setSearch(''); setStatusFilter(''); setVigenciaFilter(''); setSemFiscal(false); esquecer() }}
+        onManter={dispensar}
+      />
+
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#64748b' }} />
@@ -137,7 +177,7 @@ function ContratosListContent() {
           Sem fiscal
         </label>
         {(search || statusFilter || vigenciaFilter || semFiscal) && (
-          <button onClick={() => { setSearch(''); setStatusFilter(''); setVigenciaFilter(''); setSemFiscal(false) }}
+          <button onClick={() => { setSearch(''); setStatusFilter(''); setVigenciaFilter(''); setSemFiscal(false); esquecer() }}
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', background: 'transparent', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}>
             <X size={12} /> Limpar
           </button>
@@ -170,7 +210,7 @@ function ContratosListContent() {
       {!loading && contratos.length > 0 && isMobile && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {contratos.map(c => (
-            <div key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${c.id}`)}
+            <div key={c.id} onClick={() => { aoSair(); router.push(`/pmo-dashboard/contratos/detalhe?id=${c.id}`) }}
               style={{
                 padding: '14px 16px', background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',
                 borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
@@ -210,7 +250,7 @@ function ContratosListContent() {
             </thead>
             <tbody>
               {contratos.map(c => (
-                <tr key={c.id} onClick={() => router.push(`/pmo-dashboard/contratos/detalhe?id=${c.id}`)}
+                <tr key={c.id} onClick={() => { aoSair(); router.push(`/pmo-dashboard/contratos/detalhe?id=${c.id}`) }}
                   style={{
                     cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)',
                     transition: 'background 0.1s',

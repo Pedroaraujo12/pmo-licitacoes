@@ -8,11 +8,16 @@ import { formatBRL } from '@/lib/utils'
 import type { FornecedorResumo } from '@/types/fornecedores'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { Search, Building2, FileText, DollarSign, ArrowRight } from 'lucide-react'
+import { useRecorteDeTela } from '@/hooks/useRecorteDeTela'
+import { AvisoRecorte } from '@/components/ui/aviso-recorte'
 
 const baseInput: React.CSSProperties = {
   padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
   fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none',
 }
+
+const RECORTE_PADRAO = { search: '' }
+const RECORTE_ROTULOS = { search: 'busca' }
 
 export default function FornecedoresPage() {
   const router = useRouter()
@@ -23,7 +28,18 @@ export default function FornecedoresPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
+  const { hidratado, restaurado, dispensar, esquecer, aoSair } = useRecorteDeTela({
+    chave: 'pmo_fornecedores_filtros',
+    padrao: RECORTE_PADRAO,
+    valores: { search },
+    aplicar: r => setSearch(r.search),
+    rotulos: RECORTE_ROTULOS,
+    carregando: loading,
+  })
+
   useEffect(() => {
+    if (!hidratado) return
+
     let cancelled = false
     async function load() {
       setLoading(true)
@@ -40,7 +56,7 @@ export default function FornecedoresPage() {
     load()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search])
+  }, [hidratado, search])
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -59,6 +75,12 @@ export default function FornecedoresPage() {
           </p>
         </div>
       </div>
+
+      <AvisoRecorte
+        descricao={restaurado}
+        onVerTodos={() => { setSearch(''); esquecer() }}
+        onManter={dispensar}
+      />
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 400 }}>
@@ -95,7 +117,7 @@ export default function FornecedoresPage() {
       {!loading && fornecedores.length > 0 && (isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {fornecedores.map(f => (
-            <div key={f.nome} onClick={() => router.push(`/pmo-dashboard/fornecedores/detalhe?nome=${encodeURIComponent(f.nome)}`)}
+            <div key={f.nome} onClick={() => { aoSair(); router.push(`/pmo-dashboard/fornecedores/detalhe?nome=${encodeURIComponent(f.nome)}`) }}
               style={{
                 padding: '14px 16px', background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',
                 borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
@@ -132,7 +154,7 @@ export default function FornecedoresPage() {
             </thead>
             <tbody>
               {fornecedores.map(f => (
-                <tr key={f.nome} onClick={() => router.push(`/pmo-dashboard/fornecedores/detalhe?nome=${encodeURIComponent(f.nome)}`)}
+                <tr key={f.nome} onClick={() => { aoSair(); router.push(`/pmo-dashboard/fornecedores/detalhe?nome=${encodeURIComponent(f.nome)}`) }}
                   style={{
                     cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)',
                     transition: 'background 0.1s',

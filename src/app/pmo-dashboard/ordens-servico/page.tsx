@@ -8,11 +8,16 @@ import { formatDateBR, formatBRL } from '@/lib/utils'
 import { OS_STATUS_RECORDS } from '@/types/contratos'
 import type { OrdemServico } from '@/types/contratos'
 import { Plus, Search } from 'lucide-react'
+import { useRecorteDeTela } from '@/hooks/useRecorteDeTela'
+import { AvisoRecorte } from '@/components/ui/aviso-recorte'
 
 const baseInput: React.CSSProperties = {
   padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
   fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none',
 }
+
+const RECORTE_PADRAO = { search: '', statusFilter: '' }
+const RECORTE_ROTULOS = { search: 'busca', statusFilter: 'status' }
 
 export default function OrdensServicoListPage() {
   const router = useRouter()
@@ -21,6 +26,19 @@ export default function OrdensServicoListPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+
+  const { hidratado, restaurado, dispensar, esquecer, aoSair } = useRecorteDeTela({
+    chave: 'pmo_ordens_servico_filtros',
+    padrao: RECORTE_PADRAO,
+    valores: { search, statusFilter },
+    aplicar: r => { setSearch(r.search); setStatusFilter(r.statusFilter) },
+    rotulos: RECORTE_ROTULOS,
+    carregando: loading,
+  })
+
+  function limparFiltros() {
+    setSearch(''); setStatusFilter(''); esquecer()
+  }
 
   async function load() {
     setLoading(true)
@@ -33,7 +51,7 @@ export default function OrdensServicoListPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [search, statusFilter]) // eslint-disable-line react-hooks/set-state-in-effect,react-hooks/exhaustive-deps
+  useEffect(() => { if (hidratado) load() }, [hidratado, search, statusFilter]) // eslint-disable-line react-hooks/set-state-in-effect,react-hooks/exhaustive-deps
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -47,6 +65,8 @@ export default function OrdensServicoListPage() {
           <Plus size={14} /> Nova OS
         </button>
       </div>
+
+      <AvisoRecorte descricao={restaurado} onVerTodos={limparFiltros} onManter={dispensar} />
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
@@ -94,7 +114,7 @@ export default function OrdensServicoListPage() {
           {ordens.map(os => {
             const statusRec = OS_STATUS_RECORDS[os.status]
             return (
-              <div key={os.id} onClick={() => router.push(`/pmo-dashboard/ordens-servico/detalhe?id=${os.id}`)}
+              <div key={os.id} onClick={() => { aoSair(); router.push(`/pmo-dashboard/ordens-servico/detalhe?id=${os.id}`) }}
                 style={{
                   display: 'grid', gridTemplateColumns: '80px 1fr 2fr 120px 130px 120px 100px 80px',
                   gap: 8, padding: '12px 16px', background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',

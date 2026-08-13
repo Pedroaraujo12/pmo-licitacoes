@@ -11,6 +11,8 @@ import { useToast } from '@/components/ui/toast'
 import { cleanNum, formatDate, getAging, formatBRL, exportCSV, fetchAllSeiLinks, formatDateInputBR, parseDateBR } from '@/lib/utils'
 import { PT_BR } from '@/lib/pt-br'
 import { useDebounce } from '@/hooks/useDebounce'
+import { useRecorteDeTela } from '@/hooks/useRecorteDeTela'
+import { AvisoRecorte } from '@/components/ui/aviso-recorte'
 import type { Processo, Modalidade, Responsavel } from '@/types/database'
 
 interface Props {
@@ -21,6 +23,33 @@ interface Props {
   userRole?: string | null
   onDataChange?: () => void
 }
+
+const RECORTE_PADRAO = {
+  search: '',
+  statusFilter: '',
+  coordenacaoFilter: '',
+  modalidadeFilter: '',
+  responsavelFilter: '',
+  prioridadeFilter: '',
+  dateStart: '',
+  dateEnd: '',
+  atrasadosFilter: false,
+  sortField: 'data_entrada',
+  sortDir: 'desc',
+  page: 1,
+  viewMode: 'table',
+}
+
+const RECORTE_ROTULOS = {
+  search: 'busca',
+  prioridadeFilter: 'prioridade',
+  dateStart: 'a partir de',
+  dateEnd: 'até',
+  atrasadosFilter: 'somente atrasados',
+}
+
+/** Ordenação, página e modo de exibição não mudam o conjunto: não são recorte. */
+const RECORTE_IGNORAR = ['sortField', 'sortDir', 'page', 'viewMode']
 
 export default function GestaoProcessos({ processos, setProcessos, responsaveis, userRole, onDataChange }: Props) {
   const router = useRouter()
@@ -47,6 +76,53 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
   const [page, setPage] = useState(1)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const pageSize = 20
+
+  // O link "processos atrasados" do painel é uma intenção explícita e vence o
+  // recorte guardado; nesse caso não restauramos nada.
+  const veioDeLinkDeAtrasados = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('atrasados') === '1'
+
+  const { restaurado, dispensar, esquecer, aoSair } = useRecorteDeTela({
+    chave: 'pmo_processos_filtros',
+    padrao: RECORTE_PADRAO,
+    valores: {
+      search, statusFilter, coordenacaoFilter, modalidadeFilter, responsavelFilter,
+      prioridadeFilter, dateStart, dateEnd, atrasadosFilter, sortField, sortDir,
+      page, viewMode,
+    },
+    aplicar: r => {
+      setSearch(r.search)
+      setStatusFilter(r.statusFilter)
+      setCoordenacaoFilter(r.coordenacaoFilter)
+      setModalidadeFilter(r.modalidadeFilter)
+      setResponsavelFilter(r.responsavelFilter)
+      setPrioridadeFilter(r.prioridadeFilter)
+      setDateStart(r.dateStart)
+      setDateEnd(r.dateEnd)
+      setAtrasadosFilter(r.atrasadosFilter)
+      setSortField(r.sortField)
+      setSortDir(r.sortDir === 'asc' ? 'asc' : 'desc')
+      setPage(r.page)
+      setViewMode(r.viewMode === 'cards' ? 'cards' : 'table')
+    },
+    rotulos: RECORTE_ROTULOS,
+    ignorar: RECORTE_IGNORAR,
+    ignorarRestauracao: veioDeLinkDeAtrasados,
+  })
+
+  function limparFiltros() {
+    setSearch('')
+    setStatusFilter('')
+    setCoordenacaoFilter('')
+    setModalidadeFilter('')
+    setPrioridadeFilter('')
+    setResponsavelFilter('')
+    setDateStart('')
+    setDateEnd('')
+    setAtrasadosFilter(false)
+    setPage(1)
+    esquecer()
+  }
 
   const [showRespModal, setShowRespModal] = useState(false)
   const [respList, setRespList] = useState<Responsavel[]>(responsaveis)
@@ -375,7 +451,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
             </button>
           )}
           <button
-            onClick={() => { setSearch(''); setStatusFilter(''); setCoordenacaoFilter(''); setModalidadeFilter(''); setPrioridadeFilter(''); setResponsavelFilter(''); setDateStart(''); setDateEnd(''); setPage(1) }}
+            onClick={limparFiltros}
             className="bg-slate-800/50 text-slate-300 px-3 py-2 rounded-xl text-[10px] font-bold border border-slate-700 hover:bg-slate-700/50 transition cursor-pointer border-none"
           >
             Resetar
@@ -391,6 +467,8 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
           )}
         </div>
       </header>
+
+      <AvisoRecorte descricao={restaurado} onVerTodos={limparFiltros} onManter={dispensar} />
 
       {/* Filter Bar */}
       <div className="filter-bar">
@@ -471,18 +549,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
           const hasAnyFilter = search || statusFilter || coordenacaoFilter || modalidadeFilter || prioridadeFilter || responsavelFilter || dateStart || dateEnd || atrasadosFilter
           if (!hasAnyFilter) return null
           return (
-            <button onClick={() => {
-              setSearch('')
-              setStatusFilter('')
-              setCoordenacaoFilter('')
-              setModalidadeFilter('')
-              setPrioridadeFilter('')
-              setResponsavelFilter('')
-              setDateStart('')
-              setDateEnd('')
-              setAtrasadosFilter(false)
-              setPage(1)
-            }} style={{
+            <button onClick={limparFiltros} style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
               background: 'rgba(100,116,139,0.15)', color: '#94a3b8',
@@ -583,7 +650,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
                       <td className="px-3 py-3 text-center text-slate-600 font-bold">{(page - 1) * pageSize + idx + 1}</td>
                       <td className="px-3 py-3">
                         <div className="font-bold text-blue-400 truncate" style={{ cursor: 'pointer' }}
-                          onClick={() => router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`)}
+                          onClick={() => { aoSair(); router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`) }}
                         ><a href={seiLinks[p.id] || '#'} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: seiLinks[p.id] ? 'underline' : 'none' }}>{p.id_processo || '-'}</a></div>
                       </td>
                       <td className="px-3 py-3">
@@ -661,7 +728,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
                       <td className="px-3 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
-                            onClick={() => router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`)}
+                            onClick={() => { aoSair(); router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`) }}
                             className="p-1.5 rounded-md text-blue-400 hover:bg-blue-500/20 transition cursor-pointer border-none bg-transparent"
                             title="Ver detalhes"
                             aria-label="Ver detalhes do processo"
@@ -744,7 +811,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
             return (
               <div
                 key={p.id}
-                onClick={() => router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`)}
+                onClick={() => { aoSair(); router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`) }}
                 style={{
                   background: 'rgba(30,41,59,0.7)',
                   border: '1px solid rgba(255,255,255,0.1)',

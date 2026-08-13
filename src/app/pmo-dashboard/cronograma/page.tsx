@@ -15,10 +15,8 @@ import {
 import { listModalidadesComModelo, listEtapasDeModelos, type EtapaModelo } from '@/lib/simulador-cronograma'
 import { aplicarRitoDaModalidade } from '@/lib/aplicar-rito'
 import { sincronizarTextosDoRito, TEXTOS_PREGAO } from '@/lib/rito-textos'
-import {
-  lerFiltros, gravarFiltros, esquecerFiltros, temRecorte, descreverRecorte,
-  FILTROS_PADRAO, type FiltrosCronograma,
-} from '@/lib/filtros-cronograma'
+import { useRecorteDeTela } from '@/hooks/useRecorteDeTela'
+import { AvisoRecorte } from '@/components/ui/aviso-recorte'
 
 import {
   CheckCircle2, Clock, Circle, ArrowRight, Search,
@@ -36,6 +34,24 @@ function statusBadge(pa: string) {
     case 'em_andamento': return { label: 'Em Andamento', color: '#2563eb', icon: Clock }
     default: return { label: 'Não Iniciado', color: '#64748b', icon: Circle }
   }
+}
+
+const RECORTE_PADRAO = {
+  search: '',
+  apenasAndamento: true,
+  modalidadeFiltro: null as string | null,
+  coordenacaoFiltro: null as string | null,
+  responsavelFiltro: null as string | null,
+  prioridadeFiltro: null as string | null,
+  etapaFiltro: null as string | null,
+  page: 1,
+}
+
+const RECORTE_ROTULOS = {
+  search: 'busca',
+  prioridadeFiltro: 'prioridade',
+  apenasAndamento: 'todos os status',
+  etapaFiltro: 'etapa',
 }
 
 export default function CronogramaPage() {
@@ -66,50 +82,30 @@ export default function CronogramaPage() {
   const [diagnostico, setDiagnostico] = useState('')
   const [verificando, setVerificando] = useState(false)
   const [recarregar, setRecarregar] = useState(0)
+
   // A tela só consulta o banco depois de restaurar o recorte da visita
   // anterior; sem isso a primeira carga viria sem filtro e piscaria.
-  const [hidratado, setHidratado] = useState(false)
-  const [recorteRestaurado, setRecorteRestaurado] = useState('')
-  const scrollPendente = useRef(0)
-
-  // Restaura o recorte da última visita nesta aba. Roda uma vez, na montagem.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    const f = lerFiltros()
-    setSearch(f.search)
-    setApenasAndamento(f.apenasAndamento)
-    setModalidadeFiltro(f.modalidadeFiltro)
-    setCoordenacaoFiltro(f.coordenacaoFiltro)
-    setResponsavelFiltro(f.responsavelFiltro)
-    setPrioridadeFiltro(f.prioridadeFiltro)
-    setEtapaFiltro(f.etapaFiltro)
-    setPage(f.page)
-    scrollPendente.current = f.scrollY
-    if (temRecorte(f)) setRecorteRestaurado(descreverRecorte(f))
-    setHidratado(true)
-  }, [])
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  // Grava o recorte a cada mudança, para a próxima montagem encontrá-lo.
-  useEffect(() => {
-    if (!hidratado) return
-    const atual: FiltrosCronograma = {
+  const { hidratado, restaurado, dispensar, esquecer, aoSair } = useRecorteDeTela({
+    chave: 'pmo_cronograma_filtros',
+    padrao: RECORTE_PADRAO,
+    valores: {
       search, apenasAndamento, modalidadeFiltro, coordenacaoFiltro,
       responsavelFiltro, prioridadeFiltro, etapaFiltro, page,
-      scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
-    }
-    gravarFiltros(atual)
-  }, [hidratado, search, apenasAndamento, modalidadeFiltro, coordenacaoFiltro,
-      responsavelFiltro, prioridadeFiltro, etapaFiltro, page])
-
-  // A posição da lista só existe depois que os dados chegam.
-  useEffect(() => {
-    if (!hidratado || loading || scrollPendente.current <= 0) return
-    const alvo = scrollPendente.current
-    scrollPendente.current = 0
-    const id = requestAnimationFrame(() => window.scrollTo({ top: alvo, behavior: 'auto' }))
-    return () => cancelAnimationFrame(id)
-  }, [hidratado, loading])
+    },
+    aplicar: r => {
+      setSearch(r.search)
+      setApenasAndamento(r.apenasAndamento)
+      setModalidadeFiltro(r.modalidadeFiltro)
+      setCoordenacaoFiltro(r.coordenacaoFiltro)
+      setResponsavelFiltro(r.responsavelFiltro)
+      setPrioridadeFiltro(r.prioridadeFiltro)
+      setEtapaFiltro(r.etapaFiltro)
+      setPage(r.page)
+    },
+    rotulos: RECORTE_ROTULOS,
+    ignorar: ['page'],
+    carregando: loading,
+  })
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -488,15 +484,14 @@ export default function CronogramaPage() {
     setModalidadeFiltro(null); setCoordenacaoFiltro(null)
     setResponsavelFiltro(null); setPrioridadeFiltro(null)
     setEtapaFiltro(null); setPage(1)
-    setRecorteRestaurado('')
-    esquecerFiltros()
+    esquecer()
   }
 
   /** Volta a tela ao estado de quem abre pela primeira vez. */
   function limparTudo() {
     limparFiltros()
     setSearch('')
-    setApenasAndamento(FILTROS_PADRAO.apenasAndamento)
+    setApenasAndamento(RECORTE_PADRAO.apenasAndamento)
   }
 
   const temFiltro = !!(modalidadeFiltro || coordenacaoFiltro || responsavelFiltro || prioridadeFiltro || etapaFiltro)
@@ -603,38 +598,7 @@ export default function CronogramaPage() {
         ))}
       </div>
 
-      {recorteRestaurado && (
-        <div style={{
-          marginBottom: 14, padding: '8px 12px', borderRadius: 8,
-          background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)',
-          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10,
-          fontSize: 12, color: '#cbd5e1',
-        }}>
-          <span>Filtros da sua última visita: <strong style={{ color: '#e2e8f0' }}>{recorteRestaurado}</strong></span>
-          <button
-            type="button"
-            onClick={limparTudo}
-            style={{
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 999,
-              cursor: 'pointer', background: 'transparent', color: '#38bdf8',
-              border: '1px solid rgba(56,189,248,0.4)',
-            }}
-          >
-            Ver todos
-          </button>
-          <button
-            type="button"
-            onClick={() => setRecorteRestaurado('')}
-            style={{
-              padding: '4px 10px', fontSize: 11, borderRadius: 999, marginLeft: 'auto',
-              cursor: 'pointer', background: 'transparent', color: '#94a3b8',
-              border: '1px solid rgba(255,255,255,0.15)',
-            }}
-          >
-            Manter
-          </button>
-        </div>
-      )}
+      <AvisoRecorte descricao={restaurado} onVerTodos={limparTudo} onManter={dispensar} />
 
       {temFiltro && (
         <div style={{ marginBottom: 14 }}>
@@ -923,14 +887,7 @@ export default function CronogramaPage() {
               <div
                 key={p.id}
                 onClick={() => {
-                  // Grava a posição no clique: o efeito de gravação não roda
-                  // durante a rolagem, então sem isto o scrollY salvo é o de
-                  // quando o último filtro mudou, não o de onde a pessoa está.
-                  gravarFiltros({
-                    search, apenasAndamento, modalidadeFiltro, coordenacaoFiltro,
-                    responsavelFiltro, prioridadeFiltro, etapaFiltro, page,
-                    scrollY: window.scrollY,
-                  })
+                  aoSair()
                   router.push(`/pmo-dashboard/processos/detalhe?id=${p.id}`)
                 }}
                 style={{
