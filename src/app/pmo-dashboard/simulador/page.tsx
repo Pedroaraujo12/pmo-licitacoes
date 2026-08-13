@@ -17,7 +17,6 @@ import {
 } from '@/lib/simulador-cronograma'
 import { CalendarClock, Download, AlertTriangle } from 'lucide-react'
 
-const ORDEM_FASES = ['Planejamento', 'Produção', 'Análise', 'Revisão', 'Execução', 'Aprovação']
 
 function hojeISO(): string {
   const d = new Date()
@@ -433,97 +432,95 @@ export default function SimuladorPage() {
         </button>
       </div>
 
-      {ORDEM_FASES.map(fase => {
-        const doGrupo = projecao?.etapas.filter(e => e.fase === fase) ?? []
-        if (doGrupo.length === 0) return null
+      {/* Etapas na ordem do rito. Agrupar por fase embaralhava a leitura: as
+          fases se intercalam — no Pregão a 4 é Revisão, a 5 volta a Produção
+          e a 6 é Análise. A fase vira cabeçalho onde muda. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {(projecao?.etapas ?? []).map((etapa, indice, todas) => {
+          const cor = getAtividadeBadgeColor(etapa.fase)
+          const mudouDeFase = indice === 0 || todas[indice - 1].fase !== etapa.fase
+          const daFase = todas.filter(e => e.fase === etapa.fase && !e.cumprida)
+          const soma = daFase.reduce((acc, e) => acc + e.duracao_dias_uteis, 0)
 
-        const pendentes = doGrupo.filter(e => !e.cumprida)
-        const soma = pendentes.reduce((acc, e) => acc + e.duracao_dias_uteis, 0)
-        const cor = getAtividadeBadgeColor(fase)
-
-        return (
-          <div key={fase} style={{ marginBottom: 20 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'baseline',
-                gap: 10,
-                marginBottom: 8,
-                paddingBottom: 6,
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-              }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 700, color: cor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {getFaseAgrupada(fase)}
-              </span>
-              <span style={{ fontSize: 11, color: '#64748b' }}>
-                {pendentes.length > 0
-                  ? `${pendentes.length} ${pendentes.length === 1 ? 'etapa' : 'etapas'} · ${soma} ${soma === 1 ? 'dia útil' : 'dias úteis'}`
-                  : 'concluída'}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {doGrupo.map(etapa => (
+          return (
+            <div key={`${etapa.ordem}-${etapa.descricao}`}>
+              {mudouDeFase && (
                 <div
-                  key={etapa.ordem}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 14px',
-                    background: etapa.cumprida ? 'transparent' : 'rgba(30,41,59,0.4)',
-                    borderRadius: 10,
-                    borderLeft: `3px solid ${etapa.cumprida ? '#475569' : cor}`,
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    opacity: etapa.cumprida ? 0.5 : 1,
-                    flexWrap: isMobile ? 'wrap' : 'nowrap',
+                    display: 'flex', alignItems: 'baseline', gap: 10,
+                    margin: indice === 0 ? '0 0 8px' : '16px 0 8px',
+                    paddingBottom: 6,
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', minWidth: 20 }}>
-                    #{etapa.ordem}
+                  <span style={{ fontSize: 12, fontWeight: 700, color: cor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {getFaseAgrupada(etapa.fase)}
                   </span>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: etapa.cumprida ? '#64748b' : '#e2e8f0',
-                        textDecoration: etapa.cumprida ? 'line-through' : 'none',
-                      }}
-                    >
-                      {etapa.descricao}
-                      {etapa.duracao_dias_uteis === 0 && !etapa.cumprida && (
-                        <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', border: '1px solid #f59e0b', borderRadius: 4, padding: '1px 5px', marginLeft: 7, textTransform: 'uppercase' }}>
-                          marco
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginTop: 2 }}>
-                      {etapa.setor}
-                    </div>
-                  </div>
-
-                  <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                    {etapa.cumprida
-                      ? '—'
-                      : etapa.duracao_dias_uteis > 0
-                        ? `${etapa.duracao_dias_uteis}d úteis`
-                        : 'marco'}
-                  </span>
-
-                  <span style={{ fontSize: 12, color: etapa.cumprida ? '#64748b' : '#f1f5f9', whiteSpace: 'nowrap' }}>
-                    {etapa.cumprida
-                      ? 'já cumprida'
-                      : `${formatDateBR(etapa.data_inicio)} → ${formatDateBR(etapa.data_fim)}`}
+                  <span style={{ fontSize: 11, color: '#64748b' }}>
+                    {daFase.length > 0
+                      ? `${daFase.length} ${daFase.length === 1 ? 'etapa' : 'etapas'} · ${soma} ${soma === 1 ? 'dia útil' : 'dias úteis'}`
+                      : 'concluída'}
                   </span>
                 </div>
-              ))}
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 14px',
+                  background: etapa.cumprida ? 'transparent' : 'rgba(30,41,59,0.4)',
+                  borderRadius: 10,
+                  borderLeft: `3px solid ${etapa.cumprida ? '#475569' : cor}`,
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  opacity: etapa.cumprida ? 0.5 : 1,
+                  flexWrap: isMobile ? 'wrap' : 'nowrap',
+                }}
+              >
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', minWidth: 20 }}>
+                  #{etapa.ordem}
+                </span>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: etapa.cumprida ? '#64748b' : '#e2e8f0',
+                      textDecoration: etapa.cumprida ? 'line-through' : 'none',
+                    }}
+                  >
+                    {etapa.descricao}
+                    {etapa.duracao_dias_uteis === 0 && !etapa.cumprida && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', border: '1px solid #f59e0b', borderRadius: 4, padding: '1px 5px', marginLeft: 7, textTransform: 'uppercase' }}>
+                        marco
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginTop: 2 }}>
+                    {etapa.setor}
+                  </div>
+                </div>
+
+                <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                  {etapa.cumprida
+                    ? '—'
+                    : etapa.duracao_dias_uteis > 0
+                      ? `${etapa.duracao_dias_uteis}d úteis`
+                      : 'marco'}
+                </span>
+
+                <span style={{ fontSize: 12, color: etapa.cumprida ? '#64748b' : '#f1f5f9', whiteSpace: 'nowrap' }}>
+                  {etapa.cumprida
+                    ? 'já cumprida'
+                    : `${formatDateBR(etapa.data_inicio)} → ${formatDateBR(etapa.data_fim)}`}
+                </span>
+              </div>
             </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
 
       <p style={{ fontSize: 11, color: '#64748b', marginTop: 24, maxWidth: 720, lineHeight: 1.6 }}>
         A contagem é em dias úteis, descontando feriados cadastrados. Uma etapa de 1 dia
