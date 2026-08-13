@@ -354,6 +354,45 @@ export async function listUnidades(supabase: SupabaseClient) {
   return [...new Set((data || []).map(r => r.unidade).filter(Boolean))] as string[]
 }
 
+export interface ContagemUnidade {
+  unidade: string
+  total: number
+}
+
+/**
+ * Quantos colaboradores há em cada unidade, da maior para a menor.
+ *
+ * Conta sobre a base inteira, não sobre a página exibida — contar só o que
+ * está na tela daria um número menor e enganoso. Traz apenas a coluna
+ * `unidade`, então o custo é baixo mesmo com centenas de registros.
+ *
+ * `situacao` permite contar só os ativos, por exemplo; sem ele, conta todos.
+ */
+export async function contarPorUnidade(
+  supabase: SupabaseClient,
+  filtros?: { situacao?: string; cargo?: string },
+): Promise<ContagemUnidade[]> {
+  let query = supabase.from('colaboradores').select('unidade').limit(5000)
+
+  if (filtros?.situacao) query = query.eq('situacao', filtros.situacao)
+  if (filtros?.cargo) query = query.eq('cargo', filtros.cargo)
+
+  const { data, error } = await query
+  if (error || !data) return []
+
+  const mapa = new Map<string, number>()
+  for (const linha of data) {
+    // Sem unidade preenchida vira rótulo próprio: some da contagem seria pior,
+    // porque a soma deixaria de bater com o total de colaboradores.
+    const unidade = ((linha as { unidade: string | null }).unidade || '').trim() || 'Sem unidade'
+    mapa.set(unidade, (mapa.get(unidade) ?? 0) + 1)
+  }
+
+  return [...mapa.entries()]
+    .map(([unidade, total]) => ({ unidade, total }))
+    .sort((a, b) => b.total - a.total || a.unidade.localeCompare(b.unidade, 'pt-BR'))
+}
+
 export async function listCargos(supabase: SupabaseClient) {
   const { data } = await supabase
     .from('colaboradores')

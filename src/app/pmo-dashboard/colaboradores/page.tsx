@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
   listFavoritos, toggleFavorito, listUnidades, listCargos, getMetricas,
+  contarPorUnidade, type ContagemUnidade,
 } from '@/lib/colaboradores'
 import type { Colaborador } from '@/types/colaboradores'
 import {
@@ -27,6 +28,7 @@ export default function ColaboradoresListPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([])
   const [favoritoIds, setFavoritoIds] = useState<Set<string>>(new Set())
   const [unidades, setUnidades] = useState<string[]>([])
+  const [porUnidade, setPorUnidade] = useState<ContagemUnidade[]>([])
   const [cargos, setCargos] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 300)
@@ -122,6 +124,24 @@ export default function ColaboradoresListPage() {
   const canEdit = profile?.role && ['admin', 'gestor'].includes(profile.role)
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
 
+  // Total por unidade sobre a base inteira, acompanhando os demais filtros
+  // (menos o de unidade, para os números das outras continuarem visíveis).
+  useEffect(() => {
+    let cancelado = false
+
+    async function carregar() {
+      const supabase = createClient()
+      const contagem = await contarPorUnidade(supabase, {
+        situacao: filtroSituacao || undefined,
+        cargo: filtroCargo || undefined,
+      })
+      if (!cancelado) setPorUnidade(contagem)
+    }
+
+    carregar()
+    return () => { cancelado = true }
+  }, [filtroSituacao, filtroCargo])
+
   const baseInput: React.CSSProperties = {
     padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
     fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none',
@@ -182,6 +202,50 @@ export default function ColaboradoresListPage() {
           {totalCount} registros
         </span>
       </div>
+
+      {/* Total por unidade — clique para filtrar */}
+      {porUnidade.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
+          }}>
+            Colaboradores por unidade
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {porUnidade.map(u => {
+              const ativo = filtroUnidade === u.unidade
+              return (
+                <button
+                  key={u.unidade}
+                  type="button"
+                  onClick={() => { setFiltroUnidade(ativo ? '' : u.unidade); setPage(1) }}
+                  title={`${u.unidade} — ${u.total} colaborador(es)`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '6px 12px', fontSize: 12, fontWeight: 600,
+                    borderRadius: 999, cursor: 'pointer',
+                    maxWidth: 320, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    background: ativo ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.6)',
+                    color: '#e2e8f0',
+                    border: `1px solid ${ativo ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.unidade}</span>
+                  <span style={{
+                    fontWeight: 700, fontSize: 12,
+                    background: 'rgba(15,23,42,0.6)', borderRadius: 999,
+                    padding: '1px 8px', color: ativo ? '#38bdf8' : '#94a3b8',
+                  }}>
+                    {u.total}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Lista */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
