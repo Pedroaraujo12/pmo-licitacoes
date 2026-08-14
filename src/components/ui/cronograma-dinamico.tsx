@@ -7,6 +7,7 @@ import { formatDate } from '@/lib/utils'
 import {
   computeCronogramaStatus, getAtividadeIcon, getAtividadeBadgeColor,
   getFaseAgrupada,
+  resumirFases,
 } from '@/lib/cronograma-engine'
 import { listEtapasPorModalidade, type EtapaModelo } from '@/lib/simulador-cronograma'
 import { aplicarRitoDaModalidade, ritoDivergente } from '@/lib/aplicar-rito'
@@ -50,6 +51,7 @@ export default function CronogramaDinamico({
 
   const status = computeCronogramaStatus(atividades)
   const ordenadas = [...atividades].sort((a, b) => a.ordem - b.ordem)
+  const resumoFases = resumirFases(ordenadas.map(a => ({ fase: a.fase, dias: a.dias_uteis })))
 
   useEffect(() => {
     let cancelado = false
@@ -598,26 +600,40 @@ export default function CronogramaDinamico({
         <span>🔸 Data ajustada</span>
       </div>
 
-      {/* Etapas na ordem do rito */}
+      {/* Composição por fase. Fora da sequência o total é honesto: soma a fase
+          inteira, que no rito não ocupa um trecho contínuo. */}
+      {resumoFases.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          {resumoFases.map(f => (
+            <div
+              key={f.fase}
+              style={{
+                display: 'flex', alignItems: 'baseline', gap: 8,
+                padding: '5px 11px', borderRadius: 999,
+                background: 'rgba(30,41,59,0.5)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderLeft: `3px solid ${f.cor}`,
+              }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 700, color: f.cor }}>{f.rotulo}</span>
+              <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                {f.etapas} {f.etapas === 1 ? 'etapa' : 'etapas'} · {f.dias} {f.dias === 1 ? 'dia útil' : 'dias úteis'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Etapas na ordem do rito, sem cabeçalhos de fase: as fases se
+          intercalam e usá-las como seções quebrava a leitura da sequência. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
-        {sequencia.map((a, indice) => {
+        {sequencia.map(a => {
           const vi = getAtividadeIcon(a.status, a.data_fim)
           const isOverridden = !!(a.observacao && a.observacao.includes('override'))
           const dataImpactada = a.data_inicio_real && a.status !== 'concluido'
-          const mudouDeFase = indice === 0 || sequencia[indice - 1].fase !== a.fase
 
           return (
             <div key={a.id}>
-              {mudouDeFase && (
-                <div style={{
-                  fontSize: 12, fontWeight: 700, color: getAtividadeBadgeColor(a.fase),
-                  textTransform: 'uppercase', letterSpacing: '0.05em',
-                  margin: indice === 0 ? '0 0 8px' : '14px 0 8px',
-                }}>
-                  {getFaseAgrupada(a.fase)}
-                </div>
-              )}
-
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
                 background: a.status === 'concluido' ? 'rgba(34,197,94,0.06)'
@@ -643,7 +659,15 @@ export default function CronogramaDinamico({
                     {a.descricao}
                     {isOverridden && <span style={{ color: '#f59e0b', fontSize: 10, marginLeft: 4 }}>✏️</span>}
                   </div>
-                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b', marginTop: 2, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b', marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, color: getAtividadeBadgeColor(a.fase),
+                      textTransform: 'uppercase', letterSpacing: '0.04em',
+                      border: `1px solid ${getAtividadeBadgeColor(a.fase)}`,
+                      borderRadius: 4, padding: '1px 5px',
+                    }}>
+                      {getFaseAgrupada(a.fase)}
+                    </span>
                     <span>{a.setor}</span>
                     {a.dias_uteis !== null && a.dias_uteis !== undefined && (
                       <span>{a.dias_uteis > 0 ? `${a.dias_uteis}d úteis` : 'Marco'}</span>

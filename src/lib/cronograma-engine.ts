@@ -133,6 +133,48 @@ export function recalcCascata(
   return updated
 }
 
+export interface ResumoFase {
+  fase: string
+  rotulo: string
+  cor: string
+  etapas: number
+  dias: number
+}
+
+/**
+ * Quantas etapas e quantos dias úteis cada fase representa no rito inteiro.
+ *
+ * As fases não são blocos contíguos: no Pregão a Produção aparece nas etapas
+ * 2-3, some na 4 (Revisão), volta na 5, some na 6 (Análise) e volta nas 7-8.
+ * Enquanto isso era um cabeçalho no meio da lista, o número ao lado do título
+ * contava a fase toda e não o trecho abaixo dele — "Produção · 5 etapas · 20
+ * dias úteis" com duas etapas embaixo. O total só é honesto fora da sequência.
+ *
+ * A ordem devolvida é a da primeira aparição de cada fase.
+ */
+export function resumirFases(
+  etapas: Array<{ fase?: string | null; dias?: number | null }>,
+): ResumoFase[] {
+  const porFase = new Map<string, ResumoFase>()
+
+  for (const e of etapas ?? []) {
+    const fase = (e.fase || '').trim()
+    if (!fase) continue
+    const atual = porFase.get(fase) ?? {
+      fase,
+      rotulo: getFaseAgrupada(fase),
+      cor: getAtividadeBadgeColor(fase),
+      etapas: 0,
+      dias: 0,
+    }
+    atual.etapas += 1
+    atual.dias += typeof e.dias === 'number' && Number.isFinite(e.dias) ? e.dias : 0
+    porFase.set(fase, atual)
+  }
+
+  return [...porFase.values()]
+}
+
 export function getFaseAgrupada(fase: string): string {
   const mapa: Record<string, string> = {
     'Planejamento': '📋 Planejamento',

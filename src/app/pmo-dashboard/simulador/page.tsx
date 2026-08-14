@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatDateBR, exportCSV } from '@/lib/utils'
-import { getAtividadeBadgeColor, getFaseAgrupada } from '@/lib/cronograma-engine'
+import { getAtividadeBadgeColor, getFaseAgrupada, resumirFases } from '@/lib/cronograma-engine'
 import {
   listModalidadesComModelo,
   listEtapasDeModelos,
@@ -107,6 +107,18 @@ export default function SimuladorPage() {
     if (etapasAtuais.length === 0) return null
     return projetarCronograma(etapasAtuais, dataInicio, feriados, aPartirDe)
   }, [etapasAtuais, dataInicio, feriados, aPartirDe])
+
+  // Resume só o que ainda será executado: partindo da etapa 10, as nove
+  // anteriores não entram no prazo que a projeção está calculando.
+  const etapasPendentes = useMemo(
+    () => (projecao?.etapas ?? []).filter(e => !e.cumprida),
+    [projecao],
+  )
+  const etapasCumpridas = (projecao?.etapas?.length ?? 0) - etapasPendentes.length
+  const resumoFases = useMemo(
+    () => resumirFases(etapasPendentes.map(e => ({ fase: e.fase, dias: e.duracao_dias_uteis }))),
+    [etapasPendentes],
+  )
 
   const comparativo = useMemo(() => {
     return modalidades.map(m => {
@@ -432,38 +444,45 @@ export default function SimuladorPage() {
         </button>
       </div>
 
-      {/* Etapas na ordem do rito. Agrupar por fase embaralhava a leitura: as
-          fases se intercalam — no Pregão a 4 é Revisão, a 5 volta a Produção
-          e a 6 é Análise. A fase vira cabeçalho onde muda. */}
+      {/* Composição por fase. Aqui o total é honesto: soma a fase inteira e não
+          finge que ela ocupa um trecho contínuo da sequência. */}
+      {resumoFases.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+            Composição do prazo{etapasCumpridas > 0 ? ' — etapas ainda por cumprir' : ''}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {resumoFases.map(f => (
+              <div
+                key={f.fase}
+                style={{
+                  display: 'flex', alignItems: 'baseline', gap: 8,
+                  padding: '6px 12px', borderRadius: 999,
+                  background: 'rgba(30,41,59,0.5)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderLeft: `3px solid ${f.cor}`,
+                }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 700, color: f.cor }}>{f.rotulo}</span>
+                <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                  {f.etapas} {f.etapas === 1 ? 'etapa' : 'etapas'} · {f.dias} {f.dias === 1 ? 'dia útil' : 'dias úteis'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Etapas na ordem do rito, sem cabeçalhos de fase. As fases se
+          intercalam — no Pregão a 4 é Revisão, a 5 volta a Produção —, então
+          usá-las como seções quebrava a sequência que a pessoa está lendo.
+          A fase acompanha cada etapa, como atributo dela. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {(projecao?.etapas ?? []).map((etapa, indice, todas) => {
+        {(projecao?.etapas ?? []).map((etapa) => {
           const cor = getAtividadeBadgeColor(etapa.fase)
-          const mudouDeFase = indice === 0 || todas[indice - 1].fase !== etapa.fase
-          const daFase = todas.filter(e => e.fase === etapa.fase && !e.cumprida)
-          const soma = daFase.reduce((acc, e) => acc + e.duracao_dias_uteis, 0)
 
           return (
             <div key={`${etapa.ordem}-${etapa.descricao}`}>
-              {mudouDeFase && (
-                <div
-                  style={{
-                    display: 'flex', alignItems: 'baseline', gap: 10,
-                    margin: indice === 0 ? '0 0 8px' : '16px 0 8px',
-                    paddingBottom: 6,
-                    borderBottom: '1px solid rgba(255,255,255,0.06)',
-                  }}
-                >
-                  <span style={{ fontSize: 12, fontWeight: 700, color: cor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {getFaseAgrupada(etapa.fase)}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#64748b' }}>
-                    {daFase.length > 0
-                      ? `${daFase.length} ${daFase.length === 1 ? 'etapa' : 'etapas'} · ${soma} ${soma === 1 ? 'dia útil' : 'dias úteis'}`
-                      : 'concluída'}
-                  </span>
-                </div>
-              )}
-
               <div
                 style={{
                   display: 'flex',
@@ -498,8 +517,17 @@ export default function SimuladorPage() {
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginTop: 2 }}>
-                    {etapa.setor}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, color: cor, textTransform: 'uppercase',
+                      letterSpacing: '0.04em', border: `1px solid ${cor}`, borderRadius: 4,
+                      padding: '1px 5px', opacity: etapa.cumprida ? 0.5 : 1,
+                    }}>
+                      {getFaseAgrupada(etapa.fase)}
+                    </span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                      {etapa.setor}
+                    </span>
                   </div>
                 </div>
 
