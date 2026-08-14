@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { ehRegistroDeSistema } from './registro-atividades'
 
 /**
  * Lista do Cronograma de Processos montada diretamente das tabelas.
@@ -45,6 +46,11 @@ export interface LinhaCronograma {
   dias_uteis_atraso: number
   progresso: number
   processo_atrasado: boolean
+  /** Última anotação digitada em "Registrar Atividade" — nunca a auditoria. */
+  ultimo_registro: string | null
+  ultimo_registro_observacao: string | null
+  ultimo_registro_data: string | null
+  ultimo_registro_autor: string | null
 }
 
 export interface EtapaContagem {
@@ -80,11 +86,48 @@ function nomeDaRelacao(valor: unknown): string | null {
  * Agrega as atividades por processo — mesma conta que a RPC faz no banco.
  * Exportada para teste: é aqui que mora a aritmética de progresso e atraso.
  */
+export interface RegistroRecente {
+  processo_id: string
+  atividade: string
+  observacao?: string | null
+  data?: string | null
+  responsavel?: string | null
+  created_at?: string | null
+}
+
+/**
+ * Última anotação de cada processo, considerando só o que foi digitado no
+ * formulário "Registrar Atividade".
+ *
+ * A tabela `atividades` também guarda a trilha de auditoria do cronograma; no
+ * card ela seria ruído — e pior, esconderia a última anotação real de quem
+ * acompanha o processo, já que a auditoria é gravada com muito mais frequência.
+ */
+export function ultimoRegistroPorProcesso(
+  registros: RegistroRecente[],
+): Map<string, RegistroRecente> {
+  const mapa = new Map<string, RegistroRecente>()
+
+  for (const r of registros ?? []) {
+    if (!r?.processo_id || ehRegistroDeSistema(r.atividade)) continue
+    const atual = mapa.get(r.processo_id)
+    if (!atual || quandoFoi(r) > quandoFoi(atual)) mapa.set(r.processo_id, r)
+  }
+
+  return mapa
+}
+
+/** `created_at` é o momento real; `data` é o dia informado e serve de reserva. */
+function quandoFoi(r: RegistroRecente): string {
+  return r.created_at || r.data || ''
+}
+
 export function agregarLinhas(
   processos: Record<string, unknown>[],
   atividades: AtividadeResumo[],
   hoje: string,
   feriados: Set<string> = new Set(),
+  ultimosRegistros: Map<string, RegistroRecente> = new Map(),
 ): LinhaCronograma[] {
   const porProcesso = new Map<string, AtividadeResumo[]>()
   for (const a of atividades) {
@@ -145,6 +188,10 @@ export function agregarLinhas(
       progresso: total > 0 ? Math.floor((concluidas * 100) / total) : 0,
       processo_atrasado:
         atrasadas > 0 || (!!dataEntrega && dataEntrega < hoje && concluidas < total),
+      ultimo_registro: ultimosRegistros.get(id)?.atividade ?? null,
+      ultimo_registro_observacao: ultimosRegistros.get(id)?.observacao ?? null,
+      ultimo_registro_data: ultimosRegistros.get(id)?.data ?? null,
+      ultimo_registro_autor: ultimosRegistros.get(id)?.responsavel ?? null,
     }
   })
 }
@@ -409,19 +456,36 @@ export async function listarCronograma(
   const lista = (processos ?? []) as Record<string, unknown>[]
   if (lista.length === 0) return { linhas: [], total: count ?? 0 }
 
-  const [{ data: atividades }, { data: feriadosData }] = await Promise.all([
+  const ids = lista.map(p => p.id as string)
+
+  const [{ data: atividades }, { data: feriadosData }, { data: registros }] = await Promise.all([
     supabase
       .from('cronograma_atividades')
       .select('processo_id, status, data_fim, fase, descricao, ordem')
-      .in('processo_id', lista.map(p => p.id as string))
+      .in('processo_id', ids)
       .limit(20000),
     supabase.from('feriados').select('data'),
+    // Ordenado do mais recente para o mais antigo: com o teto, o que fica de
+    // fora é sempre registro velho, nunca a última anotação de um processo.
+    supabase
+      .from('atividades')
+      .select('processo_id, atividade, observacao, data, responsavel, created_at')
+      .in('processo_id', ids)
+      .order('created_at', { ascending: false })
+      .limit(4000),
   ])
 
   const feriados = new Set((feriadosData ?? []).map(f => String((f as { data: string }).data)))
+  const ultimos = ultimoRegistroPorProcesso((registros ?? []) as unknown as RegistroRecente[])
 
   return {
-    linhas: agregarLinhas(lista, (atividades ?? []) as unknown as AtividadeResumo[], hojeISO(), feriados),
+    linhas: agregarLinhas(
+      lista,
+      (atividades ?? []) as unknown as AtividadeResumo[],
+      hojeISO(),
+      feriados,
+      ultimos,
+    ),
     total: count ?? lista.length,
   }
 }

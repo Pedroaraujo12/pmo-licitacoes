@@ -979,6 +979,37 @@ export default function CronogramaPage() {
                       Todas as etapas concluídas
                     </div>
                   ) : null}
+
+                  {/* Última anotação de quem acompanha o processo. Só o que foi
+                      digitado em "Registrar Atividade" — a trilha de auditoria
+                      do cronograma é gravada com muito mais frequência e
+                      esconderia justamente o registro que interessa aqui. */}
+                  {p.ultimo_registro ? (
+                    <div style={{
+                      marginTop: 8, paddingLeft: 10,
+                      borderLeft: '2px solid rgba(148,163,184,0.3)',
+                    }}>
+                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 1 }}>
+                        Último registro
+                        {p.ultimo_registro_data ? ` · ${formatDate(p.ultimo_registro_data)}` : ''}
+                        {p.ultimo_registro_autor ? ` · ${p.ultimo_registro_autor}` : ''}
+                      </div>
+                      <div style={{
+                        fontSize: 13, color: '#cbd5e1', fontWeight: 500,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {p.ultimo_registro}
+                      </div>
+                      {p.ultimo_registro_observacao ? (
+                        <div style={{
+                          fontSize: 12, color: '#94a3b8', marginTop: 1,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {p.ultimo_registro_observacao}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 {p.total_atividades > 0 && (
