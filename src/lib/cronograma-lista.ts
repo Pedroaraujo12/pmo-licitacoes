@@ -47,6 +47,7 @@ export interface LinhaCronograma {
   progresso: number
   processo_atrasado: boolean
   /** Última anotação digitada em "Registrar Atividade" — nunca a auditoria. */
+  ultimo_registro_id: string | null
   ultimo_registro: string | null
   ultimo_registro_observacao: string | null
   ultimo_registro_data: string | null
@@ -87,6 +88,7 @@ function nomeDaRelacao(valor: unknown): string | null {
  * Exportada para teste: é aqui que mora a aritmética de progresso e atraso.
  */
 export interface RegistroRecente {
+  id?: string
   processo_id: string
   atividade: string
   observacao?: string | null
@@ -188,6 +190,7 @@ export function agregarLinhas(
       progresso: total > 0 ? Math.floor((concluidas * 100) / total) : 0,
       processo_atrasado:
         atrasadas > 0 || (!!dataEntrega && dataEntrega < hoje && concluidas < total),
+      ultimo_registro_id: ultimosRegistros.get(id)?.id ?? null,
       ultimo_registro: ultimosRegistros.get(id)?.atividade ?? null,
       ultimo_registro_observacao: ultimosRegistros.get(id)?.observacao ?? null,
       ultimo_registro_data: ultimosRegistros.get(id)?.data ?? null,
@@ -469,7 +472,7 @@ export async function listarCronograma(
     // fora é sempre registro velho, nunca a última anotação de um processo.
     supabase
       .from('atividades')
-      .select('processo_id, atividade, observacao, data, responsavel, created_at')
+      .select('id, processo_id, atividade, observacao, data, responsavel, created_at')
       .in('processo_id', ids)
       .order('created_at', { ascending: false })
       .limit(4000),

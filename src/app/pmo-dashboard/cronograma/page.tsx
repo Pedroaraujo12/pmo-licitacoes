@@ -17,6 +17,7 @@ import { aplicarRitoDaModalidade } from '@/lib/aplicar-rito'
 import { sincronizarTextosDoRito, TEXTOS_PREGAO } from '@/lib/rito-textos'
 import { useRecorteDeTela } from '@/hooks/useRecorteDeTela'
 import { AvisoRecorte } from '@/components/ui/aviso-recorte'
+import { atualizarRegistro, podeEditarRegistro } from '@/lib/editar-registro'
 
 import {
   CheckCircle2, Clock, Circle, ArrowRight, Search,
@@ -82,6 +83,12 @@ export default function CronogramaPage() {
   const [diagnostico, setDiagnostico] = useState('')
   const [verificando, setVerificando] = useState(false)
   const [recarregar, setRecarregar] = useState(0)
+  const [papel, setPapel] = useState<string | null>(null)
+  const [editando, setEditando] = useState<LinhaCronograma | null>(null)
+  const [edicaoTitulo, setEdicaoTitulo] = useState('')
+  const [edicaoObs, setEdicaoObs] = useState('')
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false)
+  const [erroEdicao, setErroEdicao] = useState('')
 
   // A tela só consulta o banco depois de restaurar o recorte da visita
   // anterior; sem isso a primeira carga viria sem filtro e piscaria.
@@ -106,6 +113,59 @@ export default function CronogramaPage() {
     ignorar: ['page'],
     carregando: loading,
   })
+
+  // Papel do usuário: decide se o botão de editar aparece. A permissão real
+  // continua no banco — isto só evita oferecer um botão que iria falhar.
+  useEffect(() => {
+    let cancelado = false
+    async function carregarPapel() {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user || cancelado) return
+        const { data } = await supabase
+          .from('profiles').select('role').eq('id', user.id).maybeSingle()
+        if (!cancelado) setPapel((data as { role?: string } | null)?.role ?? null)
+      } catch {
+        // sem papel: a tela segue, apenas sem o botão de editar
+      }
+    }
+    carregarPapel()
+    return () => { cancelado = true }
+  }, [])
+
+  function abrirEdicao(linha: LinhaCronograma) {
+    setEditando(linha)
+    setEdicaoTitulo(linha.ultimo_registro ?? '')
+    setEdicaoObs(linha.ultimo_registro_observacao ?? '')
+    setErroEdicao('')
+  }
+
+  async function salvarEdicao(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editando?.ultimo_registro_id) return
+
+    setSalvandoEdicao(true)
+    setErroEdicao('')
+
+    try {
+      const supabase = createClient()
+      const salvo = await atualizarRegistro(supabase, editando.ultimo_registro_id, {
+        atividade: edicaoTitulo,
+        observacao: edicaoObs,
+      })
+
+      // Atualiza a lista sem recarregar tudo: o que mudou é conhecido.
+      setTodasLinhas(linhas => linhas.map(l => l.id === editando.id
+        ? { ...l, ultimo_registro: salvo.atividade, ultimo_registro_observacao: salvo.observacao }
+        : l))
+      setEditando(null)
+    } catch (err) {
+      setErroEdicao((err as Error)?.message || 'Não foi possível salvar a alteração.')
+    } finally {
+      setSalvandoEdicao(false)
+    }
+  }
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -989,10 +1049,30 @@ export default function CronogramaPage() {
                       marginTop: 8, paddingLeft: 10,
                       borderLeft: '2px solid rgba(148,163,184,0.3)',
                     }}>
-                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 1 }}>
-                        Último registro
-                        {p.ultimo_registro_data ? ` · ${formatDate(p.ultimo_registro_data)}` : ''}
-                        {p.ultimo_registro_autor ? ` · ${p.ultimo_registro_autor}` : ''}
+                      <div style={{
+                        fontSize: 11, color: '#64748b', marginBottom: 1,
+                        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                      }}>
+                        <span>
+                          Último registro
+                          {p.ultimo_registro_data ? ` · ${formatDate(p.ultimo_registro_data)}` : ''}
+                          {p.ultimo_registro_autor ? ` · ${p.ultimo_registro_autor}` : ''}
+                        </span>
+                        {podeEditarRegistro(papel) && p.ultimo_registro_id ? (
+                          <button
+                            type="button"
+                            // O card inteiro navega para o processo: sem isto,
+                            // clicar em "editar" abriria o processo em vez do modal.
+                            onClick={ev => { ev.stopPropagation(); abrirEdicao(p) }}
+                            style={{
+                              background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+                              color: '#94a3b8', borderRadius: 999, padding: '1px 9px',
+                              fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                            }}
+                          >
+                            editar
+                          </button>
+                        ) : null}
                       </div>
                       {/* Sem corte: o registro é o que a pessoa escreveu para
                           ser lido. Truncar aqui obrigaria a abrir o processo
@@ -1069,6 +1149,102 @@ export default function CronogramaPage() {
           >
             <ChevronRight size={16} />
           </button>
+        </div>
+      )}
+
+      {/* Edição do último registro */}
+      {editando && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.75)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16, zIndex: 60,
+          }}
+          onClick={() => { if (!salvandoEdicao) setEditando(null) }}
+        >
+          <div
+            onClick={ev => ev.stopPropagation()}
+            style={{
+              background: '#1e293b', border: '1px solid #334155', borderRadius: 14,
+              padding: 20, width: '100%', maxWidth: 520,
+            }}
+          >
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', margin: '0 0 4px' }}>
+              Editar último registro
+            </h3>
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 16px' }}>
+              {editando.id_processo || 'Processo'}
+              {editando.ultimo_registro_data ? ` · registrado em ${formatDate(editando.ultimo_registro_data)}` : ''}
+            </p>
+
+            <form onSubmit={salvarEdicao}>
+              <label style={{ display: 'block', fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>
+                Título da atividade
+              </label>
+              <input
+                value={edicaoTitulo}
+                onChange={ev => setEdicaoTitulo(ev.target.value)}
+                autoFocus
+                style={{
+                  width: '100%', padding: '8px 10px', marginBottom: 12,
+                  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+                  fontSize: 13, background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', outline: 'none',
+                }}
+              />
+
+              <label style={{ display: 'block', fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>
+                Observação
+              </label>
+              <textarea
+                value={edicaoObs}
+                onChange={ev => setEdicaoObs(ev.target.value)}
+                rows={4}
+                style={{
+                  width: '100%', padding: '8px 10px', marginBottom: 12,
+                  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+                  fontSize: 13, background: 'rgba(15,23,42,0.6)', color: '#e2e8f0',
+                  outline: 'none', resize: 'vertical',
+                }}
+              />
+
+              {erroEdicao && (
+                <div style={{
+                  fontSize: 12, color: '#fca5a5', background: 'rgba(239,68,68,0.1)',
+                  border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8,
+                  padding: '8px 10px', marginBottom: 12,
+                }}>
+                  {erroEdicao}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditando(null)}
+                  disabled={salvandoEdicao}
+                  style={{
+                    padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    background: 'transparent', color: '#94a3b8',
+                    border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={salvandoEdicao || !edicaoTitulo.trim()}
+                  style={{
+                    padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    background: salvandoEdicao || !edicaoTitulo.trim() ? '#334155' : '#2563eb',
+                    color: '#fff', border: 'none',
+                    cursor: salvandoEdicao || !edicaoTitulo.trim() ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {salvandoEdicao ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
