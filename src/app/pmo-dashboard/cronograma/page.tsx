@@ -994,16 +994,20 @@ export default function CronogramaPage() {
                         {p.ultimo_registro_data ? ` · ${formatDate(p.ultimo_registro_data)}` : ''}
                         {p.ultimo_registro_autor ? ` · ${p.ultimo_registro_autor}` : ''}
                       </div>
+                      {/* Sem corte: o registro é o que a pessoa escreveu para
+                          ser lido. Truncar aqui obrigaria a abrir o processo
+                          justamente para ler o que o card se propõe a mostrar.
+                          `overflowWrap` quebra palavra longa ou URL colada. */}
                       <div style={{
                         fontSize: 13, color: '#cbd5e1', fontWeight: 500,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
                       }}>
                         {p.ultimo_registro}
                       </div>
                       {p.ultimo_registro_observacao ? (
                         <div style={{
-                          fontSize: 12, color: '#94a3b8', marginTop: 1,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          fontSize: 12, color: '#94a3b8', marginTop: 2, lineHeight: 1.5,
+                          whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
                         }}>
                           {p.ultimo_registro_observacao}
                         </div>
