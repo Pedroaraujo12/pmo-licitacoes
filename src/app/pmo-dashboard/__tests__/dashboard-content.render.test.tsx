@@ -99,8 +99,10 @@ const CRONOGRAMA = [
 
 function tabela(nome: string) {
   if (nome === 'cronograma_atividades') {
-    const chain = { eq: vi.fn(async () => ({ data: CRONOGRAMA, error: null })) }
-    return { select: vi.fn(() => chain) }
+    // espelha a cadeia real: .select(...).eq(...).limit(...)
+    const resolvido = { data: CRONOGRAMA, error: null }
+    const comLimite = { limit: vi.fn(async () => resolvido) }
+    return { select: vi.fn(() => ({ eq: vi.fn(() => comLimite) })) }
   }
   return { select: vi.fn(async () => ({ data: [], error: null })) }
 }

@@ -77,6 +77,13 @@ const PAGE_SIZE = 12
    Acima disso a agregação no cliente precisaria virar RPC. */
 const TETO_CARREGAMENTO = 1000
 
+/* As atividades de cronograma alimentam o tempo por etapa e a data de
+   conclusão. São ~19 por processo, então a carteira atual (74 processos, 261
+   atividades concluídas) cabe folgado — mas o PostgREST corta em 1000 por
+   padrão, e um corte silencioso aqui viraria média calculada sobre parte dos
+   dados. O teto fica explícito e a tela avisa quando encostar nele. */
+const TETO_ATIVIDADES = 5000
+
 const PRIORIDADES = ['Baixa', 'Média', 'Alta', 'Urgente']
 
 export default function DashboardContent({ userRole }: { userRole?: string | null }) {
@@ -189,7 +196,8 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           supabase
             .from('cronograma_atividades')
             .select('processo_id, fase, descricao, status, data_inicio, data_fim')
-            .eq('status', 'concluido'),
+            .eq('status', 'concluido')
+            .limit(TETO_ATIVIDADES),
         ])
         if (cancelled) return
 
@@ -269,6 +277,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const totalProcessos = summary?.total_processos ?? todos.length
   const concluidos = (summary?.por_status || []).filter(s => isStatusConcluido(s.status)).reduce((s, x) => s + x.total, 0)
   const acimaDoTeto = todos.length >= TETO_CARREGAMENTO
+  const atividadesNoTeto = atividades.length >= TETO_ATIVIDADES
 
   // --- Filtros ---------------------------------------------------------------
   const filtrados = useMemo(() => {
@@ -709,6 +718,12 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
         {acimaDoTeto && (
           <p style={{ margin: '8px 0 0', fontSize: 11, color: CORES.ink3 }}>
             Exibindo os primeiros {TETO_CARREGAMENTO} processos da carteira.
+          </p>
+        )}
+        {atividadesNoTeto && (
+          <p style={{ margin: '8px 0 0', fontSize: 11, color: CORES.warning }}>
+            O tempo por etapa está calculado sobre as primeiras {TETO_ATIVIDADES} atividades
+            concluídas — a média pode não refletir a carteira inteira.
           </p>
         )}
       </section>
