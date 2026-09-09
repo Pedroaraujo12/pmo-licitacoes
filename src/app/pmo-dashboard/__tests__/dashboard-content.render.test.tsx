@@ -84,15 +84,20 @@ const SUMMARY = {
   aniversariantes_15_dias: [],
 }
 
+/* Cinco ocorrências por etapa: abaixo disso a média é anedota e a função
+   descarta, como faz com os dados reais. */
+const etapa = (descricao: string, dias: number, n = 5) =>
+  Array.from({ length: n }, () => ({
+    processo_id: 'p1', fase: 'Execução', descricao, status: 'concluido',
+    data_inicio: emDias(-60), data_fim: emDias(-60 + dias),
+  }))
+
 const CRONOGRAMA = [
-  { fase: 'Instrução', descricao: null, status: 'concluido', data_inicio: emDias(-60), data_fim: emDias(-38) },
-  { fase: 'Julgamento', descricao: null, status: 'concluido', data_inicio: emDias(-30), data_fim: emDias(-20) },
+  ...etapa('Emissão de Parecer jurídico (UJUR)', 9),
+  ...etapa('Publicação no site (UCOM)', 1),
 ]
 
 function tabela(nome: string) {
-  if (nome === 'processos') {
-    return { select: vi.fn(async () => ({ data: PROCESSOS.map(p => ({ id: p.id, data_atividade: emDias(-10) })), error: null })) }
-  }
   if (nome === 'cronograma_atividades') {
     const chain = { eq: vi.fn(async () => ({ data: CRONOGRAMA, error: null })) }
     return { select: vi.fn(() => chain) }
@@ -170,8 +175,8 @@ describe('DashboardContent', () => {
   it('o tempo por etapa sai do cronograma real, não de estimativa', async () => {
     await montar()
     const grafico = screen.getByLabelText(/Tempo médio por etapa/)
-    expect(grafico.getAttribute('aria-label')).toContain('Instrução, 22')
-    expect(grafico.getAttribute('aria-label')).toContain('Julgamento, 10')
+    expect(grafico.getAttribute('aria-label')).toContain('Emissão de Parecer jurídico (UJUR), 9')
+    expect(grafico.getAttribute('aria-label')).toContain('Publicação no site (UCOM), 1')
   })
 
   it('o atalho de busca respeita a plataforma', async () => {

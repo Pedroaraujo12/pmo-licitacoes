@@ -151,8 +151,12 @@ export function calcularEconomiaPercentual(economia: number, estimadoConcluidos:
 
 export interface ProcessoConcluido {
   status_nome: string | null
-  /** Data da última atividade registrada — a melhor aproximação de conclusão. */
-  data_atividade: string | null
+  /**
+   * Data de conclusão. Vem do fim da última atividade de cronograma concluída
+   * do processo — `processos.data_atividade` está preenchida em 2 de 24
+   * concluídos, e `updated_at` carrega o carimbo de uma importação em lote.
+   */
+  data_conclusao: string | null
 }
 
 export interface PontoMensal {
@@ -186,7 +190,7 @@ export function agruparConcluidosPorMes(
 
   for (const p of processos) {
     if (!isStatusConcluido(p.status_nome)) continue
-    const d = parseDateOnly(p.data_atividade)
+    const d = parseDateOnly(p.data_conclusao)
     if (!d) continue
     const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const pos = indice.get(chave)
@@ -194,96 +198,6 @@ export function agruparConcluidosPorMes(
   }
 
   return janelas
-}
-
-export interface ProcessoHistorico {
-  status_nome: string | null
-  data_entrada: string | null
-  data_entrega: string | null
-  /** Última atividade registrada — usada como aproximação da data de conclusão. */
-  data_atividade: string | null
-  valor_estimado: number
-  valor_homologado: number
-}
-
-export interface PontoSerie {
-  chave: string
-  rotulo: string
-  atrasados: number
-  taxaHomologacao: number
-  economiaPercentual: number
-}
-
-/** Último instante do mês de `d`, para comparações "até o fim do mês". */
-function fimDoMes(ano: number, mes: number): Date {
-  return new Date(ano, mes + 1, 0)
-}
-
-/**
- * Reconstrói a série mensal dos indicadores a partir do estado atual.
- *
- * Não há histórico de status no banco, então a reconstrução assume que:
- *   - o processo entrou na carteira em `data_entrada`;
- *   - um processo hoje concluído foi concluído em `data_atividade`;
- *   - `valor_homologado` foi fixado na conclusão.
- *
- * Isso é fiel para homologação e economia (ambos só mudam na conclusão) e é
- * uma aproximação para atraso — um processo hoje cancelado aparece como
- * pendente nos meses anteriores ao cancelamento. Sem histórico de status não
- * há como fazer melhor, e a alternativa seria não mostrar tendência alguma.
- */
-export function reconstruirSerieMensal(
-  processos: ProcessoHistorico[],
-  hoje: Date,
-  meses = 6,
-): PontoSerie[] {
-  const pontos: PontoSerie[] = []
-
-  for (let i = meses - 1; i >= 0; i--) {
-    const refer = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)
-    const corte = i === 0 ? meiaNoite(hoje) : fimDoMes(refer.getFullYear(), refer.getMonth())
-    const chave = `${refer.getFullYear()}-${String(refer.getMonth() + 1).padStart(2, '0')}`
-
-    let atrasados = 0
-    let estimadoNaCarteira = 0
-    let homologadoAcumulado = 0
-    let estimadoConcluido = 0
-
-    for (const p of processos) {
-      const entrada = parseDateOnly(p.data_entrada)
-      if (entrada && meiaNoite(entrada) > corte) continue
-
-      estimadoNaCarteira += Number(p.valor_estimado) || 0
-
-      const concluido = isStatusConcluido(p.status_nome)
-      const fim = parseDateOnly(p.data_atividade)
-      const jaConcluido = concluido && fim !== null && meiaNoite(fim) <= corte
-
-      if (jaConcluido) {
-        homologadoAcumulado += Number(p.valor_homologado) || 0
-        estimadoConcluido += Number(p.valor_estimado) || 0
-        continue
-      }
-
-      if (isStatusTerminal(p.status_nome) && !concluido) continue
-
-      const entrega = parseDateOnly(p.data_entrega)
-      if (entrega && meiaNoite(entrega) < corte) atrasados += 1
-    }
-
-    pontos.push({
-      chave,
-      rotulo: MESES_CURTOS[refer.getMonth()],
-      atrasados,
-      taxaHomologacao: calcularTaxaHomologacao(estimadoNaCarteira, homologadoAcumulado),
-      economiaPercentual: calcularEconomiaPercentual(
-        estimadoConcluido - homologadoAcumulado,
-        estimadoConcluido,
-      ),
-    })
-  }
-
-  return pontos
 }
 
 export interface AtividadeCronograma {
@@ -294,24 +208,31 @@ export interface AtividadeCronograma {
   data_fim: string | null
 }
 
-export interface LeadTimeFase {
-  fase: string
+export interface LeadTimeEtapa {
+  etapa: string
   /** Média de dias corridos entre início e fim das atividades concluídas. */
   dias: number
-  /** Quantas atividades entraram na média — abaixo de 3 a média é frágil. */
+  /** Quantas atividades entraram na média. */
   amostra: number
 }
 
 /**
- * Tempo médio por fase, a partir das atividades de cronograma já concluídas.
+ * Tempo médio por etapa, a partir das atividades de cronograma já concluídas.
+ *
+ * Mede por `descricao` (a etapa), não por `fase`: agrupado por fase o número
+ * achata em 0–3 dias e não diz nada; por etapa o gargalo aparece — parecer
+ * jurídico e julgamento de propostas levam quase dez vezes o que leva uma
+ * publicação. Exige amostra mínima porque média de duas ocorrências não é
+ * tempo médio, é anedota.
+ *
  * Só entram atividades com início e fim e com fim não anterior ao início.
- * Ordena da fase mais lenta para a mais rápida — é a leitura que interessa.
+ * Ordena da etapa mais lenta para a mais rápida — é a leitura que interessa.
  */
-export function calcularLeadTimePorFase(
+export function calcularLeadTimePorEtapa(
   atividades: AtividadeCronograma[],
   opcoes: { amostraMinima?: number; limite?: number } = {},
-): LeadTimeFase[] {
-  const { amostraMinima = 1, limite = 6 } = opcoes
+): LeadTimeEtapa[] {
+  const { amostraMinima = 5, limite = 6 } = opcoes
   const acc = new Map<string, { soma: number; n: number }>()
 
   for (const a of atividades) {
@@ -321,19 +242,36 @@ export function calcularLeadTimePorFase(
     if (!inicio || !fim) continue
     const dias = Math.round((meiaNoite(fim).getTime() - meiaNoite(inicio).getTime()) / 86_400_000)
     if (dias < 0) continue
-    const fase = (a.fase || '').trim() || (a.descricao || '').trim()
-    if (!fase) continue
-    const atual = acc.get(fase) || { soma: 0, n: 0 }
+    const etapa = (a.descricao || '').trim() || (a.fase || '').trim()
+    if (!etapa) continue
+    const atual = acc.get(etapa) || { soma: 0, n: 0 }
     atual.soma += dias
     atual.n += 1
-    acc.set(fase, atual)
+    acc.set(etapa, atual)
   }
 
   return Array.from(acc.entries())
     .filter(([, v]) => v.n >= amostraMinima)
-    .map(([fase, v]) => ({ fase, dias: Math.round(v.soma / v.n), amostra: v.n }))
-    .sort((a, b) => b.dias - a.dias)
+    .map(([etapa, v]) => ({ etapa, dias: Math.round(v.soma / v.n), amostra: v.n }))
+    .sort((a, b) => b.dias - a.dias || b.amostra - a.amostra)
     .slice(0, limite)
+}
+
+/**
+ * Data de conclusão de cada processo, derivada do fim da última atividade de
+ * cronograma concluída. É a única fonte com cobertura e dispersão reais: as
+ * outras candidatas ou estão quase vazias ou carregam a data de uma carga.
+ */
+export function mapearConclusaoPorCronograma(
+  atividades: (AtividadeCronograma & { processo_id: string })[],
+): Map<string, string> {
+  const porProcesso = new Map<string, string>()
+  for (const a of atividades) {
+    if ((a.status || '').trim() !== 'concluido' || !a.data_fim) continue
+    const atual = porProcesso.get(a.processo_id)
+    if (!atual || a.data_fim > atual) porProcesso.set(a.processo_id, a.data_fim)
+  }
+  return porProcesso
 }
 
 export interface CargaResponsavel {

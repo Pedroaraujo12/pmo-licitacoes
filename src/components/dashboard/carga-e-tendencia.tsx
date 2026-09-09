@@ -17,13 +17,17 @@ import { BarrasHorizontais, Colunas, Legenda, PainelGrafico, type LinhaBarra } f
 interface Props {
   porResponsavel: CargaResponsavel[]
   concluidosPorMes: PontoMensal[]
+  /** Concluídos com data de conclusão conhecida, e o total de concluídos. */
+  concluidosComData: number
+  concluidosTotal: number
   responsavelSelecionado: string | null
   onSelecionarResponsavel: (nome: string | null) => void
   carregando?: boolean
 }
 
 export default function CargaETendencia({
-  porResponsavel, concluidosPorMes, responsavelSelecionado, onSelecionarResponsavel, carregando,
+  porResponsavel, concluidosPorMes, concluidosComData, concluidosTotal,
+  responsavelSelecionado, onSelecionarResponsavel, carregando,
 }: Props) {
   const totalEmAndamento = porResponsavel.reduce((s, r) => s + r.total, 0)
   const totalConcluidos = concluidosPorMes.reduce((s, p) => s + p.total, 0)
@@ -117,7 +121,8 @@ export default function CargaETendencia({
             vazio={carregando ? 'Carregando…' : 'Sem histórico de conclusões'}
           />
           <p style={{ margin: '8px 0 0', fontSize: 10.5, color: CORES.ink3 }}>
-            Pela data da última atividade registrada no processo.
+            Pela data de fim da última etapa concluída do cronograma
+            {concluidosTotal > 0 && ` — ${concluidosComData} de ${concluidosTotal} concluídos têm cronograma registrado`}.
           </p>
         </PainelGrafico>
       </div>

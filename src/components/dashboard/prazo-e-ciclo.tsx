@@ -1,7 +1,7 @@
 'use client'
 
 import { CORES } from '@/lib/dashboard-tokens'
-import { combinaFiltroPrazo, type ContagemFaixa, type LeadTimeFase, type FiltroPrazo } from '@/lib/dashboard-metrics'
+import { combinaFiltroPrazo, type ContagemFaixa, type LeadTimeEtapa, type FiltroPrazo } from '@/lib/dashboard-metrics'
 import { BarrasHorizontais, Legenda, PainelGrafico, type LinhaBarra } from './chart-primitives'
 
 /* ==========================================================================
@@ -13,11 +13,9 @@ import { BarrasHorizontais, Legenda, PainelGrafico, type LinhaBarra } from './ch
    médio por etapa, que é a métrica de ciclo que faltava.
    ========================================================================== */
 
-export const META_DIAS_ETAPA = 15
-
 interface Props {
   faixas: ContagemFaixa[]
-  leadTime: LeadTimeFase[]
+  leadTime: LeadTimeEtapa[]
   faixaSelecionada: FiltroPrazo | null
   onSelecionarFaixa: (faixa: FiltroPrazo | null) => void
   carregando?: boolean
@@ -50,23 +48,29 @@ export default function PrazoECiclo({ faixas, leadTime, faixaSelecionada, onSele
   const marcasPrazo: number[] = []
   for (let m = 0; m <= maxPrazo; m += passoPrazo) marcasPrazo.push(m)
 
-  const maxLead = Math.max(...leadTime.map(l => l.dias), META_DIAS_ETAPA, 1)
-  const passoLead = Math.max(5, Math.ceil(maxLead / 4 / 5) * 5)
+  const maxLead = Math.max(...leadTime.map(l => l.dias), 1)
+  const passoLead = maxLead <= 6 ? 1 : maxLead <= 12 ? 2 : Math.ceil(maxLead / 6)
   const marcasLead: number[] = []
   for (let m = 0; m <= maxLead; m += passoLead) marcasLead.push(m)
 
+  /* O rótulo é o nome da etapa como está no cronograma, e alguns passam de 45
+     caracteres. Corta no que cabe na calha e deixa o nome inteiro no tooltip —
+     texto cortado pela borda do SVG seria bug, não economia de espaço. */
+  const encurtar = (t: string, max = 26) => (t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t)
+
   const linhasLead: LinhaBarra[] = leadTime.map(l => ({
-    rotulo: l.fase,
+    rotulo: encurtar(l.etapa),
     total: l.dias,
-    cor: l.dias > META_DIAS_ETAPA ? '#c8474c' : CORES.accentDim,
     valorTexto: `${l.dias}d`,
     descricao: (
       <>
-        <b>{l.fase}</b>
+        <b>{l.etapa}</b>
         <br />
-        {l.dias} dias em média{l.dias > META_DIAS_ETAPA ? ' · acima da meta' : ''}
+        {l.dias} {l.dias === 1 ? 'dia' : 'dias'} em média
         <br />
-        <span style={{ color: CORES.ink3 }}>{l.amostra} atividade{l.amostra === 1 ? '' : 's'} concluída{l.amostra === 1 ? '' : 's'}</span>
+        <span style={{ color: CORES.ink3 }}>
+          média de {l.amostra} atividade{l.amostra === 1 ? '' : 's'} concluída{l.amostra === 1 ? '' : 's'}
+        </span>
       </>
     ),
   }))
@@ -113,30 +117,26 @@ export default function PrazoECiclo({ faixas, leadTime, faixaSelecionada, onSele
 
         <PainelGrafico
           titulo="Tempo médio por etapa"
-          meta={`dias corridos · meta de ${META_DIAS_ETAPA}d`}
+          meta="dias corridos entre início e fim"
         >
           <BarrasHorizontais
             linhas={linhasLead}
-            larguraRotulo={150}
+            larguraRotulo={168}
             altura={176}
             alturaBarra={13}
             marcas={marcasLead}
             maximo={maxLead}
-            referencia={META_DIAS_ETAPA}
+            cor={CORES.accentDim}
             ariaLabel={
               leadTime.length
-                ? `Tempo médio por etapa em dias: ${leadTime.map(l => `${l.fase}, ${l.dias}`).join('; ')}. Meta de ${META_DIAS_ETAPA} dias.`
+                ? `Tempo médio por etapa em dias: ${leadTime.map(l => `${l.etapa}, ${l.dias}`).join('; ')}.`
                 : 'Ainda não há atividades de cronograma concluídas para calcular o tempo por etapa.'
             }
             vazio={carregando ? 'Carregando…' : 'Sem atividades de cronograma concluídas'}
           />
-          <Legenda
-            itens={[
-              { cor: CORES.accentDim, texto: 'Dentro da meta' },
-              { cor: '#c8474c', texto: 'Acima da meta' },
-              { cor: CORES.ink2, texto: `Meta de ${META_DIAS_ETAPA} dias`, barra: true },
-            ]}
-          />
+          <p style={{ margin: '10px 0 0', fontSize: 10.5, color: CORES.ink3 }}>
+            Etapas com pelo menos cinco conclusões registradas, da mais lenta para a mais rápida.
+          </p>
         </PainelGrafico>
       </div>
     </section>

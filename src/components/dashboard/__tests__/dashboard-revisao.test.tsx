@@ -117,9 +117,10 @@ describe('KpiCards', () => {
     expect(container.textContent).not.toContain('↑ sobre valor estimado')
   })
 
-  it('desenha a faixa de tendência quando há série, com rótulo textual', () => {
-    render(<KpiCards {...base} serieAtrasados={[7, 9, 8, 12, 13, 11]} />)
-    expect(screen.getByLabelText('Evolução mensal dos processos em atraso')).toBeTruthy()
+  it('não exibe variação mês a mês: o banco não tem data de conclusão confiável', () => {
+    const { container } = render(<KpiCards {...base} />)
+    expect(container.textContent).not.toMatch(/p\.p\.|▲|▼/)
+    expect(container.querySelector('svg')).toBeNull()
   })
 
   it('oferece o caminho para o fluxo quando há atraso', () => {
@@ -161,18 +162,19 @@ describe('PrazoECiclo', () => {
     expect(screen.getByText('Sem atividades de cronograma concluídas')).toBeTruthy()
   })
 
-  it('descreve o tempo por etapa com a meta declarada', () => {
+  it('descreve o tempo por etapa e trunca o nome longo sem cortar na borda', () => {
     render(
       <PrazoECiclo
         faixas={faixas}
-        leadTime={[{ fase: 'Instrução', dias: 22, amostra: 4 }]}
+        leadTime={[{ etapa: 'Emissão de Parecer jurídico (UJUR)', dias: 9, amostra: 14 }]}
         faixaSelecionada={null}
         onSelecionarFaixa={vi.fn()}
       />,
     )
     const grafico = screen.getByLabelText(/Tempo médio por etapa/)
-    expect(grafico.getAttribute('aria-label')).toContain('Instrução, 22')
-    expect(grafico.getAttribute('aria-label')).toContain('Meta de 15 dias')
+    expect(grafico.getAttribute('aria-label')).toContain('Emissão de Parecer jurídico (UJUR), 9')
+    // o nome inteiro vai no rótulo acessível; na calha ele aparece truncado
+    expect(screen.getByText(/Emissão de Parecer jurídi…/)).toBeTruthy()
   })
 })
 
@@ -182,6 +184,8 @@ describe('CargaETendencia', () => {
       <CargaETendencia
         porResponsavel={[{ nome: 'Bruno', total: 4, atrasados: 1 }, { nome: 'Ilma', total: 3, atrasados: 0 }]}
         concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 7 }]}
+        concluidosComData={15}
+        concluidosTotal={24}
         responsavelSelecionado={null}
         onSelecionarResponsavel={vi.fn()}
       />,
@@ -191,16 +195,19 @@ describe('CargaETendencia', () => {
     expect(grafico.getAttribute('aria-label')).toContain('Ilma, 3.')
   })
 
-  it('declara de onde vem a data de conclusão em vez de deixar implícito', () => {
+  it('declara a fonte da data de conclusão e quantos processos ela cobre', () => {
     render(
       <CargaETendencia
         porResponsavel={[]}
         concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 7 }]}
+        concluidosComData={15}
+        concluidosTotal={24}
         responsavelSelecionado={null}
         onSelecionarResponsavel={vi.fn()}
       />,
     )
-    expect(screen.getByText(/data da última atividade registrada/)).toBeTruthy()
+    // a cobertura parcial fica na cara em vez de a série parecer mais rasa do que é
+    expect(screen.getByText(/15 de 24 concluídos têm cronograma registrado/)).toBeTruthy()
   })
 })
 

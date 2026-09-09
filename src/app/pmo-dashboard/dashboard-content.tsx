@@ -21,10 +21,10 @@ import {
   agruparPorFaixaDePrazo,
   agruparCargaPorResponsavel,
   agruparConcluidosPorMes,
-  calcularLeadTimePorFase,
+  calcularLeadTimePorEtapa,
+  mapearConclusaoPorCronograma,
   calcularTaxaHomologacao,
   calcularEconomiaPercentual,
-  reconstruirSerieMensal,
   classificarPrazo,
   rotuloPrazo,
   isStatusConcluido,
@@ -65,8 +65,8 @@ interface ProcessoRow {
   coordenacao_nome: string
   demandante_nome: string
   total_count: number
-  /** Preenchido por junção local com a tabela processos. */
-  data_atividade?: string | null
+  /** Derivada do fim da última atividade de cronograma concluída. */
+  data_conclusao?: string | null
 }
 
 /* Doze linhas por página em vez de cinco: com 5, uma carteira de 74 processos
@@ -87,7 +87,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const [summaryError, setSummaryError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [todos, setTodos] = useState<ProcessoRow[]>([])
-  const [atividades, setAtividades] = useState<AtividadeCronograma[]>([])
+  const [atividades, setAtividades] = useState<(AtividadeCronograma & { processo_id: string })[]>([])
   const [loadingSummary, setLoadingSummary] = useState(true)
   const summaryResolved = useRef(false)
   const [loadingRows, setLoadingRows] = useState(true)
@@ -184,27 +184,24 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
 
     ;(async () => {
       try {
-        const [processos, datas, cronograma] = await Promise.all([
+        const [processos, cronograma] = await Promise.all([
           supabase.rpc('search_processos', { p_limit: TETO_CARREGAMENTO, p_offset: 0 }),
-          supabase.from('processos').select('id, data_atividade'),
           supabase
             .from('cronograma_atividades')
-            .select('fase, descricao, status, data_inicio, data_fim')
+            .select('processo_id, fase, descricao, status, data_inicio, data_fim')
             .eq('status', 'concluido'),
         ])
         if (cancelled) return
 
-        const porId = new Map<string, string | null>(
-          ((datas.data as { id: string; data_atividade: string | null }[] | null) || [])
-            .map(d => [d.id, d.data_atividade]),
-        )
+        const ativs = (cronograma.data as (AtividadeCronograma & { processo_id: string })[] | null) || []
+        const conclusao = mapearConclusaoPorCronograma(ativs)
         const linhas = ((processos.data as ProcessoRow[] | null) || []).map(p => ({
           ...p,
-          data_atividade: porId.get(p.id) ?? null,
+          data_conclusao: conclusao.get(p.id) ?? null,
         }))
 
         setTodos(linhas)
-        setAtividades((cronograma.data as AtividadeCronograma[] | null) || [])
+        setAtividades(ativs)
       } catch (err) {
         if (!cancelled) console.warn('Falha ao carregar processos do dashboard:', err)
       } finally {
@@ -254,23 +251,18 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const faixasPrazo = useMemo(() => agruparPorFaixaDePrazo(todos, hoje), [todos, hoje])
   const carga = useMemo(() => agruparCargaPorResponsavel(todos, hoje), [todos, hoje])
   const concluidosPorMes = useMemo(
-    () => agruparConcluidosPorMes(todos.map(p => ({ status_nome: p.status_nome, data_atividade: p.data_atividade ?? null })), hoje),
-    [todos, hoje],
-  )
-  const leadTime = useMemo(() => calcularLeadTimePorFase(atividades), [atividades])
-  const serie = useMemo(
-    () => reconstruirSerieMensal(
-      todos.map(p => ({
-        status_nome: p.status_nome,
-        data_entrada: p.data_entrada,
-        data_entrega: p.data_entrega,
-        data_atividade: p.data_atividade ?? null,
-        valor_estimado: Number(p.valor_estimado) || 0,
-        valor_homologado: Number(p.valor_homologado) || 0,
-      })),
+    () => agruparConcluidosPorMes(
+      todos.map(p => ({ status_nome: p.status_nome, data_conclusao: p.data_conclusao ?? null })),
       hoje,
     ),
     [todos, hoje],
+  )
+  const leadTime = useMemo(() => calcularLeadTimePorEtapa(atividades), [atividades])
+  /* Quantos concluídos têm cronograma registrado — o gráfico de tendência só
+     enxerga esses, e omitir isso faria a série parecer mais rasa do que é. */
+  const concluidosComData = useMemo(
+    () => todos.filter(p => isStatusConcluido(p.status_nome) && p.data_conclusao).length,
+    [todos],
   )
 
   const atrasados = summary?.processos_atrasados ?? faixasPrazo.filter(f => f.atrasada).reduce((s, f) => s + f.total, 0)
@@ -450,7 +442,6 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
               margin: 0, fontSize: 11, fontWeight: 800, letterSpacing: '0.11em',
               textTransform: 'uppercase', color: CORES.ink2,
             }}>Indicadores da carteira</h2>
-            <span style={{ fontSize: 11.5, color: CORES.ink3 }}>variação comparada ao mês anterior</span>
           </div>
           <KpiCards
             atrasados={atrasados}
@@ -461,9 +452,6 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
             economia={summary?.economia_total || 0}
             economiaPercentual={economiaPercentual}
             concluidos={concluidos}
-            serieAtrasados={serie.map(p => p.atrasados)}
-            serieHomologacao={serie.map(p => p.taxaHomologacao)}
-            serieEconomia={serie.map(p => p.economiaPercentual)}
             onVerAtrasados={irParaAtrasados}
           />
         </section>
@@ -495,6 +483,8 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
       <CargaETendencia
         porResponsavel={carga}
         concluidosPorMes={concluidosPorMes}
+        concluidosComData={concluidosComData}
+        concluidosTotal={concluidos}
         responsavelSelecionado={responsavelFilter}
         onSelecionarResponsavel={aplicarResponsavel}
         carregando={loadingRows}

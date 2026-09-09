@@ -9,11 +9,11 @@ import {
   calcularTaxaHomologacao,
   calcularEconomiaPercentual,
   agruparConcluidosPorMes,
-  calcularLeadTimePorFase,
+  calcularLeadTimePorEtapa,
+  mapearConclusaoPorCronograma,
   agruparCargaPorResponsavel,
   rotuloPrazo,
   FAIXAS_PRAZO,
-  reconstruirSerieMensal,
   combinaFiltroPrazo,
   ROTULO_FILTRO_PRAZO,
 } from '../dashboard-metrics'
@@ -205,7 +205,7 @@ describe('agruparConcluidosPorMes', () => {
 
   it('mantém meses sem conclusão com zero, sem buraco na série', () => {
     const r = agruparConcluidosPorMes(
-      [{ status_nome: 'Concluído', data_atividade: '2026-09-02' }],
+      [{ status_nome: 'Concluído', data_conclusao: '2026-09-02' }],
       HOJE,
       6,
     )
@@ -215,11 +215,11 @@ describe('agruparConcluidosPorMes', () => {
   it('conta só status concluído e ignora o que cai fora da janela', () => {
     const r = agruparConcluidosPorMes(
       [
-        { status_nome: 'Concluído', data_atividade: '2026-08-15' },
-        { status_nome: 'Homologado', data_atividade: '2026-08-20' },
-        { status_nome: 'Em andamento', data_atividade: '2026-08-21' },
-        { status_nome: 'Concluído', data_atividade: '2025-01-10' },
-        { status_nome: 'Concluído', data_atividade: null },
+        { status_nome: 'Concluído', data_conclusao: '2026-08-15' },
+        { status_nome: 'Homologado', data_conclusao: '2026-08-20' },
+        { status_nome: 'Em andamento', data_conclusao: '2026-08-21' },
+        { status_nome: 'Concluído', data_conclusao: '2025-01-10' },
+        { status_nome: 'Concluído', data_conclusao: null },
       ],
       HOJE,
       6,
@@ -235,136 +235,78 @@ describe('agruparConcluidosPorMes', () => {
   })
 })
 
-describe('reconstruirSerieMensal', () => {
-  const proc = (over: Partial<Parameters<typeof reconstruirSerieMensal>[0][number]>) => ({
-    status_nome: 'Em andamento',
-    data_entrada: '2026-01-05',
-    data_entrega: null,
-    data_atividade: null,
-    valor_estimado: 0,
-    valor_homologado: 0,
-    ...over,
+describe('calcularLeadTimePorEtapa', () => {
+  const base = { status: 'concluido' as const, fase: 'Execução' }
+  const rep = (n: number, etapa: string, dias: number) =>
+    Array.from({ length: n }, () => ({
+      ...base, descricao: etapa,
+      data_inicio: '2026-01-01',
+      data_fim: `2026-01-${String(1 + dias).padStart(2, '0')}`,
+    }))
+
+  it('mede por etapa, não por fase — agrupado por fase o número achata', () => {
+    const r = calcularLeadTimePorEtapa([...rep(5, 'Parecer jurídico', 9), ...rep(5, 'Publicação no site', 0)])
+    expect(r.map(x => x.etapa)).toEqual(['Parecer jurídico', 'Publicação no site'])
+    expect(r[0].dias).toBe(9)
+    expect(r[1].dias).toBe(0)
   })
 
-  it('devolve a janela pedida terminando no mês corrente', () => {
-    const r = reconstruirSerieMensal([], HOJE, 6)
-    expect(r).toHaveLength(6)
-    expect(r[0].chave).toBe('2026-04')
-    expect(r[5].chave).toBe('2026-09')
+  it('exige amostra mínima: média de duas ocorrências não é tempo médio', () => {
+    expect(calcularLeadTimePorEtapa(rep(4, 'Rara', 30))).toEqual([])
+    expect(calcularLeadTimePorEtapa(rep(5, 'Rara', 30))).toHaveLength(1)
   })
 
-  it('só conta o processo a partir do mês em que entrou na carteira', () => {
-    const r = reconstruirSerieMensal(
-      [proc({ data_entrada: '2026-07-10', data_entrega: '2026-07-20' })],
-      HOJE, 6,
-    )
-    const porChave = Object.fromEntries(r.map(p => [p.chave, p.atrasados]))
-    expect(porChave['2026-06']).toBe(0)
-    expect(porChave['2026-07']).toBe(1)
-    expect(porChave['2026-09']).toBe(1)
-  })
-
-  it('para de contar atraso a partir do mês da conclusão', () => {
-    const r = reconstruirSerieMensal(
-      [proc({
-        status_nome: 'Concluído',
-        data_entrada: '2026-05-01',
-        data_entrega: '2026-05-20',
-        data_atividade: '2026-07-15',
-      })],
-      HOJE, 6,
-    )
-    const porChave = Object.fromEntries(r.map(p => [p.chave, p.atrasados]))
-    expect(porChave['2026-06']).toBe(1)
-    expect(porChave['2026-07']).toBe(0)
-    expect(porChave['2026-08']).toBe(0)
-  })
-
-  it('não conta como atraso processo terminal que nunca concluiu', () => {
-    const r = reconstruirSerieMensal(
-      [proc({ status_nome: 'Cancelado', data_entrada: '2026-01-01', data_entrega: '2026-02-01' })],
-      HOJE, 6,
-    )
-    expect(r.every(p => p.atrasados === 0)).toBe(true)
-  })
-
-  it('acumula homologação a partir do mês da conclusão', () => {
-    const r = reconstruirSerieMensal(
-      [
-        proc({ data_entrada: '2026-01-01', valor_estimado: 100 }),
-        proc({
-          status_nome: 'Concluído', data_entrada: '2026-01-01',
-          data_atividade: '2026-07-10', valor_estimado: 100, valor_homologado: 80,
-        }),
-      ],
-      HOJE, 6,
-    )
-    const porChave = Object.fromEntries(r.map(p => [p.chave, p.taxaHomologacao]))
-    expect(porChave['2026-06']).toBe(0)
-    expect(porChave['2026-07']).toBeCloseTo(40, 5) // 80 de 200
-  })
-
-  it('mede economia só contra o estimado do que já concluiu', () => {
-    const r = reconstruirSerieMensal(
-      [
-        proc({ data_entrada: '2026-01-01', valor_estimado: 900 }),
-        proc({
-          status_nome: 'Concluído', data_entrada: '2026-01-01',
-          data_atividade: '2026-08-01', valor_estimado: 100, valor_homologado: 90,
-        }),
-      ],
-      HOJE, 6,
-    )
-    const agosto = r.find(p => p.chave === '2026-08')
-    expect(agosto?.economiaPercentual).toBeCloseTo(10, 5)
-  })
-
-  it('trata processo sem data de entrada como sempre presente na carteira', () => {
-    const r = reconstruirSerieMensal(
-      [proc({ data_entrada: null, data_entrega: '2026-01-01' })],
-      HOJE, 6,
-    )
-    expect(r.every(p => p.atrasados === 1)).toBe(true)
-  })
-})
-
-describe('calcularLeadTimePorFase', () => {
-  const base = { status: 'concluido' as const, descricao: null }
-
-  it('faz a média por fase e ordena da mais lenta para a mais rápida', () => {
-    const r = calcularLeadTimePorFase([
-      { ...base, fase: 'Instrução', data_inicio: '2026-01-01', data_fim: '2026-01-11' }, // 10
-      { ...base, fase: 'Instrução', data_inicio: '2026-02-01', data_fim: '2026-02-21' }, // 20
-      { ...base, fase: 'Julgamento', data_inicio: '2026-01-01', data_fim: '2026-02-05' }, // 35
+  it('ordena da mais lenta para a mais rápida e desempata pela amostra', () => {
+    const r = calcularLeadTimePorEtapa([
+      ...rep(5, 'Lenta', 11), ...rep(9, 'Empatada A', 6), ...rep(5, 'Empatada B', 6),
     ])
-    expect(r).toEqual([
-      { fase: 'Julgamento', dias: 35, amostra: 1 },
-      { fase: 'Instrução', dias: 15, amostra: 2 },
-    ])
+    expect(r.map(x => x.etapa)).toEqual(['Lenta', 'Empatada A', 'Empatada B'])
+  })
+
+  it('respeita o limite de etapas mostradas', () => {
+    const muitas = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].flatMap((e, i) => rep(5, e, 10 - i))
+    expect(calcularLeadTimePorEtapa(muitas)).toHaveLength(6)
   })
 
   it('ignora atividade não concluída, sem datas ou com fim antes do início', () => {
-    const r = calcularLeadTimePorFase([
-      { ...base, status: 'em_andamento', fase: 'A', data_inicio: '2026-01-01', data_fim: '2026-01-10' },
-      { ...base, fase: 'B', data_inicio: null, data_fim: '2026-01-10' },
-      { ...base, fase: 'C', data_inicio: '2026-01-10', data_fim: '2026-01-01' },
-    ])
-    expect(r).toEqual([])
+    expect(calcularLeadTimePorEtapa([
+      ...rep(5, 'ok', 3).map(a => ({ ...a, status: 'em_andamento' })),
+      ...rep(5, 'sem data', 3).map(a => ({ ...a, data_inicio: null })),
+      ...rep(5, 'invertida', 3).map(a => ({ ...a, data_fim: '2025-01-01' })),
+    ])).toEqual([])
   })
 
-  it('cai para a descrição quando a fase está vazia', () => {
-    const r = calcularLeadTimePorFase([
-      { ...base, fase: '', descricao: 'Parecer jurídico', data_inicio: '2026-01-01', data_fim: '2026-01-06' },
+  it('cai para a fase quando a etapa está vazia', () => {
+    const r = calcularLeadTimePorEtapa(rep(5, '', 4).map(a => ({ ...a, descricao: '', fase: 'Instrução' })))
+    expect(r[0].etapa).toBe('Instrução')
+  })
+})
+
+describe('mapearConclusaoPorCronograma', () => {
+  const at = (processo_id: string, data_fim: string | null, status = 'concluido') =>
+    ({ processo_id, data_fim, status, fase: null, descricao: null, data_inicio: '2026-01-01' })
+
+  it('usa o fim da última etapa concluída de cada processo', () => {
+    const m = mapearConclusaoPorCronograma([
+      at('p1', '2026-03-10'), at('p1', '2026-07-22'), at('p1', '2026-05-01'),
+      at('p2', '2026-02-01'),
     ])
-    expect(r[0].fase).toBe('Parecer jurídico')
+    expect(m.get('p1')).toBe('2026-07-22')
+    expect(m.get('p2')).toBe('2026-02-01')
   })
 
-  it('respeita amostra mínima e limite de fases', () => {
-    const atividades = ['A', 'B', 'C'].map(fase => ({
-      ...base, fase, data_inicio: '2026-01-01', data_fim: '2026-01-06',
-    }))
-    expect(calcularLeadTimePorFase(atividades, { amostraMinima: 2 })).toEqual([])
-    expect(calcularLeadTimePorFase(atividades, { limite: 2 })).toHaveLength(2)
+  it('ignora etapa não concluída ou sem data de fim', () => {
+    const m = mapearConclusaoPorCronograma([
+      at('p1', '2026-09-01', 'em_andamento'),
+      at('p1', null),
+      at('p2', '2026-01-05'),
+    ])
+    expect(m.has('p1')).toBe(false)
+    expect(m.get('p2')).toBe('2026-01-05')
+  })
+
+  it('processo sem cronograma simplesmente não aparece no mapa', () => {
+    expect(mapearConclusaoPorCronograma([]).size).toBe(0)
   })
 })
 
