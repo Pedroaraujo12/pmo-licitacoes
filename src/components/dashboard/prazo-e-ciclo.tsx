@@ -1,7 +1,8 @@
 'use client'
 
 import { CORES } from '@/lib/dashboard-tokens'
-import { combinaFiltroPrazo, type ContagemFaixa, type LeadTimeEtapa, type FiltroPrazo } from '@/lib/dashboard-metrics'
+import { combinaFiltroPrazo, type ContagemFaixa, type LeadTimeEtapa, type FiltroPrazo, type ContagemAtividade } from '@/lib/dashboard-metrics'
+import AtividadesChart from './atividades-chart'
 import { BarrasHorizontais, Legenda, PainelGrafico, type LinhaBarra } from './chart-primitives'
 
 /* ==========================================================================
@@ -18,10 +19,16 @@ interface Props {
   leadTime: LeadTimeEtapa[]
   faixaSelecionada: FiltroPrazo | null
   onSelecionarFaixa: (faixa: FiltroPrazo | null) => void
+  atividades: ContagemAtividade[]
+  atividadeSelecionada: string | null
+  onSelecionarAtividade: (atividade: string | null) => void
   carregando?: boolean
 }
 
-export default function PrazoECiclo({ faixas, leadTime, faixaSelecionada, onSelecionarFaixa, carregando }: Props) {
+export default function PrazoECiclo({
+  faixas, leadTime, faixaSelecionada, onSelecionarFaixa,
+  atividades, atividadeSelecionada, onSelecionarAtividade, carregando,
+}: Props) {
   const totalAtrasados = faixas.filter(f => f.atrasada).reduce((s, f) => s + f.total, 0)
   const totalVencendo = faixas.find(f => !f.atrasada)?.total || 0
   const comDados = faixas.some(f => f.total > 0)
@@ -133,6 +140,17 @@ export default function PrazoECiclo({ faixas, leadTime, faixaSelecionada, onSele
             As seis etapas mais lentas, entre as que têm pelo menos cinco conclusões registradas.
           </p>
         </PainelGrafico>
+      </div>
+
+      {/* Largura cheia: sao 26 atividades com rotulos de ate 173 caracteres —
+          espremer isso em meia tela deixaria tudo truncado. */}
+      <div style={{ marginTop: 16 }}>
+        <AtividadesChart
+          atividades={atividades}
+          selecionada={atividadeSelecionada}
+          onSelecionar={onSelecionarAtividade}
+          carregando={carregando}
+        />
       </div>
     </section>
   )

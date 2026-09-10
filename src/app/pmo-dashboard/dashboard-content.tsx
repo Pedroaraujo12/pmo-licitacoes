@@ -27,6 +27,8 @@ import {
   mapearEtapaAtualDoCronograma,
   mapearEtapasDoProcesso,
   diagnosticarAtividade,
+  agruparPorAtividadeAtual,
+  combinaAtividade,
   calcularTaxaHomologacao,
   calcularEconomiaPercentual,
   classificarPrazo,
@@ -111,6 +113,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const [responsavelFilter, setResponsavelFilter] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [prazoFilter, setPrazoFilter] = useState<FiltroPrazo | null>(null)
+  const [atividadeFilter, setAtividadeFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [seiLinks, setSeiLinks] = useState<Record<string, string>>({})
 
@@ -148,6 +151,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const aplicarResponsavel = comReset<string | null>(setResponsavelFilter)
   const aplicarModalidade = comReset(setModalidadeFilter)
   const aplicarPrioridade = comReset(setPrioridadeFilter)
+  const aplicarAtividade = comReset<string | null>(setAtividadeFilter)
 
   // --- Indicadores agregados -------------------------------------------------
   useEffect(() => {
@@ -274,6 +278,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
 
   const faixasPrazo = useMemo(() => agruparPorFaixaDePrazo(todos, hoje), [todos, hoje])
   const carga = useMemo(() => agruparCargaPorResponsavel(todos, hoje), [todos, hoje])
+  const porAtividade = useMemo(() => agruparPorAtividadeAtual(todos), [todos])
   const concluidosPorMes = useMemo(
     () => agruparConcluidosPorMes(
       todos.map(p => ({ status_nome: p.status_nome, data_conclusao: p.data_conclusao ?? null })),
@@ -320,13 +325,14 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
       if (modalidadeFilter && (p.modalidade_nome || '').trim() !== modalidadeFilter) return false
       if (prioridadeFilter && (p.prioridade || '').trim() !== prioridadeFilter) return false
       if (prazoFilter && !combinaFiltroPrazo(classificarPrazo(p, hoje), prazoFilter)) return false
+      if (atividadeFilter && !combinaAtividade(p.atividade_atual, atividadeFilter)) return false
       if (termo) {
         const alvo = `${p.id_processo || ''} ${p.objeto_resumido || ''} ${p.responsavel_nome || ''}`.toLowerCase()
         if (!alvo.includes(termo)) return false
       }
       return true
     })
-  }, [todos, statusFilter, responsavelFilter, modalidadeFilter, prioridadeFilter, prazoFilter, debouncedSearch, hoje])
+  }, [todos, statusFilter, responsavelFilter, modalidadeFilter, prioridadeFilter, prazoFilter, atividadeFilter, debouncedSearch, hoje])
 
   const totalCount = filtrados.length
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
@@ -341,6 +347,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
     setResponsavelFilter(null)
     setStatusFilter(null)
     setPrazoFilter(null)
+    setAtividadeFilter(null)
     setPage(1)
   }
 
@@ -351,6 +358,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
     rotulo: ROTULO_FILTRO_PRAZO[prazoFilter] || 'Prazo',
     onRemove: () => aplicarPrazo(null),
   })
+  if (atividadeFilter) chips.push({ chave: 'atividade', rotulo: `Atividade: ${atividadeFilter}`, onRemove: () => aplicarAtividade(null) })
   if (responsavelFilter) chips.push({ chave: 'resp', rotulo: `Responsável: ${responsavelFilter}`, onRemove: () => aplicarResponsavel(null) })
   if (modalidadeFilter) chips.push({ chave: 'mod', rotulo: modalidadeFilter, onRemove: () => aplicarModalidade('') })
   if (prioridadeFilter) chips.push({ chave: 'pri', rotulo: `Prioridade ${prioridadeFilter}`, onRemove: () => aplicarPrioridade('') })
@@ -504,6 +512,9 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           leadTime={leadTime}
           faixaSelecionada={prazoFilter}
           onSelecionarFaixa={aplicarPrazo}
+          atividades={porAtividade}
+          atividadeSelecionada={atividadeFilter}
+          onSelecionarAtividade={aplicarAtividade}
           carregando={loadingRows}
         />
       </div>

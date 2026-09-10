@@ -226,6 +226,20 @@ describe('DashboardContent', () => {
     expect(celula.getAttribute('title')).toContain('Declarado: Adjudicação')
   })
 
+  it('o gráfico por atividade filtra a tabela e vira chip removível', async () => {
+    await montar()
+    const grafico = screen.getByLabelText(/Processos por atividade atual:/)
+    expect(grafico.getAttribute('aria-label')).toContain('Adjudicação, 1')
+
+    // a primeira barra é a atividade mais frequente do fixture
+    fireEvent.click(grafico.querySelector('rect')!)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Remover filtro Atividade:/ })).toBeTruthy())
+
+    // e o filtro realmente reduz a tabela
+    const linhas = screen.getAllByRole('row').length
+    expect(linhas).toBeLessThan(1 + PROCESSOS.length)
+  })
+
   it('não mostra mais a coluna Observações, que duplicava a atividade atual', async () => {
     await montar()
     expect(screen.queryByRole('columnheader', { name: 'Observações' })).toBeNull()

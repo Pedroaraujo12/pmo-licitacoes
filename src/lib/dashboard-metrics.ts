@@ -407,3 +407,53 @@ export function cronogramasNuncaIniciados(etapas: EtapaCronograma[]): Set<string
   }
   return new Set([...temCronograma].filter(id => !temConcluida.has(id)))
 }
+
+/* ==========================================================================
+   Distribuição por atividade atual.
+
+   A carteira real tem 26 atividades distintas, com cauda longa: 14 delas com
+   um único processo. Agrupar a cauda em "Outras" deixaria esses 14 processos
+   sem como serem alcançados — e o gráfico existe justamente para filtrar.
+   Todas aparecem; quem cuida do espaço é a tela, com rolagem.
+   ========================================================================== */
+
+export const ATIVIDADE_NAO_DECLARADA = '(não declarada)'
+
+export interface ContagemAtividade {
+  /** Texto da atividade, ou o rótulo de ausência. */
+  atividade: string
+  total: number
+  /** Falso para o grupo de processos sem atividade declarada. */
+  declarada: boolean
+}
+
+/**
+ * Processos por atividade atual, do mais frequente ao menos.
+ *
+ * Processos sem atividade entram num grupo próprio em vez de sumirem: são 17
+ * na carteira atual, o maior grupo de todos, e omiti-los faria o gráfico
+ * somar menos que a carteira sem explicar a diferença.
+ */
+export function agruparPorAtividadeAtual(
+  processos: { atividade_atual: string | null }[],
+): ContagemAtividade[] {
+  const contagem = new Map<string, number>()
+  for (const p of processos) {
+    const chave = (p.atividade_atual || '').trim() || ATIVIDADE_NAO_DECLARADA
+    contagem.set(chave, (contagem.get(chave) || 0) + 1)
+  }
+  return Array.from(contagem.entries())
+    .map(([atividade, total]) => ({
+      atividade, total, declarada: atividade !== ATIVIDADE_NAO_DECLARADA,
+    }))
+    .sort((a, b) =>
+      b.total - a.total || a.atividade.localeCompare(b.atividade, 'pt-BR'))
+}
+
+/** Se o processo pertence à atividade selecionada no gráfico. */
+export function combinaAtividade(atividadeDoProcesso: string | null, filtro: string | null): boolean {
+  if (!filtro) return true
+  const declarada = (atividadeDoProcesso || '').trim()
+  if (filtro === ATIVIDADE_NAO_DECLARADA) return declarada === ''
+  return declarada === filtro
+}

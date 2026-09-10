@@ -125,6 +125,9 @@ describe('a tela aguenta as strings reais', () => {
         leadTime={LEAD_TIME_REAL}
         faixaSelecionada={null}
         onSelecionarFaixa={vi.fn()}
+        atividades={[]}
+        atividadeSelecionada={null}
+        onSelecionarAtividade={vi.fn()}
       />,
     )
     const maisLongo = LEAD_TIME_REAL.reduce((a, b) => (a.etapa.length >= b.etapa.length ? a : b))
@@ -151,6 +154,9 @@ describe('a tela aguenta as strings reais', () => {
         leadTime={LEAD_TIME_REAL}
         faixaSelecionada={null}
         onSelecionarFaixa={vi.fn()}
+        atividades={[]}
+        atividadeSelecionada={null}
+        onSelecionarAtividade={vi.fn()}
       />,
     )
     const rotulos = [...document.querySelectorAll('svg[aria-label*="Tempo médio"] text')]
@@ -166,6 +172,9 @@ describe('a tela aguenta as strings reais', () => {
         leadTime={LEAD_TIME_REAL}
         faixaSelecionada={null}
         onSelecionarFaixa={vi.fn()}
+        atividades={[]}
+        atividadeSelecionada={null}
+        onSelecionarAtividade={vi.fn()}
       />,
     )
     const marcas = [...document.querySelectorAll('svg[aria-label*="Tempo médio"] text')]

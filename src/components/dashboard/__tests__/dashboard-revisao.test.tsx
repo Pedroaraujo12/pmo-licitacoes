@@ -149,7 +149,7 @@ describe('PrazoECiclo', () => {
 
   it('descreve o gráfico de prazo em texto, para quem não enxerga a barra', () => {
     render(
-      <PrazoECiclo faixas={faixas} leadTime={[]} faixaSelecionada={null} onSelecionarFaixa={vi.fn()} />,
+      <PrazoECiclo faixas={faixas} leadTime={[]} faixaSelecionada={null} onSelecionarFaixa={vi.fn()} atividades={[]} atividadeSelecionada={null} onSelecionarAtividade={vi.fn()} />,
     )
     const grafico = screen.getByLabelText(/Processos por faixa de prazo:/)
     expect(grafico.getAttribute('aria-label')).toContain('Atraso acima de 30 dias, 1')
@@ -157,7 +157,7 @@ describe('PrazoECiclo', () => {
 
   it('diz claramente quando ainda não há cronograma concluído para medir ciclo', () => {
     render(
-      <PrazoECiclo faixas={faixas} leadTime={[]} faixaSelecionada={null} onSelecionarFaixa={vi.fn()} />,
+      <PrazoECiclo faixas={faixas} leadTime={[]} faixaSelecionada={null} onSelecionarFaixa={vi.fn()} atividades={[]} atividadeSelecionada={null} onSelecionarAtividade={vi.fn()} />,
     )
     expect(screen.getByText('Sem atividades de cronograma concluídas')).toBeTruthy()
   })
@@ -169,6 +169,9 @@ describe('PrazoECiclo', () => {
         leadTime={[{ etapa: 'Emissão de Parecer jurídico (UJUR)', dias: 9, amostra: 14 }]}
         faixaSelecionada={null}
         onSelecionarFaixa={vi.fn()}
+        atividades={[]}
+        atividadeSelecionada={null}
+        onSelecionarAtividade={vi.fn()}
       />,
     )
     const grafico = screen.getByLabelText(/Tempo médio por etapa/)
