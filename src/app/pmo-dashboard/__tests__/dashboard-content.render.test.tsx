@@ -111,10 +111,10 @@ const CRONOGRAMA_COM_ORDEM = [
 
 function tabela(nome: string) {
   if (nome === 'cronograma_atividades') {
-    // espelha a cadeia real: .select(...).eq(...).limit(...)
+    // espelha a cadeia real: .select(...).limit(...) — sem filtro de status,
+    // porque o diagnostico de aderencia precisa tambem das etapas pendentes
     const resolvido = { data: CRONOGRAMA_COM_ORDEM, error: null }
-    const comLimite = { limit: vi.fn(async () => resolvido) }
-    return { select: vi.fn(() => ({ eq: vi.fn(() => comLimite) })) }
+    return { select: vi.fn(() => ({ limit: vi.fn(async () => resolvido) })) }
   }
   return { select: vi.fn(async () => ({ data: [], error: null })) }
 }

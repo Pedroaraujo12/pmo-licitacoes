@@ -199,8 +199,11 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           supabase.rpc('search_processos', { p_limit: TETO_CARREGAMENTO, p_offset: 0 }),
           supabase
             .from('cronograma_atividades')
+            /* Todas as etapas, nao so as concluidas: o tempo por etapa usa as
+               concluidas (e filtra sozinho), mas o diagnostico de aderencia
+               precisa das pendentes para saber qual etapa o cronograma aponta
+               e quais existem no rito do processo. */
             .select('processo_id, fase, descricao, status, ordem, data_inicio, data_fim')
-            .eq('status', 'concluido')
             .limit(TETO_ATIVIDADES),
         ])
         if (cancelled) return
