@@ -236,6 +236,27 @@ describe('a tela aguenta as strings reais', () => {
     expect(devolvido.textContent).toContain('R$ 0,00')
   })
 
+  it('a equipe cresceu alem do limite antigo e ninguem pode sumir por isso', () => {
+    // 17 responsaveis cadastrados, 11 com processo em andamento — o codigo
+    // cortava em 10 e o 11o (Isaias) desaparecia do grafico sem aviso
+    const equipe = ['Bruno', 'Guilherme', 'Thiago', 'Alice Camargo', 'Hugo',
+                    'Karla Oliveira', 'Rebeca', 'Renan', 'Bárbara', 'Ilma', 'Isaias']
+    render(
+      <CargaETendencia
+        porResponsavel={equipe.map((nome, i) => ({ nome, total: i < 3 ? 3 : i < 8 ? 2 : 1, atrasados: 0 }))}
+        concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 1 }]}
+        concluidosComData={16}
+        concluidosTotal={26}
+        responsavelSelecionado={null}
+        onSelecionarResponsavel={vi.fn()}
+      />,
+    )
+    const aria = document.querySelector('svg[aria-label*="responsável"]')!.getAttribute('aria-label')!
+    for (const nome of equipe) expect(aria).toContain(nome)
+    expect(screen.getByText(/11 responsáveis/)).toBeTruthy()
+    expect(screen.queryByText(/fora do gráfico/)).toBeNull()
+  })
+
   it('a participacao de cada status na carteira soma 100%', () => {
     const somaPct = STATUS_REAIS.reduce((s, x) => s + (x.valor_estimado / ESTIMADO_TOTAL) * 100, 0)
     expect(somaPct).toBeCloseTo(100, 6)

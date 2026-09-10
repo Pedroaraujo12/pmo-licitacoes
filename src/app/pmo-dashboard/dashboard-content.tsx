@@ -737,7 +737,10 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           {/* Quatro categorias não justificam um gráfico: os números com a
               participação ao lado leem mais rápido no mesmo espaço. */}
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {(summary?.por_modalidade || []).slice(0, 6).map(m => {
+            {/* Sem corte: sao 6 modalidades cadastradas e o corte anterior era
+                em 6 — a proxima cadastrada sumiria da lista sem aviso, como
+                aconteceu com o 11o responsavel. */}
+            {(summary?.por_modalidade || []).map(m => {
               const nome = m.modalidade || 'Sem modalidade'
               const share = totalProcessos > 0 ? (m.total / totalProcessos) * 100 : 0
               const ativo = modalidadeFilter === nome
