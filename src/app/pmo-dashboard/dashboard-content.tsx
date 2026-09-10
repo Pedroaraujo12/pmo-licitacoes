@@ -27,7 +27,6 @@ import {
   mapearEtapaAtualDoCronograma,
   mapearEtapasDoProcesso,
   diagnosticarAtividade,
-  cronogramasNuncaIniciados,
   calcularTaxaHomologacao,
   calcularEconomiaPercentual,
   classificarPrazo,
@@ -285,11 +284,11 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const leadTime = useMemo(() => calcularLeadTimePorEtapa(atividades), [atividades])
   /* Aderência entre o que o processo declara e o que o cronograma aponta.
      Depois da migração para os ritos DIOP, o texto de muitos processos ficou
-     no rito antigo — sem isso na tela, ninguém tem como saber qual das duas
-     respostas está velha. */
+     no rito antigo. O aviso fica na linha do processo, não numa faixa no topo:
+     a faixa denunciava um problema que leva semanas para resolver, e alarme
+     que mora meses na tela vira paisagem — inclusive o de atraso, ao lado. */
   const etapaAtual = useMemo(() => mapearEtapaAtualDoCronograma(atividades), [atividades])
   const etapasPorProcesso = useMemo(() => mapearEtapasDoProcesso(atividades), [atividades])
-  const ritosParados = useMemo(() => cronogramasNuncaIniciados(atividades), [atividades])
 
   const diagnosticoPorProcesso = useMemo(() => {
     const m = new Map<string, ReturnType<typeof diagnosticarAtividade>>()
@@ -298,19 +297,6 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
     }
     return m
   }, [todos, etapaAtual, etapasPorProcesso])
-
-  const foraDoRito = useMemo(
-    () => todos.filter(p => diagnosticoPorProcesso.get(p.id)?.aderencia === 'fora_do_rito').length,
-    [todos, diagnosticoPorProcesso],
-  )
-  const semDeclarar = useMemo(
-    () => todos.filter(p => diagnosticoPorProcesso.get(p.id)?.aderencia === 'nao_declarada').length,
-    [todos, diagnosticoPorProcesso],
-  )
-  const ritosParadosEmAndamento = useMemo(
-    () => todos.filter(p => (p.status_nome || '').trim() === 'Em andamento' && ritosParados.has(p.id)).length,
-    [todos, ritosParados],
-  )
 
   /* Quantos concluídos têm cronograma registrado — o gráfico de tendência só
      enxerga esses, e omitir isso faria a série parecer mais rasa do que é. */
@@ -465,35 +451,6 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           >
             Ver os {atrasados} atrasados
           </button>
-        </div>
-      )}
-
-      {/* A divergencia entre o texto declarado e o cronograma nao aparecia em
-          lugar nenhum: era preciso abrir processo a processo para descobrir. */}
-      {!loadingRows && (foraDoRito > 0 || semDeclarar > 0 || ritosParadosEmAndamento > 0) && (
-        <div
-          style={{
-            display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap',
-            padding: '11px 16px', borderRadius: 12, marginBottom: 20,
-            background: CORES.surface, border: `1px solid ${CORES.line}`,
-            borderLeft: `3px solid ${CORES.warning}`,
-          }}
-        >
-          <AlertTriangle size={17} style={{ color: CORES.warning, flexShrink: 0, marginTop: 1 }} aria-hidden="true" />
-          <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 13, color: CORES.ink }}>
-              <strong style={{ fontWeight: 700 }}>Atividade atual e cronograma divergem.</strong>{' '}
-              {foraDoRito > 0 && `${foraDoRito} processo${foraDoRito === 1 ? ' declara uma etapa que não existe' : 's declaram uma etapa que não existe'} no próprio rito`}
-              {foraDoRito > 0 && (semDeclarar > 0 || ritosParadosEmAndamento > 0) && '; '}
-              {semDeclarar > 0 && `${semDeclarar} não ${semDeclarar === 1 ? 'declara' : 'declaram'} atividade`}
-              {semDeclarar > 0 && ritosParadosEmAndamento > 0 && '; '}
-              {ritosParadosEmAndamento > 0 && `${ritosParadosEmAndamento} em andamento com cronograma sem nenhuma etapa concluída`}.
-            </p>
-            <p style={{ margin: '4px 0 0', fontSize: 11.5, color: CORES.ink3 }}>
-              Enquanto divergirem, a coluna Atividade atual e o tempo por etapa falam de coisas diferentes.
-              A coluna marca cada caso; abrir o processo mostra a etapa que o cronograma aponta.
-            </p>
-          </div>
         </div>
       )}
 

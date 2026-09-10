@@ -209,11 +209,13 @@ describe('DashboardContent', () => {
     expect(screen.getByRole('columnheader', { name: 'Prazo' })).toBeTruthy()
   })
 
-  it('avisa que atividade declarada e cronograma divergem, em vez de deixar passar', async () => {
+  it('não instala faixa de alarme permanente no topo pela divergência', async () => {
     await montar()
-    // p1 declara "Adjudicação", que não existe no cronograma dele
-    expect(screen.getByText(/Atividade atual e cronograma divergem/)).toBeTruthy()
-    expect(screen.getByText(/declaram uma etapa que não existe|declara uma etapa que não existe/)).toBeTruthy()
+    // O aviso vive na linha do processo. Uma faixa fixa denunciando um problema
+    // que leva semanas para resolver vira paisagem — e leva junto a faixa de
+    // atraso, que é acionável.
+    expect(screen.queryByText(/Atividade atual e cronograma divergem/)).toBeNull()
+    expect(screen.getByRole('alert').textContent).toMatch(/em atraso/)
   })
 
   it('marca a linha divergente e mostra as duas versões no title', async () => {
