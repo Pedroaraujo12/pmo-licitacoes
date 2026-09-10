@@ -135,8 +135,9 @@ describe('a tela aguenta as strings reais', () => {
       .map(t => t.textContent || '')
     const rotuloDaEtapa = rotulos.find(r => r.startsWith('Publicação do Edital'))
     expect(rotuloDaEtapa).toBeTruthy()
-    expect(rotuloDaEtapa!.length).toBeLessThanOrEqual(26)
     expect(rotuloDaEtapa!.endsWith('…')).toBe(true)
+    // o corte acompanha a calha (168px), nao um numero fixo de caracteres
+    expect(rotuloDaEtapa!.length).toBeLessThanOrEqual(Math.floor((168 - 12) / 6.6))
 
     // e o nome inteiro segue disponivel para leitura por voz
     const aria = document.querySelector('svg[aria-label*="Tempo médio"]')!.getAttribute('aria-label')!

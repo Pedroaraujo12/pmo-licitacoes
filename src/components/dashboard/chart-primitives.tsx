@@ -127,6 +127,17 @@ export function BarrasHorizontais({
   }
 
   const rotuloX = Math.min(larguraRotulo, Math.max(70, largura * 0.36))
+
+  /* O rotulo e desenhado em SVG, que nao quebra linha nem reticencia sozinho:
+     texto maior que a calha simplesmente vaza pela borda. Cortar por numero
+     de caracteres nao resolve — 26 letras estreitas cabem, 26 largas nao — e
+     foi assim que "Fase de Julgamento das Pr…" vazou 2px. O corte usa a
+     largura disponivel, com uma estimativa conservadora por caractere para
+     a fonte do painel em 11px. O nome inteiro segue no tooltip e no aria-label. */
+  const LARGURA_POR_CARACTERE = 6.6
+  const maxCaracteres = Math.max(6, Math.floor((rotuloX - 12) / LARGURA_POR_CARACTERE))
+  const caber = (t: string) =>
+    t.length > maxCaracteres ? t.slice(0, maxCaracteres - 1).trimEnd() + '…' : t
   const larguraValor = 46
   const plot = Math.max(40, largura - rotuloX - larguraValor)
   const max = maximo ?? Math.max(...linhas.map(l => l.total), 1)
@@ -170,7 +181,7 @@ export function BarrasHorizontais({
                 x={rotuloX - 9} y={cy + 4} fill={l.selecionada ? CORES.ink : CORES.ink2}
                 fontSize={11} fontWeight={l.selecionada ? 700 : 400} textAnchor="end"
               >
-                {l.rotulo}
+                {caber(l.rotulo)}
               </text>
 
               {parcela > 0 ? (

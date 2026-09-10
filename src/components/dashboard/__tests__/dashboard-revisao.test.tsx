@@ -174,7 +174,7 @@ describe('PrazoECiclo', () => {
     const grafico = screen.getByLabelText(/Tempo médio por etapa/)
     expect(grafico.getAttribute('aria-label')).toContain('Emissão de Parecer jurídico (UJUR), 9')
     // o nome inteiro vai no rótulo acessível; na calha ele aparece truncado
-    expect(screen.getByText(/Emissão de Parecer jurídi…/)).toBeTruthy()
+    expect(screen.getByText(/^Emissão de Parecer.*…$/)).toBeTruthy()
   })
 })
 

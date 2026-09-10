@@ -53,13 +53,8 @@ export default function PrazoECiclo({ faixas, leadTime, faixaSelecionada, onSele
   const marcasLead: number[] = []
   for (let m = 0; m <= maxLead; m += passoLead) marcasLead.push(m)
 
-  /* O rótulo é o nome da etapa como está no cronograma, e alguns passam de 45
-     caracteres. Corta no que cabe na calha e deixa o nome inteiro no tooltip —
-     texto cortado pela borda do SVG seria bug, não economia de espaço. */
-  const encurtar = (t: string, max = 26) => (t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t)
-
   const linhasLead: LinhaBarra[] = leadTime.map(l => ({
-    rotulo: encurtar(l.etapa),
+    rotulo: l.etapa,
     total: l.dias,
     valorTexto: `${l.dias}d`,
     descricao: (
