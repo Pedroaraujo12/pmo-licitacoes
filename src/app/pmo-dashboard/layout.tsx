@@ -10,23 +10,10 @@ import { ToastProvider } from '@/components/ui/toast'
 import { WebVitals } from '@/components/ui/web-vitals'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { registrarNavegacao } from '@/lib/navegacao'
-import {
-  LayoutDashboard, FileText, Users, Calendar, LogOut, Menu, X, FileEdit, Contact2, StickyNote, Sun, FileSignature, Building2, CalendarClock,
-} from 'lucide-react'
+import { navGrupos } from './nav-grupos'
+import { LogOut, Menu, X } from 'lucide-react'
 
-const navItems = [
-  { href: '/pmo-dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/pmo-dashboard/cronograma', label: 'Cronograma', icon: Calendar },
-  { href: '/pmo-dashboard/simulador', label: 'Simulador', icon: CalendarClock },
-  { href: '/pmo-dashboard/processos', label: 'Processos', icon: FileText },
-  { href: '/pmo-dashboard/contratos', label: 'Contratos', icon: FileSignature },
-  { href: '/pmo-dashboard/fornecedores', label: 'Fornecedores', icon: Building2 },
-  { href: '/pmo-dashboard/documentos', label: 'Documentos', icon: FileEdit },
-  { href: '/pmo-dashboard/colaboradores', label: 'Colaboradores', icon: Contact2 },
-  { href: '/pmo-dashboard/notas', label: 'Notas', icon: StickyNote },
-  { href: '/pmo-dashboard/notas/hoje', label: 'Painel do Dia', icon: Sun },
-  { href: '/pmo-dashboard/usuarios', label: 'Usuários', icon: Users },
-]
+
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -204,23 +191,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
         </div>
 
-        <nav style={{ flex: 1, padding: '8px 4px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {navItems.map(item => {
-            const Icon = item.icon
-            const active = pathname === item.href || (item.href !== '/pmo-dashboard' && pathname.startsWith(item.href + '/'))
-            return (
-              <Link key={item.href} href={item.href} prefetch={false} onClick={() => { if (isMobile) setMobileOpen(false) }}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: sidebarOpen ? 'flex-start' : 'center',
-                  gap: 12, padding: '10px 8px', borderRadius: 8, textDecoration: 'none',
-                  color: active ? '#fff' : '#94a3b8', background: active ? '#334155' : 'transparent',
-                  fontSize: 14, fontWeight: active ? 600 : 400, whiteSpace: 'nowrap',
-                }} title={!sidebarOpen ? item.label : undefined}>
-                <Icon size={18} />
-                {sidebarOpen && <span>{item.label}</span>}
-              </Link>
-            )
-          })}
+        <nav aria-label="Seções do sistema" style={{ flex: 1, padding: '8px 4px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
+          {navGrupos.map((grupo, iGrupo) => (
+            <div key={grupo.titulo} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {/* Recolhida, a barra nao tem onde escrever o titulo: um fio no
+                  lugar mantem a divisao legivel sem ocupar largura. */}
+              {sidebarOpen ? (
+                <div style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: '0.11em', textTransform: 'uppercase',
+                  color: '#7d8aa5', padding: iGrupo === 0 ? '8px 8px 6px' : '16px 8px 6px',
+                }}>{grupo.titulo}</div>
+              ) : (
+                iGrupo > 0 && <div aria-hidden="true" style={{ height: 1, background: '#334155', margin: '10px 8px' }} />
+              )}
+
+              {grupo.itens.map(item => {
+                const Icon = item.icon
+                const active = pathname === item.href || (item.href !== '/pmo-dashboard' && pathname.startsWith(item.href + '/'))
+                return (
+                  <Link key={item.href} href={item.href} prefetch={false} aria-current={active ? 'page' : undefined}
+                    onClick={() => { if (isMobile) setMobileOpen(false) }}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                      gap: 12, padding: '10px 8px', borderRadius: 8, textDecoration: 'none',
+                      color: active ? '#fff' : '#a8b4cc', background: active ? '#334155' : 'transparent',
+                      fontSize: 14, fontWeight: active ? 600 : 400, whiteSpace: 'nowrap',
+                    }} title={!sidebarOpen ? item.label : undefined}>
+                    <Icon size={18} />
+                    {sidebarOpen && <span>{item.label}</span>}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
         </nav>
 
         <div style={{ padding: sidebarOpen ? '12px' : '12px 4px', borderTop: '1px solid #334155', display: 'flex', flexDirection: 'column', alignItems: sidebarOpen ? 'stretch' : 'center' }}>
