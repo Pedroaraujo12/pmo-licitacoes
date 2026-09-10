@@ -81,12 +81,13 @@ const PAGE_SIZE = 12
    Acima disso a agregação no cliente precisaria virar RPC. */
 const TETO_CARREGAMENTO = 1000
 
-/* As atividades de cronograma alimentam o tempo por etapa e a data de
-   conclusão. São ~19 por processo, então a carteira atual (74 processos, 261
-   atividades concluídas) cabe folgado — mas o PostgREST corta em 1000 por
-   padrão, e um corte silencioso aqui viraria média calculada sobre parte dos
-   dados. O teto fica explícito e a tela avisa quando encostar nele. */
-const TETO_ATIVIDADES = 5000
+/* As atividades de cronograma alimentam o tempo por etapa, a data de conclusão
+   e o diagnóstico de aderência. São ~19 por processo — 1.380 na carteira atual.
+   Pedir `.limit(5000)` não resolve: o PostgREST tem um teto próprio de 1.000
+   linhas por resposta e corta em silêncio, o que fazia processos com etapas
+   faltando aparecerem como "fora do rito" sem estarem. Daí a paginação. */
+const PAGINA_ATIVIDADES = 1000
+const TETO_ATIVIDADES = 20000
 
 const PRIORIDADES = ['Baixa', 'Média', 'Alta', 'Urgente']
 
@@ -195,20 +196,32 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
 
     ;(async () => {
       try {
-        const [processos, cronograma] = await Promise.all([
+        /* Todas as etapas, não só as concluídas: o tempo por etapa usa as
+           concluídas (e filtra sozinho), mas o diagnóstico de aderência precisa
+           das pendentes para saber qual etapa o cronograma aponta e quais
+           existem no rito do processo. */
+        async function carregarAtividades() {
+          const acumulado: (AtividadeCronograma & { processo_id: string; ordem: number })[] = []
+          for (let inicio = 0; inicio < TETO_ATIVIDADES; inicio += PAGINA_ATIVIDADES) {
+            const { data, error } = await supabase
+              .from('cronograma_atividades')
+              .select('processo_id, fase, descricao, status, ordem, data_inicio, data_fim')
+              .order('processo_id', { ascending: true })
+              .order('ordem', { ascending: true })
+              .range(inicio, inicio + PAGINA_ATIVIDADES - 1)
+            if (error) break
+            const pagina = (data as (AtividadeCronograma & { processo_id: string; ordem: number })[] | null) || []
+            acumulado.push(...pagina)
+            if (pagina.length < PAGINA_ATIVIDADES) break
+          }
+          return acumulado
+        }
+
+        const [processos, ativs] = await Promise.all([
           supabase.rpc('search_processos', { p_limit: TETO_CARREGAMENTO, p_offset: 0 }),
-          supabase
-            .from('cronograma_atividades')
-            /* Todas as etapas, nao so as concluidas: o tempo por etapa usa as
-               concluidas (e filtra sozinho), mas o diagnostico de aderencia
-               precisa das pendentes para saber qual etapa o cronograma aponta
-               e quais existem no rito do processo. */
-            .select('processo_id, fase, descricao, status, ordem, data_inicio, data_fim')
-            .limit(TETO_ATIVIDADES),
+          carregarAtividades(),
         ])
         if (cancelled) return
-
-        const ativs = (cronograma.data as (AtividadeCronograma & { processo_id: string; ordem: number })[] | null) || []
         const conclusao = mapearConclusaoPorCronograma(ativs)
         const linhas = ((processos.data as ProcessoRow[] | null) || []).map(p => ({
           ...p,
@@ -815,8 +828,8 @@ Cronograma aponta: ${d.etapaDoCronograma}`
         )}
         {atividadesNoTeto && (
           <p style={{ margin: '8px 0 0', fontSize: 11, color: CORES.warning }}>
-            O tempo por etapa está calculado sobre as primeiras {TETO_ATIVIDADES} atividades
-            concluídas — a média pode não refletir a carteira inteira.
+            O cronograma foi lido até o teto de {TETO_ATIVIDADES} etapas — o tempo por etapa
+            e o diagnóstico de aderência podem não refletir a carteira inteira.
           </p>
         )}
       </section>
