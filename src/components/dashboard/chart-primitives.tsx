@@ -70,6 +70,34 @@ function TooltipLayer({ nó, conteudo }: { nó: React.RefObject<HTMLDivElement |
 
 /* -------------------------------------------------------------------------- */
 
+const FONTE_ROTULO = "11px 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
+
+let contextoDeMedida: CanvasRenderingContext2D | null | undefined
+
+/**
+ * Largura real de um texto na fonte do eixo.
+ *
+ * Estimar por numero de caracteres nao funciona nos dois sentidos: cortar em
+ * 26 deixou "Fase de Julgamento das Pr…" vazar 2px, e apertar a estimativa
+ * passou a truncar "Atraso de 1 a 15 dias", que cabia inteiro. measureText da
+ * o valor exato sem custar um passe de layout.
+ *
+ * Onde nao ha canvas (jsdom, sem o pacote nativo), cai numa estimativa —
+ * o suficiente para os testes decidirem entre "cabe" e "nao cabe".
+ */
+function medirTexto(texto: string): number {
+  if (contextoDeMedida === undefined) {
+    contextoDeMedida = typeof document !== 'undefined'
+      ? document.createElement('canvas').getContext('2d')
+      : null
+  }
+  if (!contextoDeMedida || typeof contextoDeMedida.measureText !== 'function') {
+    return texto.length * 6.2
+  }
+  contextoDeMedida.font = FONTE_ROTULO
+  return contextoDeMedida.measureText(texto).width || texto.length * 6.2
+}
+
 export interface LinhaBarra {
   rotulo: string
   /** Valor total da barra. */
@@ -128,16 +156,16 @@ export function BarrasHorizontais({
 
   const rotuloX = Math.min(larguraRotulo, Math.max(70, largura * 0.36))
 
-  /* O rotulo e desenhado em SVG, que nao quebra linha nem reticencia sozinho:
-     texto maior que a calha simplesmente vaza pela borda. Cortar por numero
-     de caracteres nao resolve — 26 letras estreitas cabem, 26 largas nao — e
-     foi assim que "Fase de Julgamento das Pr…" vazou 2px. O corte usa a
-     largura disponivel, com uma estimativa conservadora por caractere para
-     a fonte do painel em 11px. O nome inteiro segue no tooltip e no aria-label. */
-  const LARGURA_POR_CARACTERE = 6.6
-  const maxCaracteres = Math.max(6, Math.floor((rotuloX - 12) / LARGURA_POR_CARACTERE))
-  const caber = (t: string) =>
-    t.length > maxCaracteres ? t.slice(0, maxCaracteres - 1).trimEnd() + '…' : t
+  /* SVG nao quebra linha nem coloca reticencia sozinho: texto maior que a
+     calha vaza pela borda. O corte usa a largura medida do texto, nao um
+     numero de caracteres — o nome inteiro segue no tooltip e no aria-label. */
+  const espacoDoRotulo = rotuloX - 12
+  const caber = (t: string) => {
+    if (medirTexto(t) <= espacoDoRotulo) return t
+    let corte = t.length
+    while (corte > 1 && medirTexto(t.slice(0, corte).trimEnd() + '…') > espacoDoRotulo) corte--
+    return t.slice(0, corte).trimEnd() + '…'
+  }
   const larguraValor = 46
   const plot = Math.max(40, largura - rotuloX - larguraValor)
   const max = maximo ?? Math.max(...linhas.map(l => l.total), 1)
