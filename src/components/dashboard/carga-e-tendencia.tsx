@@ -122,7 +122,10 @@ export default function CargaETendencia({
           />
           <p style={{ margin: '8px 0 0', fontSize: 10.5, color: CORES.ink3 }}>
             Pela data de fim da última etapa concluída do cronograma
-            {concluidosTotal > 0 && ` — ${concluidosComData} de ${concluidosTotal} concluídos têm cronograma registrado`}.
+            {/* a cobertura só é afirmada depois que os processos chegaram:
+                durante o carregamento diria "0 de 24", que não é verdade */}
+            {!carregando && concluidosTotal > 0 &&
+              ` — ${concluidosComData} de ${concluidosTotal} concluídos têm cronograma registrado`}.
           </p>
         </PainelGrafico>
       </div>
