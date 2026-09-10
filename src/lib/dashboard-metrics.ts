@@ -284,11 +284,15 @@ export interface CargaResponsavel {
  * Carga por responsável entre os processos em andamento, com a parcela em
  * atraso destacada. A cor do gráfico passa a codificar atraso em vez de
  * repetir a ordenação das barras.
+ *
+ * Devolve TODOS os responsáveis com processo em andamento. Havia aqui um
+ * limite de 10 embutido: ao entrar o 11º responsável na equipe, ele sumia do
+ * gráfico sem nada na tela indicar que alguém tinha ficado de fora. Quem
+ * decide o que cabe é quem desenha, e assumindo o custo de dizer o que cortou.
  */
 export function agruparCargaPorResponsavel(
   processos: (ProcessoPrazo & { responsavel_nome: string | null })[],
   hoje: Date,
-  limite = 10,
 ): CargaResponsavel[] {
   const acc = new Map<string, CargaResponsavel>()
   for (const p of processos) {
@@ -302,7 +306,6 @@ export function agruparCargaPorResponsavel(
   }
   return Array.from(acc.values())
     .sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, 'pt-BR'))
-    .slice(0, limite)
 }
 
 /** Rótulo de prazo para a coluna da tabela. */

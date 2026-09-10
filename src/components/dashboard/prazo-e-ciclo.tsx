@@ -130,7 +130,7 @@ export default function PrazoECiclo({ faixas, leadTime, faixaSelecionada, onSele
             vazio={carregando ? 'Carregando…' : 'Sem atividades de cronograma concluídas'}
           />
           <p style={{ margin: '10px 0 0', fontSize: 10.5, color: CORES.ink3 }}>
-            Etapas com pelo menos cinco conclusões registradas, da mais lenta para a mais rápida.
+            As seis etapas mais lentas, entre as que têm pelo menos cinco conclusões registradas.
           </p>
         </PainelGrafico>
       </div>

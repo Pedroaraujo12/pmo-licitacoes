@@ -30,13 +30,21 @@ export default function CargaETendencia({
   responsavelSelecionado, onSelecionarResponsavel, carregando,
 }: Props) {
   const totalEmAndamento = porResponsavel.reduce((s, r) => s + r.total, 0)
+
+  /* Todo mundo com processo em andamento aparece. A altura acompanha o tamanho
+     da equipe em vez de espremer as barras num quadro fixo — e se algum dia
+     passar de VISIVEIS, o corte e dito na tela, nao escondido. */
+  const VISIVEIS = 20
+  const mostrados = porResponsavel.slice(0, VISIVEIS)
+  const ocultos = porResponsavel.length - mostrados.length
+  const alturaCarga = Math.max(176, mostrados.length * 21 + 20)
   const totalConcluidos = concluidosPorMes.reduce((s, p) => s + p.total, 0)
   const maxCarga = Math.max(...porResponsavel.map(r => r.total), 1)
   const marcasCarga: number[] = []
   const passo = maxCarga <= 6 ? 1 : Math.ceil(maxCarga / 6)
   for (let m = 0; m <= maxCarga; m += passo) marcasCarga.push(m)
 
-  const linhas: LinhaBarra[] = porResponsavel.map(r => ({
+  const linhas: LinhaBarra[] = mostrados.map(r => ({
     rotulo: r.nome,
     total: r.total,
     parcela: r.atrasados,
@@ -70,20 +78,22 @@ export default function CargaETendencia({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PainelGrafico
           titulo="Em andamento por responsável"
-          meta={carregando ? 'carregando…' : `${totalEmAndamento} processo${totalEmAndamento === 1 ? '' : 's'}`}
+          meta={carregando
+            ? 'carregando…'
+            : `${totalEmAndamento} processo${totalEmAndamento === 1 ? '' : 's'} · ${porResponsavel.length} responsáve${porResponsavel.length === 1 ? 'l' : 'is'}`}
         >
           <BarrasHorizontais
             linhas={linhas}
             larguraRotulo={112}
-            altura={212}
+            altura={alturaCarga}
             alturaBarra={12}
             marcas={marcasCarga}
             maximo={maxCarga}
             cor={CORES.accentDim}
             corAlternativa="#c8474c"
             ariaLabel={
-              porResponsavel.length
-                ? `Processos em andamento por responsável, com a parcela em atraso destacada: ${porResponsavel
+              mostrados.length
+                ? `Processos em andamento por responsável, com a parcela em atraso destacada: ${mostrados
                     .map(r => `${r.nome}, ${r.total}${r.atrasados ? `, sendo ${r.atrasados} em atraso` : ''}`)
                     .join('; ')}.`
                 : 'Nenhum processo em andamento.'
@@ -96,6 +106,11 @@ export default function CargaETendencia({
               { cor: '#c8474c', texto: 'Em atraso' },
             ]}
           />
+          {ocultos > 0 && (
+            <p style={{ margin: '8px 0 0', fontSize: 10.5, color: CORES.ink3 }}>
+              +{ocultos} responsáve{ocultos === 1 ? 'l' : 'is'} com menos processos, fora do gráfico.
+            </p>
+          )}
         </PainelGrafico>
 
         <PainelGrafico

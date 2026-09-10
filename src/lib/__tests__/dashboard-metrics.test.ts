@@ -332,16 +332,26 @@ describe('agruparCargaPorResponsavel', () => {
     expect(r).toEqual([{ nome: 'Sem responsável', total: 2, atrasados: 0 }])
   })
 
-  it('desempata por nome e respeita o limite', () => {
+  it('desempata por nome, em ordem do português', () => {
     const r = agruparCargaPorResponsavel([
       { responsavel_nome: 'Zeca', status_nome: 'Em andamento', data_entrega: null },
       { responsavel_nome: 'Ana', status_nome: 'Em andamento', data_entrega: null },
+      { responsavel_nome: 'Ávila', status_nome: 'Em andamento', data_entrega: null },
     ], HOJE)
-    expect(r.map(x => x.nome)).toEqual(['Ana', 'Zeca'])
-    expect(agruparCargaPorResponsavel([
-      { responsavel_nome: 'Ana', status_nome: 'Em andamento', data_entrega: null },
-      { responsavel_nome: 'Zeca', status_nome: 'Em andamento', data_entrega: null },
-    ], HOJE, 1)).toHaveLength(1)
+    expect(r.map(x => x.nome)).toEqual(['Ana', 'Ávila', 'Zeca'])
+  })
+
+  it('não esconde ninguém: o 11º responsável da equipe continua na lista', () => {
+    // um responsavel novo entra com um processo so e cai no fim da ordenacao;
+    // com o limite de 10 que existia aqui, ele sumia sem aviso
+    const equipe = ['Bruno', 'Guilherme', 'Thiago', 'Alice Camargo', 'Hugo',
+                    'Karla Oliveira', 'Rebeca', 'Renan', 'Bárbara', 'Ilma', 'Isaias']
+    const processos = equipe.map(nome => ({
+      responsavel_nome: nome, status_nome: 'Em andamento', data_entrega: null,
+    }))
+    const r = agruparCargaPorResponsavel(processos, HOJE)
+    expect(r).toHaveLength(11)
+    expect(r.map(x => x.nome)).toContain('Isaias')
   })
 })
 

@@ -195,6 +195,39 @@ describe('CargaETendencia', () => {
     expect(grafico.getAttribute('aria-label')).toContain('Ilma, 3.')
   })
 
+  it('avisa quando algum responsável fica fora do gráfico, em vez de sumir com ele', () => {
+    const equipe = Array.from({ length: 23 }, (_, i) => ({
+      nome: `Pessoa ${String(i).padStart(2, '0')}`, total: 23 - i, atrasados: 0,
+    }))
+    render(
+      <CargaETendencia
+        porResponsavel={equipe}
+        concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 1 }]}
+        concluidosComData={15}
+        concluidosTotal={24}
+        responsavelSelecionado={null}
+        onSelecionarResponsavel={vi.fn()}
+      />,
+    )
+    expect(screen.getByText(/23 responsáveis/)).toBeTruthy()
+    expect(screen.getByText(/\+3 responsáveis com menos processos, fora do gráfico/)).toBeTruthy()
+  })
+
+  it('com a equipe inteira cabendo, não inventa aviso de corte', () => {
+    render(
+      <CargaETendencia
+        porResponsavel={[{ nome: 'Isaias', total: 1, atrasados: 0 }]}
+        concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 1 }]}
+        concluidosComData={15}
+        concluidosTotal={24}
+        responsavelSelecionado={null}
+        onSelecionarResponsavel={vi.fn()}
+      />,
+    )
+    expect(screen.queryByText(/fora do gráfico/)).toBeNull()
+    expect(screen.getByText(/1 responsável/)).toBeTruthy()
+  })
+
   it('declara a fonte da data de conclusão e quantos processos ela cobre', () => {
     render(
       <CargaETendencia
