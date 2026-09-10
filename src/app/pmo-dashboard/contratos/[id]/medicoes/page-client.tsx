@@ -20,7 +20,7 @@ const baseInput: React.CSSProperties = {
   borderRadius: 8, fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none',
 }
 const labelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: '#64748b',
+  fontSize: 11, fontWeight: 600, color: '#94a3b8',
   textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4,
 }
 
@@ -199,14 +199,14 @@ export default function MedicoesClient({ params }: { params: Promise<{ id: strin
       )}
 
       {medicoes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#64748b', fontSize: 14 }}>
+        <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8', fontSize: 14 }}>
           Nenhuma medição registrada
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{
             display: 'grid', gridTemplateColumns: '80px 100px 100px 100px 120px 80px 100px',
-            gap: 8, padding: '8px 16px', fontSize: 11, fontWeight: 700, color: '#64748b',
+            gap: 8, padding: '8px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8',
             textTransform: 'uppercase', letterSpacing: '0.05em',
           }}>
             <span>Nº</span>
@@ -231,7 +231,7 @@ export default function MedicoesClient({ params }: { params: Promise<{ id: strin
                 <span style={{ color: '#94a3b8' }}>{formatDateBR(m.periodo_inicio)}</span>
                 <span style={{ color: '#94a3b8' }}>{formatDateBR(m.periodo_fim)}</span>
                 <span style={{ color: '#22c55e', fontWeight: 600 }}>{formatBRL(m.valor_medido)}</span>
-                <span style={{ color: '#64748b', fontWeight: 600 }}>{m.percentual_executado}%</span>
+                <span style={{ color: '#94a3b8', fontWeight: 600 }}>{m.percentual_executado}%</span>
                 <span style={{
                   fontSize: 11, padding: '2px 8px', borderRadius: 6, justifySelf: 'start',
                   background: `${statusRec.bgColor}20`, color: statusRec.color, fontWeight: 600,

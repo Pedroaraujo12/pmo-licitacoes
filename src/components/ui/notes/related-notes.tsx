@@ -48,7 +48,7 @@ export default function RelatedNotes({ processoId, colaboradorId }: RelatedNotes
             Anotações Relacionadas
           </h3>
           {notes.length > 0 && (
-            <span style={{ fontSize: 11, color: '#64748b' }}>({notes.length})</span>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>({notes.length})</span>
           )}
         </div>
         <button
@@ -60,7 +60,7 @@ export default function RelatedNotes({ processoId, colaboradorId }: RelatedNotes
       </div>
 
       {notes.length === 0 && (
-        <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Nenhuma anotação vinculada ainda.</p>
+        <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Nenhuma anotação vinculada ainda.</p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -80,7 +80,7 @@ export default function RelatedNotes({ processoId, colaboradorId }: RelatedNotes
                 <span style={{ fontWeight: 600, fontSize: 13, color: '#f1f5f9' }}>{note.title}</span>
               )}
               {note.reminder_at && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 11, color: '#64748b', marginLeft: 'auto' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 11, color: '#94a3b8', marginLeft: 'auto' }}>
                   <Bell className="w-3 h-3" />
                   {formatDateBR(note.reminder_at)}
                 </span>

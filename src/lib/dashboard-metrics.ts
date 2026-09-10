@@ -321,3 +321,89 @@ export function rotuloPrazo(processo: ProcessoPrazo, hoje: Date): { texto: strin
   if (dias <= 7) return { texto: `vence em ${dias} ${dias === 1 ? 'dia' : 'dias'}`, tom: 'alerta' }
   return { texto: `${dias} dias restantes`, tom: 'neutro' }
 }
+
+/* ==========================================================================
+   Aderência entre a atividade declarada no processo e o cronograma.
+
+   O sistema guarda a etapa em dois lugares: o texto em `processos.atividade_atual`
+   e a primeira etapa não concluída do cronograma. Depois da migração para os
+   ritos DIOP, os cronogramas foram regenerados mas o texto ficou no rito antigo
+   — 39 de 57 processos passaram a declarar uma etapa que não existe no próprio
+   cronograma, e ninguém tinha como saber olhando a tela.
+
+   Isto não conserta o dado; torna a divergência visível, que é o passo que
+   permite consertar com conhecimento de causa.
+   ========================================================================== */
+
+export interface EtapaCronograma {
+  processo_id: string
+  descricao: string | null
+  status: string | null
+  ordem: number
+}
+
+export type Aderencia =
+  | 'confere'          // o texto declarado é a etapa que o cronograma aponta
+  | 'outra_etapa'      // o texto existe no cronograma, mas não é a etapa atual
+  | 'fora_do_rito'     // o texto não existe em nenhuma etapa deste processo
+  | 'nao_declarada'    // o processo não declara atividade atual
+  | 'sem_cronograma'   // não há cronograma para comparar
+
+export interface DiagnosticoAtividade {
+  aderencia: Aderencia
+  /** Etapa que o cronograma considera em andamento. */
+  etapaDoCronograma: string | null
+}
+
+/** Primeira etapa não concluída de cada processo, por ordem. */
+export function mapearEtapaAtualDoCronograma(etapas: EtapaCronograma[]): Map<string, string> {
+  const melhor = new Map<string, { ordem: number; descricao: string }>()
+  for (const e of etapas) {
+    if ((e.status || '').trim() === 'concluido') continue
+    const desc = (e.descricao || '').trim()
+    if (!desc) continue
+    const atual = melhor.get(e.processo_id)
+    if (!atual || e.ordem < atual.ordem) melhor.set(e.processo_id, { ordem: e.ordem, descricao: desc })
+  }
+  return new Map([...melhor].map(([id, v]) => [id, v.descricao]))
+}
+
+/** Conjunto de etapas de cada processo, para saber se o texto existe no rito. */
+export function mapearEtapasDoProcesso(etapas: EtapaCronograma[]): Map<string, Set<string>> {
+  const porProcesso = new Map<string, Set<string>>()
+  for (const e of etapas) {
+    const desc = (e.descricao || '').trim()
+    if (!desc) continue
+    if (!porProcesso.has(e.processo_id)) porProcesso.set(e.processo_id, new Set())
+    porProcesso.get(e.processo_id)!.add(desc)
+  }
+  return porProcesso
+}
+
+export function diagnosticarAtividade(
+  processoId: string,
+  atividadeDeclarada: string | null,
+  etapaAtual: Map<string, string>,
+  etapasDoProcesso: Map<string, Set<string>>,
+): DiagnosticoAtividade {
+  const doCronograma = etapaAtual.get(processoId) ?? null
+  const etapas = etapasDoProcesso.get(processoId)
+  const declarada = (atividadeDeclarada || '').trim()
+
+  if (!etapas || etapas.size === 0) return { aderencia: 'sem_cronograma', etapaDoCronograma: null }
+  if (!declarada) return { aderencia: 'nao_declarada', etapaDoCronograma: doCronograma }
+  if (declarada === doCronograma) return { aderencia: 'confere', etapaDoCronograma: doCronograma }
+  if (etapas.has(declarada)) return { aderencia: 'outra_etapa', etapaDoCronograma: doCronograma }
+  return { aderencia: 'fora_do_rito', etapaDoCronograma: doCronograma }
+}
+
+/** Processos cujo cronograma nunca teve etapa concluída — rito parado na 1ª. */
+export function cronogramasNuncaIniciados(etapas: EtapaCronograma[]): Set<string> {
+  const temConcluida = new Set<string>()
+  const temCronograma = new Set<string>()
+  for (const e of etapas) {
+    temCronograma.add(e.processo_id)
+    if ((e.status || '').trim() === 'concluido') temConcluida.add(e.processo_id)
+  }
+  return new Set([...temCronograma].filter(id => !temConcluida.has(id)))
+}

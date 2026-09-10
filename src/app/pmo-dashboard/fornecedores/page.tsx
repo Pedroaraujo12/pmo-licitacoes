@@ -70,7 +70,7 @@ export default function FornecedoresPage() {
             <Building2 size={20} style={{ marginRight: 8, verticalAlign: 'middle', color: '#60a5fa' }} />
             Fornecedores
           </h1>
-          <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>
+          <p style={{ color: '#94a3b8', fontSize: 14, margin: '4px 0 0' }}>
             {fornecedores.length} fornecedor{fornecedores.length !== 1 ? 'es' : ''} cadastrado{fornecedores.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -84,7 +84,7 @@ export default function FornecedoresPage() {
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 400 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#64748b' }} />
+          <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
           <input placeholder="Buscar por nome, CNPJ ou representante..."
             value={search} onChange={e => setSearch(e.target.value)}
             style={{ ...baseInput, paddingLeft: 32, width: '100%' }} />
@@ -104,7 +104,7 @@ export default function FornecedoresPage() {
 
       {!loading && fornecedores.length === 0 && (
         <div style={{
-          textAlign: 'center', padding: 60, color: '#64748b',
+          textAlign: 'center', padding: 60, color: '#94a3b8',
           background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',
           borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)',
         }}>
@@ -127,7 +127,7 @@ export default function FornecedoresPage() {
                 <ArrowRight size={14} style={{ color: '#475569' }} />
               </div>
               {f.cnpj && <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 2 }}>CNPJ: {f.cnpj}</div>}
-              <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#64748b', marginTop: 4 }}>
+              <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
                 <span><FileText size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />{f.total_contratos} contratos</span>
                 <span><DollarSign size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />{formatBRL(f.valor_total)}</span>
               </div>
@@ -145,7 +145,7 @@ export default function FornecedoresPage() {
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                 {['Fornecedor', 'CNPJ', 'Contratos', 'Valor Total', 'Executado', 'Representante', 'Contato'].map(h => (
                   <th key={h} style={{
-                    textAlign: 'left', padding: '12px 16px', color: '#64748b',
+                    textAlign: 'left', padding: '12px 16px', color: '#94a3b8',
                     fontWeight: 600, fontSize: 11, textTransform: 'uppercase',
                     letterSpacing: '0.05em', whiteSpace: 'nowrap',
                   }}>{h}</th>

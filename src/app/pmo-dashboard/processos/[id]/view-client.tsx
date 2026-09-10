@@ -232,10 +232,10 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
             <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: '#f8fafc', margin: 0, wordBreak: 'break-word' }}>
               <a href={linkSei || '#'} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: linkSei ? 'underline' : 'none', textUnderlineOffset: 3 }}>
                 {processo.id_processo}
-                {!linkSei && <span style={{ color: '#64748b', fontSize: 10, marginLeft: 6, fontWeight: 400 }}>(sem link)</span>}
+                {!linkSei && <span style={{ color: '#94a3b8', fontSize: 10, marginLeft: 6, fontWeight: 400 }}>(sem link)</span>}
               </a>
             </h1>
-            <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>{processo.objeto_resumido}</p>
+            <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>{processo.objeto_resumido}</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
@@ -274,19 +274,19 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
         gap: 16, marginBottom: 24,
       }}>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data de Entrada</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Data de Entrada</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{formatDate(processo.data_entrada)}</div>
         </div>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coordenação</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coordenação</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.coordenacoes?.nome || '-'}</div>
         </div>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.status_processo?.nome || '-'}</div>
         </div>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Responsável</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Responsável</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
             {processo.responsaveis?.nome || '-'}
             {responsavelColaborador && (
@@ -298,18 +298,18 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
             )}
           </div>
           {responsavelColaborador && (
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
               {responsavelColaborador.cargo && <span>{responsavelColaborador.cargo} · </span>}
               {responsavelColaborador.unidade && <span>{responsavelColaborador.unidade}</span>}
             </div>
           )}
         </div>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modalidade</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modalidade</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{processo.modalidades?.nome || '-'}</div>
         </div>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Progresso</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Progresso</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ flex: 1, height: 6, background: '#1e293b', borderRadius: 3, overflow: 'hidden' }}>
               <div style={{
@@ -326,15 +326,15 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
           </div>
         </div>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Estimado</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Estimado</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.valor_estimado ? formatBRL(processo.valor_estimado) : '-'}</div>
         </div>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Homologado</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Homologado</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#22c55e' }}>{processo.valor_homologado ? formatBRL(processo.valor_homologado) : '-'}</div>
         </div>
         <div style={fieldStyle}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Drive</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Drive</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>
             {processo.drive ? (
               <a href={processo.drive} target="_blank" rel="noopener noreferrer"
@@ -369,24 +369,24 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
         {contratoVinculado ? (
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12 }}>
             <div style={fieldStyle}>
-              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Nº Contrato</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Nº Contrato</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{contratoVinculado.numero_contrato}</div>
             </div>
             <div style={fieldStyle}>
-              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Contratada</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Contratada</div>
               <div style={{ fontSize: 13, color: '#f1f5f9' }}>{contratoVinculado.contratada_nome}</div>
             </div>
             <div style={fieldStyle}>
-              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Valor</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Valor</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#22c55e' }}>{formatBRL(contratoVinculado.valor_atual)}</div>
             </div>
             <div style={fieldStyle}>
-              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Status</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2, fontWeight: 600, textTransform: 'uppercase' }}>Status</div>
               <div style={{ fontSize: 13, color: '#f1f5f9' }}>{contratoVinculado.status}</div>
             </div>
           </div>
         ) : (
-          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Nenhum contrato vinculado a este processo.</p>
+          <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Nenhum contrato vinculado a este processo.</p>
         )}
       </div>
 
@@ -430,7 +430,7 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
               <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(30,41,59,0.5)', borderRadius: 8 }}>
                 <div>
                   <span style={{ fontSize: 13, fontWeight: 500, color: '#f1f5f9' }}>{d.titulo_documento}</span>
-                  <span style={{ fontSize: 11, color: '#64748b', marginLeft: 8 }}>{d.created_at ? formatDate(d.created_at) : ''}</span>
+                  <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 8 }}>{d.created_at ? formatDate(d.created_at) : ''}</span>
                 </div>
                 <span style={{ fontSize: 11, color: '#60a5fa' }}>v{d.template_versions?.version_number || '—'}</span>
               </div>
@@ -444,7 +444,7 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
           📅 Cronograma Dinâmico
         </h3>
         {cronograma.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#64748b' }}>
+          <p style={{ fontSize: 13, color: '#94a3b8' }}>
             Nenhuma etapa de cronograma encontrada.
           </p>
         ) : (
@@ -500,7 +500,7 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
       <div style={cardStyle}>
         <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Histórico de Atividades</h3>
         {registrosManuais.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#64748b' }}>Nenhuma atividade registrada</p>
+          <p style={{ fontSize: 13, color: '#94a3b8' }}>Nenhuma atividade registrada</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {registrosManuais.map(a => (
@@ -510,7 +510,7 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
                   justifyContent: 'space-between', marginBottom: 4, gap: 2,
                 }}>
                   <span style={{ fontWeight: 600, fontSize: 13, color: '#f1f5f9' }}>{a.atividade}</span>
-                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>
                     {a.data ? formatDate(a.data) : ''}
                     {a.responsavel && ` - ${a.responsavel}`}
                   </span>
@@ -528,7 +528,7 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
               onClick={() => setVerTrilha(v => !v)}
               style={{
                 background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
-                fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6,
               }}
             >
               {verTrilha ? '▾' : '▸'} Alterações registradas pelo sistema ({registrosDeSistema.length})
@@ -545,7 +545,7 @@ export default function ProcessoViewClient({ params, idOverride }: { params?: Pr
                         justifyContent: 'space-between', marginBottom: 2, gap: 2,
                       }}>
                         <span style={{ fontWeight: 600, fontSize: 12, color: '#cbd5e1' }}>{r.titulo}</span>
-                        <span style={{ fontSize: 11, color: '#64748b' }}>{a.data ? formatDate(a.data) : ''}</span>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>{a.data ? formatDate(a.data) : ''}</span>
                       </div>
                       {r.detalhe && <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{r.detalhe}</p>}
                       {r.justificativa && (

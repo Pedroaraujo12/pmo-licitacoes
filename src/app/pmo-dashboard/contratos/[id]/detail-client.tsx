@@ -33,7 +33,7 @@ const fieldStyle: React.CSSProperties = {
 }
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600,
+  fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600,
   textTransform: 'uppercase', letterSpacing: '0.05em',
 }
 
@@ -52,7 +52,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       style={{
         padding: '8px 16px', fontSize: 12, fontWeight: 600,
         background: active ? 'rgba(59,130,246,0.15)' : 'transparent',
-        color: active ? '#60a5fa' : '#64748b',
+        color: active ? '#60a5fa' : '#94a3b8',
         border: 'none', borderBottom: active ? '2px solid #60a5fa' : '2px solid transparent',
         cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
       }}>
@@ -223,7 +223,7 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
             padding: '14px 16px', textAlign: 'center',
           }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: sc.color }}>{sc.value}</div>
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500, marginTop: 2 }}>{sc.label}</div>
+            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500, marginTop: 2 }}>{sc.label}</div>
           </div>
         ))}
       </div>
@@ -276,28 +276,28 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
             }}>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>VALOR ORIGINAL</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>VALOR ORIGINAL</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>{formatBRL(bd.valorOriginal)}</div>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>Base do contrato sem aditivos</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8' }}>Base do contrato sem aditivos</div>
                 </div>
                 {bd.totalAcrescimos > 0 && (
                   <div>
-                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>ACRÉSCIMOS</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>ACRÉSCIMOS</div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>+ {formatBRL(bd.totalAcrescimos)}</div>
-                    <div style={{ fontSize: 10, color: '#64748b' }}>Aditivos de acréscimo/valor</div>
+                    <div style={{ fontSize: 10, color: '#94a3b8' }}>Aditivos de acréscimo/valor</div>
                   </div>
                 )}
                 {bd.totalSupressoes > 0 && (
                   <div>
-                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>SUPRESSÕES</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>SUPRESSÕES</div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: '#ef4444', marginTop: 2 }}>- {formatBRL(bd.totalSupressoes)}</div>
-                    <div style={{ fontSize: 10, color: '#64748b' }}>Aditivos de supressão</div>
+                    <div style={{ fontSize: 10, color: '#94a3b8' }}>Aditivos de supressão</div>
                   </div>
                 )}
                 <div>
-                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>VALOR ATUAL (calculado)</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>VALOR ATUAL (calculado)</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: '#60a5fa', marginTop: 2 }}>{formatBRL(bd.valorAtualCalculado)}</div>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>Original + acréscimos - supressões</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8' }}>Original + acréscimos - supressões</div>
                 </div>
               </div>
               {c.total_aditivos !== undefined && c.total_aditivos !== null && (
@@ -386,7 +386,7 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{os.numero_os}</div>
                 {os.objeto && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{os.objeto}</div>}
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
                   {formatDateBR(os.data_inicio)} - {formatDateBR(os.data_fim_prevista)}
                 </div>
               </div>
@@ -399,7 +399,7 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
                     fontWeight: 600, whiteSpace: 'nowrap',
                   }}>{statusRec.label}</span>
                 )}
-                <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{os.percentual_execucao}% exec.</div>
+                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{os.percentual_execucao}% exec.</div>
               </div>
             </div>
           )
@@ -424,14 +424,14 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{ad.numero_aditivo}</div>
                 {tipoRec && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{tipoRec.label}</div>}
-                {ad.justificativa && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{ad.justificativa}</div>}
+                {ad.justificativa && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{ad.justificativa}</div>}
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0, fontSize: 12 }}>
                 <div style={{ color: '#94a3b8' }}>Anterior: {formatBRL(ad.valor_anterior)}</div>
                 <div style={{ color: '#f59e0b' }}>Alteração: {formatBRL(ad.valor_alteracao)}</div>
                 <div style={{ color: '#22c55e', fontWeight: 500 }}>Novo: {formatBRL(ad.valor_novo)}</div>
                 {ad.vigencia_nova_fim && (
-                  <div style={{ color: '#64748b', fontSize: 10, marginTop: 2 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>
                     Vig: {formatDateBR(ad.vigencia_nova_fim)}
                   </div>
                 )}
@@ -459,7 +459,7 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{m.numero_medicao}</div>
                 {m.competencia && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Competência: {m.competencia}</div>}
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
                   {formatDateBR(m.periodo_inicio)} - {formatDateBR(m.periodo_fim)}
                 </div>
               </div>
@@ -497,7 +497,7 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>NF {p.numero_nota_fiscal}</div>
                 {p.data_emissao_nf && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Emissão: {formatDateBR(p.data_emissao_nf)}</div>}
-                {p.data_vencimento && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Venc: {formatDateBR(p.data_vencimento)}</div>}
+                {p.data_vencimento && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Venc: {formatDateBR(p.data_vencimento)}</div>}
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0, fontSize: 12 }}>
                 <div style={{ fontWeight: 600, color: '#22c55e' }}>{formatBRL(p.valor)}</div>
@@ -508,7 +508,7 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
                     fontWeight: 600, whiteSpace: 'nowrap',
                   }}>{statusRec.label}</span>
                 )}
-                {p.data_pagamento && <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Pago: {formatDateBR(p.data_pagamento)}</div>}
+                {p.data_pagamento && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>Pago: {formatDateBR(p.data_pagamento)}</div>}
               </div>
             </div>
           )
@@ -531,13 +531,13 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{h.entidade}</div>
                 {h.descricao && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{h.descricao}</div>}
-                <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
                   <span>Ação: {h.acao}</span>
                   {h.valor_anterior && <span>Anterior: {h.valor_anterior}</span>}
                   {h.valor_novo && <span>Novo: {h.valor_novo}</span>}
                 </div>
               </div>
-              <div style={{ textAlign: 'right', flexShrink: 0, fontSize: 11, color: '#64748b' }}>
+              <div style={{ textAlign: 'right', flexShrink: 0, fontSize: 11, color: '#94a3b8' }}>
                 <div>{formatDateBR(h.created_at)}</div>
                 {h.profiles?.name && <div>{h.profiles.name}</div>}
               </div>
@@ -550,7 +550,7 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
 
   function EmptyTab({ message }: { message: string }) {
     return (
-      <div style={{ textAlign: 'center', padding: 40, color: '#64748b', fontSize: 13 }}>
+      <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 13 }}>
         {message}
       </div>
     )
@@ -580,7 +580,7 @@ export default function ContratoDetailClient({ params, idOverride }: { params?: 
             </div>
             <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>{c.contratada_nome}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#64748b' }}>
+              <span style={{ fontSize: 12, color: '#94a3b8' }}>
                 <Calendar size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
                 {formatDateBR(c.data_inicio_vigencia)} - {formatDateBR(c.data_fim_vigencia)}
               </span>

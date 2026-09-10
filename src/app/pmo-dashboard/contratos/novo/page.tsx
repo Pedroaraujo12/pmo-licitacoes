@@ -232,12 +232,12 @@ export default function NovoContratoPage() {
         </Link>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Novo Contrato</h1>
-          <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>Preencha os dados do contrato</p>
+          <p style={{ color: '#94a3b8', fontSize: 14, margin: '4px 0 0' }}>Preencha os dados do contrato</p>
         </div>
       </div>
 
       {loading && (
-        <div style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 14 }}>Carregando dados...</div>
+        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Carregando dados...</div>
       )}
 
       {!loading && (
@@ -265,7 +265,7 @@ export default function NovoContratoPage() {
               <label style={labelStyle}>Processo Vinculado</label>
               <div style={{ position: 'relative' }}>
                 <Search size={14} style={{
-                  position: 'absolute', left: 10, top: 10, color: '#64748b', pointerEvents: 'none'
+                  position: 'absolute', left: 10, top: 10, color: '#94a3b8', pointerEvents: 'none'
                 }} />
                 <input type="text" placeholder="Buscar processo..."
                   value={selectedProcesso
@@ -279,7 +279,7 @@ export default function NovoContratoPage() {
                     onClick={() => { setField('processo_id', ''); setProcessoSearch('') }}
                     style={{
                       position: 'absolute', right: 8, top: 8,
-                      background: 'none', border: 'none', color: '#64748b',
+                      background: 'none', border: 'none', color: '#94a3b8',
                       cursor: 'pointer', fontSize: 14,
                     }}>&times;</button>
                 )}
@@ -291,7 +291,7 @@ export default function NovoContratoPage() {
                   borderRadius: 8, maxHeight: 200, overflowY: 'auto', marginTop: 4,
                 }}>
                   {filteredProcessos.length === 0 ? (
-                    <div style={{ padding: 10, fontSize: 12, color: '#64748b' }}>
+                    <div style={{ padding: 10, fontSize: 12, color: '#94a3b8' }}>
                       Nenhum processo encontrado
                     </div>
                   ) : (

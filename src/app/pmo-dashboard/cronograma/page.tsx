@@ -33,7 +33,7 @@ function statusBadge(pa: string) {
   switch (pa) {
     case 'concluido': return { label: 'Concluído', color: '#059669', icon: CheckCircle2 }
     case 'em_andamento': return { label: 'Em Andamento', color: '#2563eb', icon: Clock }
-    default: return { label: 'Não Iniciado', color: '#64748b', icon: Circle }
+    default: return { label: 'Não Iniciado', color: '#94a3b8', icon: Circle }
   }
 }
 
@@ -636,7 +636,7 @@ export default function CronogramaPage() {
           <div key={f.rotulo}>
             <label style={{
               display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-              textTransform: 'uppercase', color: '#64748b', marginBottom: 4,
+              textTransform: 'uppercase', color: '#94a3b8', marginBottom: 4,
             }}>
               {f.rotulo}
             </label>
@@ -796,7 +796,7 @@ export default function CronogramaPage() {
         <div style={{ marginBottom: 14 }}>
           <div style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
+            textTransform: 'uppercase', color: '#94a3b8', marginBottom: 8,
           }}>
             Processos por coordenação
           </div>
@@ -830,7 +830,7 @@ export default function CronogramaPage() {
         <div style={{ marginBottom: 16 }}>
           <div style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
+            textTransform: 'uppercase', color: '#94a3b8', marginBottom: 8,
           }}>
             {modalidadeFiltro && etapasPorModalidade[modalidadeFiltro]
               ? `Etapas do rito · ${modalidadeFiltro}`
@@ -913,7 +913,7 @@ export default function CronogramaPage() {
         background: 'rgba(30,41,59,0.5)', borderRadius: 10,
         border: '1px solid rgba(255,255,255,0.1)', padding: '0 12px',
       }}>
-        <Search size={16} color="#64748b" />
+        <Search size={16} color="#94a3b8" />
         <input
           ref={searchRef}
           type="text"
@@ -927,14 +927,14 @@ export default function CronogramaPage() {
         />
         {search && (
           <button onClick={() => { setSearch(''); setPage(1) }}
-            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16 }}>
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>
             ×
           </button>
         )}
       </div>
 
       {list.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
           {debouncedSearch ? 'Nenhum processo encontrado para esta busca.' : 'Nenhum processo encontrado.'}
         </div>
       ) : (
@@ -968,7 +968,7 @@ export default function CronogramaPage() {
                   <div style={{ color: '#f1f5f9', fontWeight: 600, fontSize: 14, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {p.objeto_resumido || 'Sem objeto'}
                   </div>
-                  <div style={{ color: '#64748b', fontSize: 12, marginBottom: 4 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 4 }}>
                     <a href={seiLinks[p.id] || '#'} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: seiLinks[p.id] ? 'underline' : 'none' }}>{p.id_processo || 'Sem ID'}</a>{p.modalidade_nome ? ` · ${p.modalidade_nome}` : ''}
                   </div>
                   <div style={{ color: '#94a3b8', fontSize: 13 }}>
@@ -1004,7 +1004,7 @@ export default function CronogramaPage() {
                       <span style={{ color: '#94a3b8' }}>Etapa atual: </span>
                       {p.etapa_atual_ordem ? `${p.etapa_atual_ordem}. ` : ''}{p.etapa_atual}
                       {p.ultima_fase ? (
-                        <span style={{ color: '#64748b' }}> · {p.ultima_fase}</span>
+                        <span style={{ color: '#94a3b8' }}> · {p.ultima_fase}</span>
                       ) : null}
 
                       {/* Tempo parado na etapa além do previsto, em dias úteis */}
@@ -1023,13 +1023,13 @@ export default function CronogramaPage() {
                             Parada há {p.dias_uteis_atraso} {p.dias_uteis_atraso === 1 ? 'dia útil' : 'dias úteis'}
                           </span>
                           {p.etapa_atual_data_fim ? (
-                            <span style={{ color: '#64748b', fontSize: 12, marginLeft: 8 }}>
+                            <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 8 }}>
                               prazo era {formatDate(p.etapa_atual_data_fim)}
                             </span>
                           ) : null}
                         </div>
                       ) : p.etapa_atual_data_fim ? (
-                        <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+                        <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 4 }}>
                           Prazo da etapa: {formatDate(p.etapa_atual_data_fim)}
                         </div>
                       ) : null}
@@ -1050,7 +1050,7 @@ export default function CronogramaPage() {
                       borderLeft: '2px solid rgba(148,163,184,0.3)',
                     }}>
                       <div style={{
-                        fontSize: 11, color: '#64748b', marginBottom: 1,
+                        fontSize: 11, color: '#94a3b8', marginBottom: 1,
                         display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
                       }}>
                         <span>
@@ -1109,13 +1109,13 @@ export default function CronogramaPage() {
                         transition: 'width 0.3s',
                       }} />
                     </div>
-                    <div style={{ color: '#64748b', fontSize: 12 }}>
+                    <div style={{ color: '#94a3b8', fontSize: 12 }}>
                       {p.data_entrega ? `Previsão: ${formatDate(p.data_entrega)}` : ''}
                     </div>
                   </div>
                 )}
 
-                <ArrowRight size={16} color="#64748b" />
+                <ArrowRight size={16} color="#94a3b8" />
               </div>
             )
           })}

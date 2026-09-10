@@ -80,7 +80,7 @@ export default function AniversariantesPage() {
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><div className="loading-spinner" /></div>
       ) : aniversariantes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#64748b', fontSize: 14 }}>
+        <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8', fontSize: 14 }}>
           Nenhum aniversariante encontrado neste período
         </div>
       ) : (
@@ -115,7 +115,7 @@ export default function AniversariantesPage() {
                   <span>{a.dia_nascimento}/{String(a.mes_nascimento).padStart(2, '0')} — {a.idade} anos</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, fontSize: 12, color: '#64748b', flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 8, fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>
                 {a.email_institucional && <span>{a.email_institucional}</span>}
                 {a.telefone_institucional && <span>{a.telefone_institucional}</span>}
               </div>

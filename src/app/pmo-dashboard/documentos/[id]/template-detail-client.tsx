@@ -195,14 +195,14 @@ export default function TemplateDetailClient({ params, idOverride }: { params?: 
                   {Object.entries(TIPO_DOCUMENTO_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               ) : (
-                <span style={{ fontSize: 12, color: '#64748b' }}>{TIPO_DOCUMENTO_LABELS[template.tipo_documento as keyof typeof TIPO_DOCUMENTO_LABELS]}</span>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>{TIPO_DOCUMENTO_LABELS[template.tipo_documento as keyof typeof TIPO_DOCUMENTO_LABELS]}</span>
               )}
               {editing ? (
                 <select value={editCategoria} onChange={e => setEditCategoria(e.target.value)} style={{ ...baseInput, width: 'auto', fontSize: 11, padding: '2px 8px' }}>
                   {Object.entries(CATEGORIA_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               ) : (
-                <span style={{ fontSize: 12, color: '#64748b' }}>{CATEGORIA_LABELS[template.categoria as keyof typeof CATEGORIA_LABELS]}</span>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>{CATEGORIA_LABELS[template.categoria as keyof typeof CATEGORIA_LABELS]}</span>
               )}
               {editing ? (
                 <input value={editBaseLegal} onChange={e => setEditBaseLegal(e.target.value)} placeholder="Base legal" style={{ ...baseInput, width: 200, fontSize: 11, padding: '2px 8px' }} />
@@ -264,7 +264,7 @@ export default function TemplateDetailClient({ params, idOverride }: { params?: 
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {template.tags?.length > 0 ? template.tags.map(t => (
                 <span key={t} style={{ fontSize: 11, padding: '2px 8px', background: 'rgba(37,99,235,0.2)', color: '#60a5fa', borderRadius: 10 }}>#{t}</span>
-              )) : <span style={{ fontSize: 13, color: '#64748b' }}>Nenhuma tag</span>}
+              )) : <span style={{ fontSize: 13, color: '#94a3b8' }}>Nenhuma tag</span>}
             </div>
           )}
         </div>
@@ -280,7 +280,7 @@ export default function TemplateDetailClient({ params, idOverride }: { params?: 
         </div>
         {activeVersion && (
           <div>
-            <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 4px' }}>
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 4px' }}>
               Aprovado em {activeVersion.data_aprovacao ? formatDate(activeVersion.data_aprovacao) : '—'}
               {activeVersion.profiles_aprovador?.name ? ` por ${activeVersion.profiles_aprovador.name}` : ''}
             </p>
@@ -327,7 +327,7 @@ export default function TemplateDetailClient({ params, idOverride }: { params?: 
         )}
 
         {versions.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#64748b' }}>Nenhuma versão cadastrada</p>
+          <p style={{ fontSize: 13, color: '#94a3b8' }}>Nenhuma versão cadastrada</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {versions.map(v => (
@@ -346,7 +346,7 @@ export default function TemplateDetailClient({ params, idOverride }: { params?: 
                       <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: 'rgba(34,197,94,0.2)', color: '#22c55e', fontWeight: 700 }}>VIGENTE</span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
                     <span>{v.profiles?.name || '—'}</span>
                     <span>{v.created_at ? formatDate(v.created_at) : '—'}</span>
                     {v.resumo_alteracao && <span style={{ color: '#94a3b8' }}>{v.resumo_alteracao}</span>}

@@ -35,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
           Erro ao carregar este componente.
           {/* A mensagem fica visível: em celular não há console para consultar. */}
           <div style={{
-            marginTop: 8, color: '#64748b', fontSize: 11,
+            marginTop: 8, color: '#94a3b8', fontSize: 11,
             wordBreak: 'break-word', maxWidth: 520, marginInline: 'auto',
           }}>
             {this.state.message}

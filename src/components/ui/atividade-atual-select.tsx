@@ -124,7 +124,7 @@ export default function AtividadeAtualSelect({
       </select>
 
       {!modalidadeId && (
-        <p style={{ fontSize: 11, color: '#64748b', margin: '4px 0 0' }}>
+        <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
           Escolha a modalidade para ver as etapas do rito.
         </p>
       )}

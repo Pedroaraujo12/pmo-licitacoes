@@ -101,7 +101,7 @@ export default function NovoModeloPage() {
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conteúdo do Modelo *</label>
-            <span style={{ fontSize: 11, color: '#64748b' }}>Use [[PLACEHOLDER]] para campos variáveis</span>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>Use [[PLACEHOLDER]] para campos variáveis</span>
           </div>
           <textarea value={form.conteudo} onChange={e => setForm(f => ({ ...f, conteudo: e.target.value }))} rows={20}
             placeholder={`EDITAL DE PREGÃO ELETRÔNICO Nº [[NUMERO_PROCESSO]]/[[ANO_PROCESSO]]

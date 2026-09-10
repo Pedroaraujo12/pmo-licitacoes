@@ -24,7 +24,7 @@ const baseInputStyle: React.CSSProperties = {
   borderRadius: 8, fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none',
 }
 const labelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: '#64748b',
+  fontSize: 11, fontWeight: 600, color: '#94a3b8',
   textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4,
 }
 
@@ -395,7 +395,7 @@ export default function ColaboradorDetailClient({ params, idOverride }: { params
                 Vinculado a: <strong>{linkedUser?.name || colaborador.user_id}</strong>
               </p>
               {linkedUser?.email && (
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>{linkedUser.email}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>{linkedUser.email}</p>
               )}
             </div>
             {canManage && (
@@ -407,7 +407,7 @@ export default function ColaboradorDetailClient({ params, idOverride }: { params
           </div>
         ) : (
           <div>
-            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px' }}>Nenhum usuário vinculado</p>
+            <p style={{ fontSize: 13, color: '#94a3b8', margin: '0 0 12px' }}>Nenhum usuário vinculado</p>
             {canManage && (
               showVincular ? (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -444,7 +444,7 @@ export default function ColaboradorDetailClient({ params, idOverride }: { params
           <FileText size={14} /> Processos Associados ({processos.length})
         </h3>
         {processos.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Nenhum processo associado</p>
+          <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Nenhum processo associado</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {processos.map(p => (
@@ -456,7 +456,7 @@ export default function ColaboradorDetailClient({ params, idOverride }: { params
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{p.id_processo || p.id.slice(0, 8)}</span>
                   {p.objeto_resumido && <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>{p.objeto_resumido}</span>}
                 </div>
-                <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#64748b' }}>
+                <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#94a3b8' }}>
                   {p.modalidades?.nome && <span>{p.modalidades.nome}</span>}
                   {p.status_processo?.nome && <span>{p.status_processo.nome}</span>}
                 </div>

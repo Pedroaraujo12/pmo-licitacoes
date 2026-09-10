@@ -14,7 +14,7 @@ const baseInput: React.CSSProperties = {
   borderRadius: 8, fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none',
 }
 const labelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: '#64748b',
+  fontSize: 11, fontWeight: 600, color: '#94a3b8',
   textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4,
 }
 

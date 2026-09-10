@@ -538,7 +538,7 @@ export default function CronogramaDinamico({
       {/* Status Header */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 20, padding: 16, background: 'rgba(15,23,42,0.5)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ flex: 1, minWidth: 120 }}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600 }}>PROGRESSO</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600 }}>PROGRESSO</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3 }}>
               <div style={{ width: `${status.progresso}%`, height: '100%', background: '#22c55e', borderRadius: 3, transition: 'width 0.3s' }} />
@@ -548,13 +548,13 @@ export default function CronogramaDinamico({
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{status.concluidas}/{status.total} etapas</div>
         </div>
         <div style={{ minWidth: 100 }}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600 }}>ATRASADAS</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600 }}>ATRASADAS</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: status.atrasadas > 0 ? '#ef4444' : '#22c55e' }}>
             {status.atrasadas > 0 ? `🔴 ${status.atrasadas}` : '✅ 0'}
           </div>
         </div>
         <div style={{ minWidth: 100 }}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600 }}>ATIVIDADE ATUAL</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600 }}>ATIVIDADE ATUAL</div>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {status.atividade_atual || 'Nenhuma'}
           </div>
@@ -646,20 +646,20 @@ export default function CronogramaDinamico({
                 flexWrap: 'wrap',
               }}>
                 <span style={{ fontSize: 14 }}>{vi.icon}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', minWidth: 20 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', minWidth: 20 }}>
                   #{a.ordem}
                 </span>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
                     fontSize: 13, fontWeight: 500,
-                    color: a.status === 'concluido' ? '#64748b' : '#e2e8f0',
+                    color: a.status === 'concluido' ? '#94a3b8' : '#e2e8f0',
                     textDecoration: a.status === 'concluido' ? 'line-through' : 'none',
                   }}>
                     {a.descricao}
                     {isOverridden && <span style={{ color: '#f59e0b', fontSize: 10, marginLeft: 4 }}>✏️</span>}
                   </div>
-                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b', marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#94a3b8', marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{
                       fontSize: 9, fontWeight: 700, color: getAtividadeBadgeColor(a.fase),
                       textTransform: 'uppercase', letterSpacing: '0.04em',
@@ -757,7 +757,7 @@ export default function CronogramaDinamico({
                   onChange={e => setReposData(e.target.value)}
                   style={{ width: '100%', padding: '8px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 13, background: 'rgba(15,23,42,0.5)', color: '#cbd5e1', outline: 'none' }}
                 />
-                <p style={{ fontSize: 11, color: '#64748b', margin: '4px 0 0' }}>
+                <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
                   Se a etapa já começou, informe a data real de início — não a de hoje.
                 </p>
               </div>
@@ -777,7 +777,7 @@ export default function CronogramaDinamico({
                 />
                 <span>
                   Reabrir etapas já concluídas a partir desta
-                  <span style={{ display: 'block', fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  <span style={{ display: 'block', fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
                     Elas voltam a pendentes e perdem as datas reais registradas.
                     Necessário para recomeçar um processo inteiramente concluído.
                   </span>

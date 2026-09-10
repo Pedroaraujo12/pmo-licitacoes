@@ -97,10 +97,22 @@ const CRONOGRAMA = [
   ...etapa('Publicação no site (UCOM)', 1),
 ]
 
+/* p1 declara "Adjudicação", que não existe no rito dele — é o caso real dos
+   processos que ficaram com o texto do rito antigo depois da migração DIOP.
+   A última etapa fica pendente para o cronograma ter uma etapa atual a apontar. */
+const CRONOGRAMA_COM_ORDEM = [
+  ...CRONOGRAMA.map((c, i) => ({ ...c, ordem: i + 1 })),
+  {
+    processo_id: 'p1', fase: 'Execução', descricao: 'Homologação',
+    status: 'nao_iniciado', ordem: 99,
+    data_inicio: emDias(-5), data_fim: emDias(5),
+  },
+]
+
 function tabela(nome: string) {
   if (nome === 'cronograma_atividades') {
     // espelha a cadeia real: .select(...).eq(...).limit(...)
-    const resolvido = { data: CRONOGRAMA, error: null }
+    const resolvido = { data: CRONOGRAMA_COM_ORDEM, error: null }
     const comLimite = { limit: vi.fn(async () => resolvido) }
     return { select: vi.fn(() => ({ eq: vi.fn(() => comLimite) })) }
   }
@@ -190,6 +202,21 @@ describe('DashboardContent', () => {
     await montar('visualizador')
     expect(screen.queryByRole('columnheader', { name: 'Ações' })).toBeNull()
     expect(screen.getByRole('columnheader', { name: 'Prazo' })).toBeTruthy()
+  })
+
+  it('avisa que atividade declarada e cronograma divergem, em vez de deixar passar', async () => {
+    await montar()
+    // p1 declara "Adjudicação", que não existe no cronograma dele
+    expect(screen.getByText(/Atividade atual e cronograma divergem/)).toBeTruthy()
+    expect(screen.getByText(/declaram uma etapa que não existe|declara uma etapa que não existe/)).toBeTruthy()
+  })
+
+  it('marca a linha divergente e mostra as duas versões no title', async () => {
+    await montar()
+    const linha = screen.getByText('Telessaúde').closest('tr')!
+    expect(within(linha).getByLabelText('Diverge do cronograma')).toBeTruthy()
+    const celula = within(linha).getByTitle(/Cronograma aponta:/)
+    expect(celula.getAttribute('title')).toContain('Declarado: Adjudicação')
   })
 
   it('não mostra mais a coluna Observações, que duplicava a atividade atual', async () => {

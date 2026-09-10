@@ -194,11 +194,11 @@ export default function ColaboradoresListPage() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Colaboradores</h1>
           {metricas && (
-            <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 12, color: '#64748b' }}>
+            <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 12, color: '#94a3b8' }}>
               <span><span style={{ color: '#22c55e', fontWeight: 600 }}>{metricas.ativos}</span> ativos</span>
               {metricas.afastados > 0 && <span><span style={{ color: '#f59e0b', fontWeight: 600 }}>{metricas.afastados}</span> afastados</span>}
-              <span><span style={{ color: '#64748b', fontWeight: 600 }}>{metricas.unidades_distintas}</span> unidades</span>
-              <span><span style={{ color: '#64748b', fontWeight: 600 }}>{metricas.total}</span> total</span>
+              <span><span style={{ color: '#94a3b8', fontWeight: 600 }}>{metricas.unidades_distintas}</span> unidades</span>
+              <span><span style={{ color: '#94a3b8', fontWeight: 600 }}>{metricas.total}</span> total</span>
             </div>
           )}
         </div>
@@ -221,7 +221,7 @@ export default function ColaboradoresListPage() {
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#64748b' }} />
+          <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
           <input placeholder="Buscar por nome, unidade, cargo..."
             value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
             style={{ ...baseInput, paddingLeft: 32, width: '100%' }} />
@@ -240,7 +240,7 @@ export default function ColaboradoresListPage() {
           <option value="afastado">Afastado</option>
           <option value="desligado">Desligado</option>
         </select>
-        <span style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
           {totalCount} registros
         </span>
       </div>
@@ -250,7 +250,7 @@ export default function ColaboradoresListPage() {
         <div style={{ marginBottom: 16 }}>
           <div style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
+            textTransform: 'uppercase', color: '#94a3b8', marginBottom: 8,
           }}>
             Colaboradores por unidade
           </div>
@@ -306,7 +306,7 @@ export default function ColaboradoresListPage() {
             {loadError}
           </div>
         ) : colaboradores.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#64748b', fontSize: 14 }}>
+          <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8', fontSize: 14 }}>
             Nenhum colaborador encontrado
           </div>
         ) : (
@@ -348,7 +348,7 @@ export default function ColaboradoresListPage() {
                   {c.regime && <span>{REGIME_LABELS[c.regime]}</span>}
                 </div>
               </div>
-              <div style={{ textAlign: 'right', fontSize: 12, color: '#64748b', flexShrink: 0 }}>
+              <div style={{ textAlign: 'right', fontSize: 12, color: '#94a3b8', flexShrink: 0 }}>
                 {c.email_institucional && <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
                   <Mail size={11} /> {c.email_institucional}
                 </div>}

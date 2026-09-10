@@ -83,7 +83,7 @@ export default function DashboardError({
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => setAberto(v => !v)}
             style={{
-              padding: '6px 12px', background: 'transparent', color: '#64748b',
+              padding: '6px 12px', background: 'transparent', color: '#94a3b8',
               border: '1px solid #1e293b', borderRadius: 6, fontSize: 12,
               cursor: 'pointer',
             }}>
@@ -91,7 +91,7 @@ export default function DashboardError({
           </button>
           <button onClick={copiar}
             style={{
-              padding: '6px 12px', background: 'transparent', color: '#64748b',
+              padding: '6px 12px', background: 'transparent', color: '#94a3b8',
               border: '1px solid #1e293b', borderRadius: 6, fontSize: 12,
               cursor: 'pointer',
             }}>

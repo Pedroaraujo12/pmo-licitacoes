@@ -405,7 +405,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
               onClick={() => setViewMode('table')}
               style={{
                 padding: '6px 10px', background: viewMode === 'table' ? 'rgba(139,92,246,0.15)' : 'transparent',
-                border: 'none', color: viewMode === 'table' ? '#a78bfa' : '#64748b', cursor: 'pointer',
+                border: 'none', color: viewMode === 'table' ? '#a78bfa' : '#94a3b8', cursor: 'pointer',
                 fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
               }}
             >
@@ -415,7 +415,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
               onClick={() => setViewMode('cards')}
               style={{
                 padding: '6px 10px', background: viewMode === 'cards' ? 'rgba(139,92,246,0.15)' : 'transparent',
-                border: 'none', color: viewMode === 'cards' ? '#a78bfa' : '#64748b', cursor: 'pointer',
+                border: 'none', color: viewMode === 'cards' ? '#a78bfa' : '#94a3b8', cursor: 'pointer',
                 fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
               }}
             >
@@ -495,7 +495,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
           </span>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <label style={{ fontSize: 9, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>De</label>
+          <label style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>De</label>
           <input
             value={dateStart}
             onChange={e => { setDateStart(e.target.value); setPage(1) }}
@@ -505,7 +505,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <label style={{ fontSize: 9, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Até</label>
+          <label style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Até</label>
           <input
             value={dateEnd}
             onChange={e => { setDateEnd(e.target.value); setPage(1) }}
@@ -566,7 +566,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
         <div style={{ marginBottom: 16 }}>
           <div style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: '#64748b', marginBottom: 8,
+            textTransform: 'uppercase', color: '#94a3b8', marginBottom: 8,
           }}>
             Processos por coordenação
           </div>
@@ -838,7 +838,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
                 <div style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 500, marginBottom: 8, lineHeight: 1.4 }}>
                   {p.objeto_resumido || '-'}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8, fontSize: 11, color: '#64748b' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8, fontSize: 11, color: '#94a3b8' }}>
                   <span><strong style={{ color: '#94a3b8' }}>Resp:</strong> {p.responsaveis?.nome || 'N/I'}</span>
                   <span><strong style={{ color: '#94a3b8' }}>Modal:</strong> {p.modalidades?.nome || '-'}</span>
                   {p.prioridade && (
@@ -863,7 +863,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
                     {formatBRL(p.valor_estimado)}
                   </span>
-                  <span style={{ fontSize: 10, color: '#64748b' }}>
+                  <span style={{ fontSize: 10, color: '#94a3b8' }}>
                     {concluidas}/{total} etapas
                   </span>
                 </div>
@@ -871,7 +871,7 @@ export default function GestaoProcessos({ processos, setProcessos, responsaveis,
             )
           })}
           {filtered.length === 0 && (
-            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: '#64748b', fontSize: 12 }}>
+            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 12 }}>
               Nenhum processo encontrado
             </div>
           )}

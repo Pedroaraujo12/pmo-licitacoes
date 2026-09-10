@@ -19,7 +19,7 @@ const fieldStyle: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.06)', padding: '12px 16px',
 }
 const labelStyle: React.CSSProperties = {
-  fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600,
+  fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600,
   textTransform: 'uppercase', letterSpacing: '0.05em',
 }
 
@@ -134,7 +134,7 @@ export default function OrdemServicoDetailClient({ params, idOverride }: { param
             </button>
           </div>
         ) : (
-          <span style={{ color: '#64748b', fontSize: 13 }}>—</span>
+          <span style={{ color: '#94a3b8', fontSize: 13 }}>—</span>
         )}
       </div>
 

@@ -23,6 +23,10 @@ import {
   agruparConcluidosPorMes,
   calcularLeadTimePorEtapa,
   mapearConclusaoPorCronograma,
+  mapearEtapaAtualDoCronograma,
+  mapearEtapasDoProcesso,
+  diagnosticarAtividade,
+  cronogramasNuncaIniciados,
   calcularTaxaHomologacao,
   calcularEconomiaPercentual,
   classificarPrazo,
@@ -94,7 +98,7 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
   const [summaryError, setSummaryError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [todos, setTodos] = useState<ProcessoRow[]>([])
-  const [atividades, setAtividades] = useState<(AtividadeCronograma & { processo_id: string })[]>([])
+  const [atividades, setAtividades] = useState<(AtividadeCronograma & { processo_id: string; ordem: number })[]>([])
   const [loadingSummary, setLoadingSummary] = useState(true)
   const summaryResolved = useRef(false)
   const [loadingRows, setLoadingRows] = useState(true)
@@ -195,13 +199,13 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           supabase.rpc('search_processos', { p_limit: TETO_CARREGAMENTO, p_offset: 0 }),
           supabase
             .from('cronograma_atividades')
-            .select('processo_id, fase, descricao, status, data_inicio, data_fim')
+            .select('processo_id, fase, descricao, status, ordem, data_inicio, data_fim')
             .eq('status', 'concluido')
             .limit(TETO_ATIVIDADES),
         ])
         if (cancelled) return
 
-        const ativs = (cronograma.data as (AtividadeCronograma & { processo_id: string })[] | null) || []
+        const ativs = (cronograma.data as (AtividadeCronograma & { processo_id: string; ordem: number })[] | null) || []
         const conclusao = mapearConclusaoPorCronograma(ativs)
         const linhas = ((processos.data as ProcessoRow[] | null) || []).map(p => ({
           ...p,
@@ -266,6 +270,35 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
     [todos, hoje],
   )
   const leadTime = useMemo(() => calcularLeadTimePorEtapa(atividades), [atividades])
+  /* Aderência entre o que o processo declara e o que o cronograma aponta.
+     Depois da migração para os ritos DIOP, o texto de muitos processos ficou
+     no rito antigo — sem isso na tela, ninguém tem como saber qual das duas
+     respostas está velha. */
+  const etapaAtual = useMemo(() => mapearEtapaAtualDoCronograma(atividades), [atividades])
+  const etapasPorProcesso = useMemo(() => mapearEtapasDoProcesso(atividades), [atividades])
+  const ritosParados = useMemo(() => cronogramasNuncaIniciados(atividades), [atividades])
+
+  const diagnosticoPorProcesso = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof diagnosticarAtividade>>()
+    for (const p of todos) {
+      m.set(p.id, diagnosticarAtividade(p.id, p.atividade_atual, etapaAtual, etapasPorProcesso))
+    }
+    return m
+  }, [todos, etapaAtual, etapasPorProcesso])
+
+  const foraDoRito = useMemo(
+    () => todos.filter(p => diagnosticoPorProcesso.get(p.id)?.aderencia === 'fora_do_rito').length,
+    [todos, diagnosticoPorProcesso],
+  )
+  const semDeclarar = useMemo(
+    () => todos.filter(p => diagnosticoPorProcesso.get(p.id)?.aderencia === 'nao_declarada').length,
+    [todos, diagnosticoPorProcesso],
+  )
+  const ritosParadosEmAndamento = useMemo(
+    () => todos.filter(p => (p.status_nome || '').trim() === 'Em andamento' && ritosParados.has(p.id)).length,
+    [todos, ritosParados],
+  )
+
   /* Quantos concluídos têm cronograma registrado — o gráfico de tendência só
      enxerga esses, e omitir isso faria a série parecer mais rasa do que é. */
   const concluidosComData = useMemo(
@@ -419,6 +452,35 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           >
             Ver os {atrasados} atrasados
           </button>
+        </div>
+      )}
+
+      {/* A divergencia entre o texto declarado e o cronograma nao aparecia em
+          lugar nenhum: era preciso abrir processo a processo para descobrir. */}
+      {!loadingRows && (foraDoRito > 0 || semDeclarar > 0 || ritosParadosEmAndamento > 0) && (
+        <div
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap',
+            padding: '11px 16px', borderRadius: 12, marginBottom: 20,
+            background: CORES.surface, border: `1px solid ${CORES.line}`,
+            borderLeft: `3px solid ${CORES.warning}`,
+          }}
+        >
+          <AlertTriangle size={17} style={{ color: CORES.warning, flexShrink: 0, marginTop: 1 }} aria-hidden="true" />
+          <div style={{ minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 13, color: CORES.ink }}>
+              <strong style={{ fontWeight: 700 }}>Atividade atual e cronograma divergem.</strong>{' '}
+              {foraDoRito > 0 && `${foraDoRito} processo${foraDoRito === 1 ? ' declara uma etapa que não existe' : 's declaram uma etapa que não existe'} no próprio rito`}
+              {foraDoRito > 0 && (semDeclarar > 0 || ritosParadosEmAndamento > 0) && '; '}
+              {semDeclarar > 0 && `${semDeclarar} não ${semDeclarar === 1 ? 'declara' : 'declaram'} atividade`}
+              {semDeclarar > 0 && ritosParadosEmAndamento > 0 && '; '}
+              {ritosParadosEmAndamento > 0 && `${ritosParadosEmAndamento} em andamento com cronograma sem nenhuma etapa concluída`}.
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: 11.5, color: CORES.ink3 }}>
+              Enquanto divergirem, a coluna Atividade atual e o tempo por etapa falam de coisas diferentes.
+              A coluna marca cada caso; abrir o processo mostra a etapa que o cronograma aponta.
+            </p>
+          </div>
         </div>
       )}
 
@@ -657,9 +719,37 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
                         <span style={{ display: 'block', fontWeight: 600, color: CORES.ink, maxWidth: '34ch', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.objeto_resumido || '-'}>
                           {p.objeto_resumido || '-'}
                         </span>
-                        <span style={{ display: 'block', fontSize: 12, color: CORES.ink2, maxWidth: '34ch', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.atividade_atual || 'Sem atividade atual'}>
-                          {p.atividade_atual || 'Sem atividade atual'}
-                        </span>
+                        {(() => {
+                          const d = diagnosticoPorProcesso.get(p.id)
+                          const divergente = d?.aderencia === 'fora_do_rito' || d?.aderencia === 'outra_etapa'
+                          const titulo = d?.etapaDoCronograma
+                            ? `Declarado: ${p.atividade_atual || '—'}
+Cronograma aponta: ${d.etapaDoCronograma}`
+                            : (p.atividade_atual || 'Sem atividade atual')
+                          return (
+                            <span
+                              title={titulo}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 5, fontSize: 12,
+                                color: p.atividade_atual ? CORES.ink2 : CORES.ink3,
+                                maxWidth: '34ch',
+                              }}
+                            >
+                              {divergente && (
+                                <i
+                                  aria-label="Diverge do cronograma"
+                                  style={{
+                                    width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                                    background: CORES.warning,
+                                  }}
+                                />
+                              )}
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {p.atividade_atual || 'Sem atividade atual'}
+                              </span>
+                            </span>
+                          )
+                        })()}
                       </Td>
                       <Td>
                         <span style={{

@@ -184,7 +184,7 @@ export default function SimuladorPage() {
       <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
         <AlertTriangle size={28} style={{ color: '#f59e0b', marginBottom: 12 }} />
         <p style={{ fontSize: 14 }}>{erro}</p>
-        <p style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
+        <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
           Cadastre um modelo em Modelos de Cronograma para simular esta modalidade.
         </p>
       </div>
@@ -208,7 +208,7 @@ export default function SimuladorPage() {
     fontWeight: 700,
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    color: '#64748b',
+    color: '#94a3b8',
     marginBottom: 4,
   }
 
@@ -282,7 +282,7 @@ export default function SimuladorPage() {
               </option>
             ))}
           </select>
-          <p style={{ fontSize: 11, color: '#64748b', margin: '4px 0 0' }}>
+          <p style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0 0' }}>
             {parcial
               ? `As etapas 1 a ${aPartirDe - 1} são tratadas como já cumpridas.`
               : 'Escolha outra etapa se o processo já estiver em andamento.'}
@@ -404,7 +404,7 @@ export default function SimuladorPage() {
               <span style={{ fontSize: 16, fontWeight: 700, color: '#38bdf8' }}>
                 {formatDateBR(proj?.data_conclusao ?? null)}
               </span>
-              <span style={{ fontSize: 11, color: '#64748b' }}>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>
                 {diasReais} dias úteis · {proj?.dias_corridos ?? 0} corridos
               </span>
             </button>
@@ -448,7 +448,7 @@ export default function SimuladorPage() {
           finge que ela ocupa um trecho contínuo da sequência. */}
       {resumoFases.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
             Composição do prazo{etapasCumpridas > 0 ? ' — etapas ainda por cumprir' : ''}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -497,7 +497,7 @@ export default function SimuladorPage() {
                   flexWrap: isMobile ? 'wrap' : 'nowrap',
                 }}
               >
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', minWidth: 20 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', minWidth: 20 }}>
                   #{etapa.ordem}
                 </span>
 
@@ -506,7 +506,7 @@ export default function SimuladorPage() {
                     style={{
                       fontSize: 13,
                       fontWeight: 500,
-                      color: etapa.cumprida ? '#64748b' : '#e2e8f0',
+                      color: etapa.cumprida ? '#94a3b8' : '#e2e8f0',
                       textDecoration: etapa.cumprida ? 'line-through' : 'none',
                     }}
                   >
@@ -525,7 +525,7 @@ export default function SimuladorPage() {
                     }}>
                       {getFaseAgrupada(etapa.fase)}
                     </span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
                       {etapa.setor}
                     </span>
                   </div>
@@ -539,7 +539,7 @@ export default function SimuladorPage() {
                       : 'marco'}
                 </span>
 
-                <span style={{ fontSize: 12, color: etapa.cumprida ? '#64748b' : '#f1f5f9', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 12, color: etapa.cumprida ? '#94a3b8' : '#f1f5f9', whiteSpace: 'nowrap' }}>
                   {etapa.cumprida
                     ? 'já cumprida'
                     : `${formatDateBR(etapa.data_inicio)} → ${formatDateBR(etapa.data_fim)}`}
@@ -550,7 +550,7 @@ export default function SimuladorPage() {
         })}
       </div>
 
-      <p style={{ fontSize: 11, color: '#64748b', marginTop: 24, maxWidth: 720, lineHeight: 1.6 }}>
+      <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 24, maxWidth: 720, lineHeight: 1.6 }}>
         A contagem é em dias úteis, descontando feriados cadastrados. Uma etapa de 1 dia
         começa e termina no mesmo dia; etapas de duração zero são marcos. Esta é uma
         projeção do rito — no processo, cada etapa pode ser ajustada com justificativa.

@@ -70,7 +70,7 @@ function VencimentosContent() {
 
   function renderTable(lista: Contrato[], vazio: string) {
     if (lista.length === 0) {
-      return <p style={{ fontSize: 13, color: '#64748b', textAlign: 'center', padding: 20 }}>{vazio}</p>
+      return <p style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', padding: 20 }}>{vazio}</p>
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -91,7 +91,7 @@ function VencimentosContent() {
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9', marginBottom: 2 }}>
                   {c.numero_contrato}
                 </div>
-                <div style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {c.contratada_nome}
                   {c.processos?.id_processo && ` · ${c.processos.id_processo}`}
                 </div>
@@ -114,7 +114,7 @@ function VencimentosContent() {
   }
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>Carregando vencimentos...</div>
+    return <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Carregando vencimentos...</div>
   }
 
   if (error) {
@@ -128,7 +128,7 @@ function VencimentosContent() {
           <Calendar size={20} style={{ marginRight: 8, verticalAlign: 'middle', color: '#f59e0b' }} />
           Vencimentos de Contratos
         </h1>
-        <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>
+        <p style={{ color: '#94a3b8', fontSize: 14, margin: '4px 0 0' }}>
           Acompanhamento de prazos contratuais
         </p>
       </div>

@@ -58,7 +58,7 @@ export default function OrdensServicoListPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Ordens de Serviço</h1>
-          <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>{ordens.length} registro(s)</p>
+          <p style={{ color: '#94a3b8', fontSize: 14, margin: '4px 0 0' }}>{ordens.length} registro(s)</p>
         </div>
         <button onClick={() => router.push('/pmo-dashboard/ordens-servico/nova')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
@@ -70,7 +70,7 @@ export default function OrdensServicoListPage() {
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#64748b' }} />
+          <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
           <input placeholder="Buscar por Nº OS ou Objeto..."
             value={search} onChange={e => setSearch(e.target.value)}
             style={{ ...baseInput, paddingLeft: 32, width: '100%' }} />
@@ -92,7 +92,7 @@ export default function OrdensServicoListPage() {
           ))}
         </div>
       ) : ordens.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#64748b', fontSize: 14 }}>
+        <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8', fontSize: 14 }}>
           Nenhuma ordem de serviço encontrada
         </div>
       ) : (
@@ -100,7 +100,7 @@ export default function OrdensServicoListPage() {
           {/* Header */}
           <div style={{
             display: 'grid', gridTemplateColumns: '80px 1fr 2fr 120px 130px 120px 100px 80px',
-            gap: 8, padding: '8px 16px', fontSize: 11, fontWeight: 700, color: '#64748b',
+            gap: 8, padding: '8px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8',
             textTransform: 'uppercase', letterSpacing: '0.05em',
           }}>
             <span>Nº OS</span>
@@ -138,7 +138,7 @@ export default function OrdensServicoListPage() {
                   <div style={{ flex: 1, height: 6, background: '#1e293b', borderRadius: 3, overflow: 'hidden', minWidth: 50 }}>
                     <div style={{ height: '100%', width: `${Math.min(os.percentual_execucao || 0, 100)}%`, background: '#3b82f6', borderRadius: 3 }} />
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', minWidth: 30 }}>{os.percentual_execucao || 0}%</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', minWidth: 30 }}>{os.percentual_execucao || 0}%</span>
                 </div>
               </div>
             )

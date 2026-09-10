@@ -192,7 +192,7 @@ export default function UsuariosPage() {
     padding: '10px 14px',
     textAlign: 'left',
     fontWeight: 700,
-    color: '#64748b',
+    color: '#94a3b8',
     whiteSpace: 'nowrap',
     fontSize: 10,
     textTransform: 'uppercase',
@@ -221,7 +221,7 @@ export default function UsuariosPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Gerenciar Usuários</h1>
-          <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>Controle de níveis de acesso</p>
+          <p style={{ color: '#94a3b8', fontSize: 14, marginTop: 4 }}>Controle de níveis de acesso</p>
         </div>
         {isAdmin && (
           <button onClick={() => setShowCreate(true)}
@@ -247,7 +247,7 @@ export default function UsuariosPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Novo Usuário</h2>
               <button onClick={() => setShowCreate(false)}
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}>
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
                 <X size={20} />
               </button>
             </div>
@@ -312,7 +312,7 @@ export default function UsuariosPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Editar Usuário</h2>
               <button onClick={() => setEditUser(null)}
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}>
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
                 <X size={20} />
               </button>
             </div>
@@ -401,7 +401,7 @@ export default function UsuariosPage() {
             {profiles.map(p => (
               <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <td style={tdStyle}>{p.name}</td>
-                <td style={{ ...tdStyle, color: '#64748b', fontSize: 11, fontFamily: 'monospace' }}>
+                <td style={{ ...tdStyle, color: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }}>
                   {p.email || p.id.substring(0, 8) + '...'}
                 </td>
                 <td style={tdStyle}>
@@ -416,7 +416,7 @@ export default function UsuariosPage() {
                     {p.role}
                   </span>
                 </td>
-                <td style={{ ...tdStyle, color: '#64748b' }}>
+                <td style={{ ...tdStyle, color: '#94a3b8' }}>
                   {formatDateBR(p.created_at)}
                 </td>
                 {isAdmin && (
@@ -477,7 +477,7 @@ function RoleCard({ icon, role, desc, color }: { icon: React.ReactNode; role: st
         <span style={{ color }}>{icon}</span>
         <span style={{ fontWeight: 600, fontSize: 14, color: '#f1f5f9', textTransform: 'capitalize' }}>{role}</span>
       </div>
-      <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{desc}</p>
+      <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{desc}</p>
     </div>
   )
 }

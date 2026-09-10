@@ -155,7 +155,7 @@ export default function GerarDocumentoModal({ open, onClose, processoId, onGener
               {loadingTemplates ? (
                 <div className="loading-spinner" style={{ margin: '10px auto' }} />
               ) : filteredTemplates.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#64748b' }}>Nenhum modelo aprovado disponível.</p>
+                <p style={{ fontSize: 13, color: '#94a3b8' }}>Nenhum modelo aprovado disponível.</p>
               ) : (
                 <select value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)} style={{ ...baseInput, cursor: 'pointer' }}>
                   <option value="">Selecione um modelo...</option>

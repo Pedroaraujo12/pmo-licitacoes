@@ -151,7 +151,7 @@ export default function RelatoriosPage() {
     <div>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Relatórios de Contratos</h1>
-        <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>Relatórios operacionais e financeiros para exportação</p>
+        <p style={{ color: '#94a3b8', fontSize: 14, margin: '4px 0 0' }}>Relatórios operacionais e financeiros para exportação</p>
       </div>
 
       {loading ? (
@@ -180,7 +180,7 @@ export default function RelatoriosPage() {
                     background: 'rgba(99,102,241,0.2)', padding: '2px 10px', borderRadius: 12,
                   }}>{count}</span>
                 </div>
-                <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 16px' }}>{rel.descricao}</p>
+                <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 16px' }}>{rel.descricao}</p>
                 <button
                   onClick={() => handleExport(rel.id)}
                   disabled={count === 0 || exporting === rel.id}

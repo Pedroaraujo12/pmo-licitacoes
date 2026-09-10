@@ -66,7 +66,7 @@ export type TipoDocumentoContrato =
   | 'outro'
 
 export const CONTRATO_STATUS_RECORDS: Record<ContratoStatus, { label: string; color: string; bgColor: string }> = {
-  minuta: { label: 'Minuta', color: '#64748b', bgColor: '#f1f5f9' },
+  minuta: { label: 'Minuta', color: '#94a3b8', bgColor: '#f1f5f9' },
   aguardando_assinatura: { label: 'Aguardando Assinatura', color: '#f59e0b', bgColor: '#fffbeb' },
   aguardando_publicacao: { label: 'Aguardando Publicação', color: '#f59e0b', bgColor: '#fffbeb' },
   vigente: { label: 'Vigente', color: '#059669', bgColor: '#ecfdf5' },

@@ -259,7 +259,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
               <div style={{ textAlign: 'center' }}>
                 <div className="loading-spinner" />
-                <p style={{ color: '#64748b', fontSize: 14, marginTop: 12 }}>Carregando...</p>
+                <p style={{ color: '#94a3b8', fontSize: 14, marginTop: 12 }}>Carregando...</p>
               </div>
             </div>
           ) : (

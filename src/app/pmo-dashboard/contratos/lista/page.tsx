@@ -122,7 +122,7 @@ function ContratosListContent() {
           </button>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Contratos</h1>
-            <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>{contratos.length} contrato{contratos.length !== 1 ? 's' : ''} encontrado{contratos.length !== 1 ? 's' : ''}</p>
+            <p style={{ color: '#94a3b8', fontSize: 14, margin: '4px 0 0' }}>{contratos.length} contrato{contratos.length !== 1 ? 's' : ''} encontrado{contratos.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -155,7 +155,7 @@ function ContratosListContent() {
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#64748b' }} />
+          <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
           <input placeholder="Buscar por nº contrato, contratada, objeto..."
             value={search} onChange={e => setSearch(e.target.value)}
             style={{ ...baseInput, paddingLeft: 32, width: '100%' }} />
@@ -197,7 +197,7 @@ function ContratosListContent() {
 
       {!loading && contratos.length === 0 && (
         <div style={{
-          textAlign: 'center', padding: 60, color: '#64748b',
+          textAlign: 'center', padding: 60, color: '#94a3b8',
           background: 'rgba(30,41,59,0.7)', backdropFilter: 'blur(12px)',
           borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)',
         }}>
@@ -220,8 +220,8 @@ function ContratosListContent() {
                 {getStatusBadge(c.status)}
               </div>
               <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>{c.contratada_nome}</div>
-              {c.objeto && <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6, lineHeight: 1.4 }}>{c.objeto}</div>}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }}>
+              {c.objeto && <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, lineHeight: 1.4 }}>{c.objeto}</div>}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8' }}>
                 <span>Vig: {formatDateBR(c.data_inicio_vigencia)} - {formatDateBR(c.data_fim_vigencia)}</span>
                 <span>{formatBRL(c.valor_atual)}</span>
               </div>
@@ -241,7 +241,7 @@ function ContratosListContent() {
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                 {['Nº Contrato', 'Contratada', 'Objeto', 'Vigência', 'Valor', 'Executado', 'Status'].map(h => (
                   <th key={h} style={{
-                    textAlign: 'left', padding: '12px 16px', color: '#64748b',
+                    textAlign: 'left', padding: '12px 16px', color: '#94a3b8',
                     fontWeight: 600, fontSize: 11, textTransform: 'uppercase',
                     letterSpacing: '0.05em', whiteSpace: 'nowrap',
                   }}>{h}</th>

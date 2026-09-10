@@ -61,7 +61,7 @@ export function getAtividadeIcon(status: string, dataFim: string | null) {
   const diff = Math.ceil((fim.getTime() - hoje.getTime()) / 86400000)
   if (diff < 0) return { icon: '🔴', color: '#ef4444' }
   if (diff <= 3) return { icon: '🟡', color: '#eab308' }
-  return { icon: '⏳', color: '#64748b' }
+  return { icon: '⏳', color: '#94a3b8' }
 }
 
 export function getAtividadeBadgeColor(fase: string): string {

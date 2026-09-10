@@ -40,7 +40,7 @@ function MetricCard({ icon, label, value, color, bgColor }: MetricCardProps) {
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2 }}>{value}</div>
-        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500, marginTop: 2 }}>{label}</div>
+        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500, marginTop: 2 }}>{label}</div>
       </div>
     </div>
   )
@@ -149,7 +149,7 @@ export default function ContratosDashboardPage() {
       }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Gestão de Contratos</h1>
-          <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>Painel geral de contratos</p>
+          <p style={{ color: '#94a3b8', fontSize: 14, margin: '4px 0 0' }}>Painel geral de contratos</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => router.push('/pmo-dashboard/contratos/novo')}
@@ -215,7 +215,7 @@ export default function ContratosDashboardPage() {
           )}
         </div>
         {proximosVencimentos.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Nenhum contrato vencendo nos próximos 30 dias.</p>
+          <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Nenhum contrato vencendo nos próximos 30 dias.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {proximosVencimentos.slice(0, 5).map(c => (
@@ -297,7 +297,7 @@ export default function ContratosDashboardPage() {
             </div>
           )}
           {semFiscal.length === 0 && semMovimentacao.length === 0 && (
-            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Nenhum alerta no momento.</p>
+            <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Nenhum alerta no momento.</p>
           )}
         </div>
       </div>

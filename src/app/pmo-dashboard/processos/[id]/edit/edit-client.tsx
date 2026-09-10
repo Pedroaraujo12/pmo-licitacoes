@@ -9,6 +9,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { cleanNum, formatBRL, upsertSeiLink, fetchSeiLink } from '@/lib/utils'
 import { PT_BR } from '@/lib/pt-br'
 import AtividadeAtualSelect from '@/components/ui/atividade-atual-select'
+import { validarProcesso, avisosProcesso } from '@/lib/validacao-processo'
 
 export default function EditProcessoClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
   const paramsId = idOverride ?? (params ? use(params).id : '')
@@ -18,6 +19,7 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
   const [loading, setLoading] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
+  const [avisos, setAvisos] = useState<string[]>([])
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const isMobile = useIsMobile()
 
@@ -84,11 +86,27 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
     setLoading(true)
     setError('')
 
-    if (!form.responsavel_id) {
-      setError('Responsável é obrigatório.')
+    /* Barrar na entrada em vez de deixar o furo aparecer depois nos numeros:
+       concluido sem valor homologado derruba a taxa; sem data de conclusao
+       some da tendencia; pendente sem data de entrega fica fora de qualquer
+       faixa de prazo. */
+    const problemas = validarProcesso({
+      responsavel_id: form.responsavel_id,
+      status_nome: statusList.find(s => s.id === form.status_id)?.nome ?? null,
+      valor_estimado: cleanNum(form.valor_estimado),
+      valor_homologado: cleanNum(form.valor_homologado),
+      data_atividade: form.data_atividade,
+      data_entrega: form.data_entrega,
+    })
+    if (problemas.length > 0) {
+      setError(problemas.map(p => p.mensagem).join(' '))
       setLoading(false)
       return
     }
+    setAvisos(avisosProcesso({
+      valor_estimado: cleanNum(form.valor_estimado),
+      valor_homologado: cleanNum(form.valor_homologado),
+    }))
 
     const payload: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(form)) {
@@ -195,12 +213,18 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Editar Processo</h1>
-        <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>{form.id_processo}</p>
+        <p style={{ color: '#94a3b8', fontSize: 14, marginTop: 4 }}>{form.id_processo}</p>
       </div>
 
       {error && (
         <div style={{ padding: '10px 14px', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', borderRadius: 8, fontSize: 13, marginBottom: 16, border: '1px solid rgba(239,68,68,0.3)' }}>
           {error}
+        </div>
+      )}
+
+      {avisos.length > 0 && (
+        <div role="status" style={{ padding: '10px 14px', background: 'rgba(201,133,0,0.14)', color: '#e8c07a', borderRadius: 8, fontSize: 13, marginBottom: 16, border: '1px solid rgba(201,133,0,0.32)' }}>
+          {avisos.join(' ')}
         </div>
       )}
 
@@ -276,7 +300,7 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
             placeholder="https://drive.google.com/..."
             style={baseInput}
           />
-          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>{PT_BR.googleDrive}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94a3b8' }}>{PT_BR.googleDrive}</p>
         </div>
         <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Link SEI (Processo Administrativo)</label>
@@ -286,7 +310,7 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
             placeholder="https://sei.agenciasus.org.br/sei/controlador.php?acao=procedimento_trabalhar&id_procedimento=..."
             style={baseInput}
           />
-          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>Link para o processo no SEI (Sistema Eletrônico de Informações)</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94a3b8' }}>Link para o processo no SEI (Sistema Eletrônico de Informações)</p>
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

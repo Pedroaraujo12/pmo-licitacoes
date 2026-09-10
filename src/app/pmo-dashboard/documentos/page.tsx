@@ -105,7 +105,7 @@ export default function DocumentosListPage() {
       {/* Filtros */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
-          <Search size={16} style={{ position: 'absolute', left: 10, top: 10, color: '#64748b' }} />
+          <Search size={16} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
           <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()}
             placeholder="Buscar modelos..." style={{ ...baseInput, paddingLeft: 32, width: '100%' }} />
         </div>
@@ -133,7 +133,7 @@ export default function DocumentosListPage() {
           <div className="loading-spinner" />
         </div>
       ) : templates.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>
+        <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
           <FileText size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
           <p style={{ fontSize: 14 }}>Nenhum modelo encontrado</p>
         </div>
@@ -155,7 +155,7 @@ export default function DocumentosListPage() {
                     {TEMPLATE_STATUS_LABELS[t.status]}
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: 12, fontSize: 12, color: '#64748b' }}>
+                <div style={{ display: 'flex', gap: 12, fontSize: 12, color: '#94a3b8' }}>
                   <span>{TIPO_DOCUMENTO_LABELS[t.tipo_documento as keyof typeof TIPO_DOCUMENTO_LABELS]}</span>
                   <span>{CATEGORIA_LABELS[t.categoria as keyof typeof CATEGORIA_LABELS]}</span>
                   {t.base_legal && <span>{t.base_legal}</span>}

@@ -118,10 +118,10 @@ export default function AniversariantesWidget() {
           }}>
           <span style={{ fontSize: 14 }}>🎂</span>
           <span style={{ flex: 1, fontWeight: 500 }}>{a.nome}</span>
-          <span style={{ fontSize: 11, color: '#64748b' }}>
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>
             {a.dia}/{String(a.mes).padStart(2, '0')}
           </span>
-          {a.unidade && <span style={{ fontSize: 11, color: '#64748b' }}>{a.unidade}</span>}
+          {a.unidade && <span style={{ fontSize: 11, color: '#94a3b8' }}>{a.unidade}</span>}
         </div>
       ))}
 

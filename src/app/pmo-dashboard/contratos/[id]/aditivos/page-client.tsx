@@ -20,7 +20,7 @@ const baseInput: React.CSSProperties = {
   borderRadius: 8, fontSize: 13, background: 'rgba(30,41,59,0.5)', color: '#cbd5e1', outline: 'none',
 }
 const labelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: '#64748b',
+  fontSize: 11, fontWeight: 600, color: '#94a3b8',
   textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4,
 }
 
@@ -203,14 +203,14 @@ export default function AditivosClient({ params }: { params: Promise<{ id: strin
       )}
 
       {aditivos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#64748b', fontSize: 14 }}>
+        <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8', fontSize: 14 }}>
           Nenhum aditivo registrado
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{
             display: 'grid', gridTemplateColumns: '80px 1fr 120px 120px 120px 100px 100px 80px',
-            gap: 8, padding: '8px 16px', fontSize: 11, fontWeight: 700, color: '#64748b',
+            gap: 8, padding: '8px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8',
             textTransform: 'uppercase', letterSpacing: '0.05em',
           }}>
             <span>Nº</span>

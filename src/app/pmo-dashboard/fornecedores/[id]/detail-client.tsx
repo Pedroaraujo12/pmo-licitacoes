@@ -39,7 +39,7 @@ function MetricCard({ icon, label, value, color }: {
       </div>
       <div>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2 }}>{value}</div>
-        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500, marginTop: 2 }}>{label}</div>
+        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500, marginTop: 2 }}>{label}</div>
       </div>
     </div>
   )
@@ -52,7 +52,7 @@ function DetailField({ label, children }: { label: string; children: React.React
       border: '1px solid rgba(255,255,255,0.06)', padding: '12px 16px',
     }}>
       <div style={{
-        fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 600,
+        fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600,
         textTransform: 'uppercase', letterSpacing: '0.05em',
       }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>{children}</div>
@@ -99,7 +99,7 @@ export default function FornecedorDetailClient() {
 
   if (!nome) {
     return (
-      <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>
+      <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
         Fornecedor não especificado.
       </div>
     )
@@ -126,7 +126,7 @@ export default function FornecedorDetailClient() {
 
   if (!resumo) {
     return (
-      <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>
+      <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>
         Fornecedor não encontrado.
       </div>
     )
@@ -151,7 +151,7 @@ export default function FornecedorDetailClient() {
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>
             {resumo.nome}
           </h1>
-          <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>
+          <p style={{ color: '#94a3b8', fontSize: 14, margin: '4px 0 0' }}>
             {resumo.total_contratos} contrato{resumo.total_contratos !== 1 ? 's' : ''} vinculado{resumo.total_contratos !== 1 ? 's' : ''}
           </p>
         </div>
@@ -176,19 +176,19 @@ export default function FornecedorDetailClient() {
           {resumo.cnpj && <DetailField label="CNPJ">{resumo.cnpj}</DetailField>}
           {resumo.representante && (
             <DetailField label="Representante">
-              <User size={12} style={{ marginRight: 4, verticalAlign: 'middle', color: '#64748b' }} />
+              <User size={12} style={{ marginRight: 4, verticalAlign: 'middle', color: '#94a3b8' }} />
               {resumo.representante}
             </DetailField>
           )}
           {resumo.email && (
             <DetailField label="E-mail">
-              <Mail size={12} style={{ marginRight: 4, verticalAlign: 'middle', color: '#64748b' }} />
+              <Mail size={12} style={{ marginRight: 4, verticalAlign: 'middle', color: '#94a3b8' }} />
               {resumo.email}
             </DetailField>
           )}
           {resumo.telefone && (
             <DetailField label="Telefone">
-              <Phone size={12} style={{ marginRight: 4, verticalAlign: 'middle', color: '#64748b' }} />
+              <Phone size={12} style={{ marginRight: 4, verticalAlign: 'middle', color: '#94a3b8' }} />
               {resumo.telefone}
             </DetailField>
           )}
@@ -202,7 +202,7 @@ export default function FornecedorDetailClient() {
           <FileText size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} /> Contratos Relacionados
         </h3>
         {contratos.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Nenhum contrato encontrado.</p>
+          <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Nenhum contrato encontrado.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {contratos.map(c => {
@@ -230,11 +230,11 @@ export default function FornecedorDetailClient() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 12, fontWeight: 500, color: '#22c55e' }}>{formatBRL(c.valor_atual)}</div>
-                      <div style={{ fontSize: 10, color: '#64748b' }}>contratado</div>
+                      <div style={{ fontSize: 10, color: '#94a3b8' }}>contratado</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 12, fontWeight: 500, color: '#60a5fa' }}>{formatBRL(c.valor_executado)}</div>
-                      <div style={{ fontSize: 10, color: '#64748b' }}>executado</div>
+                      <div style={{ fontSize: 10, color: '#94a3b8' }}>executado</div>
                     </div>
                     {statusRec && (
                       <span style={{

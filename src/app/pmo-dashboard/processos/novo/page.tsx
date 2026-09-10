@@ -188,7 +188,7 @@ export default function NovoProcessoPage() {
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Novo Processo</h1>
-        <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>Preencha os dados do processo licitatório</p>
+        <p style={{ color: '#94a3b8', fontSize: 14, marginTop: 4 }}>Preencha os dados do processo licitatório</p>
       </div>
 
       {error && (
@@ -252,11 +252,11 @@ export default function NovoProcessoPage() {
         </div>
         <div style={{ marginBottom: 24 }}>
           {renderInput('drive', PT_BR.googleDrive)}
-          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>{PT_BR.googleDrive}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94a3b8' }}>{PT_BR.googleDrive}</p>
         </div>
         <div style={{ marginBottom: 24 }}>
           {renderInput('link_sei', 'Link SEI (Processo Administrativo)')}
-          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>Link para o processo no SEI (Sistema Eletrônico de Informações)</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94a3b8' }}>Link para o processo no SEI (Sistema Eletrônico de Informações)</p>
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
