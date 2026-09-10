@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ehRegistroDeSistema } from './registro-atividades'
+import { buscarTodasAsPaginas } from './paginacao-supabase'
 
 /**
  * Lista do Cronograma de Processos montada diretamente das tabelas.
@@ -461,30 +462,41 @@ export async function listarCronograma(
 
   const ids = lista.map(p => p.id as string)
 
-  const [{ data: atividades }, { data: feriadosData }, { data: registros }] = await Promise.all([
-    supabase
-      .from('cronograma_atividades')
-      .select('processo_id, status, data_fim, fase, descricao, ordem')
-      .in('processo_id', ids)
-      .limit(20000),
+  /* Paginado, não `.limit(20000)`: o PostgREST entrega no máximo 1.000 linhas
+     por resposta e corta em silêncio. Com 74 processos a ~19 etapas cada, são
+     1.380 — a lista vinha faltando 380, e processo com etapa faltando aparecia
+     com progresso e etapa atual errados. */
+  const [{ linhas: atividades }, { data: feriadosData }, { linhas: registros }] = await Promise.all([
+    buscarTodasAsPaginas<AtividadeResumo>((de, ate) =>
+      supabase
+        .from('cronograma_atividades')
+        .select('processo_id, status, data_fim, fase, descricao, ordem')
+        .in('processo_id', ids)
+        .order('processo_id', { ascending: true })
+        .order('ordem', { ascending: true })
+        .range(de, ate) as unknown as PromiseLike<{ data: AtividadeResumo[] | null; error?: unknown }>,
+    ),
     supabase.from('feriados').select('data'),
-    // Ordenado do mais recente para o mais antigo: com o teto, o que fica de
+    // Do mais recente para o mais antigo: se o teto for atingido, o que fica de
     // fora é sempre registro velho, nunca a última anotação de um processo.
-    supabase
-      .from('atividades')
-      .select('id, processo_id, atividade, observacao, data, responsavel, created_at')
-      .in('processo_id', ids)
-      .order('created_at', { ascending: false })
-      .limit(4000),
+    buscarTodasAsPaginas<RegistroRecente>((de, ate) =>
+      supabase
+        .from('atividades')
+        .select('id, processo_id, atividade, observacao, data, responsavel, created_at')
+        .in('processo_id', ids)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(de, ate) as unknown as PromiseLike<{ data: RegistroRecente[] | null; error?: unknown }>,
+    ),
   ])
 
   const feriados = new Set((feriadosData ?? []).map(f => String((f as { data: string }).data)))
-  const ultimos = ultimoRegistroPorProcesso((registros ?? []) as unknown as RegistroRecente[])
+  const ultimos = ultimoRegistroPorProcesso(registros)
 
   return {
     linhas: agregarLinhas(
       lista,
-      (atividades ?? []) as unknown as AtividadeResumo[],
+      atividades,
       hojeISO(),
       feriados,
       ultimos,

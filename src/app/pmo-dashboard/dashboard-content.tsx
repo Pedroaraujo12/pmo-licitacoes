@@ -17,6 +17,7 @@ import PrazoECiclo from '@/components/dashboard/prazo-e-ciclo'
 import CargaETendencia from '@/components/dashboard/carga-e-tendencia'
 import FilterChips, { type Chip } from '@/components/dashboard/filter-chips'
 import { CORES, corDoStatus } from '@/lib/dashboard-tokens'
+import { buscarTodasAsPaginas } from '@/lib/paginacao-supabase'
 import {
   agruparPorFaixaDePrazo,
   agruparCargaPorResponsavel,
@@ -86,7 +87,6 @@ const TETO_CARREGAMENTO = 1000
    Pedir `.limit(5000)` não resolve: o PostgREST tem um teto próprio de 1.000
    linhas por resposta e corta em silêncio, o que fazia processos com etapas
    faltando aparecerem como "fora do rito" sem estarem. Daí a paginação. */
-const PAGINA_ATIVIDADES = 1000
 const TETO_ATIVIDADES = 20000
 
 const PRIORIDADES = ['Baixa', 'Média', 'Alta', 'Urgente']
@@ -200,21 +200,18 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
            concluídas (e filtra sozinho), mas o diagnóstico de aderência precisa
            das pendentes para saber qual etapa o cronograma aponta e quais
            existem no rito do processo. */
+        type EtapaCarregada = AtividadeCronograma & { processo_id: string; ordem: number }
         async function carregarAtividades() {
-          const acumulado: (AtividadeCronograma & { processo_id: string; ordem: number })[] = []
-          for (let inicio = 0; inicio < TETO_ATIVIDADES; inicio += PAGINA_ATIVIDADES) {
-            const { data, error } = await supabase
+          const { linhas } = await buscarTodasAsPaginas<EtapaCarregada>((de, ate) =>
+            supabase
               .from('cronograma_atividades')
               .select('processo_id, fase, descricao, status, ordem, data_inicio, data_fim')
               .order('processo_id', { ascending: true })
               .order('ordem', { ascending: true })
-              .range(inicio, inicio + PAGINA_ATIVIDADES - 1)
-            if (error) break
-            const pagina = (data as (AtividadeCronograma & { processo_id: string; ordem: number })[] | null) || []
-            acumulado.push(...pagina)
-            if (pagina.length < PAGINA_ATIVIDADES) break
-          }
-          return acumulado
+              .range(de, ate) as unknown as PromiseLike<{ data: EtapaCarregada[] | null; error?: unknown }>,
+            { teto: TETO_ATIVIDADES },
+          )
+          return linhas
         }
 
         const [processos, ativs] = await Promise.all([
