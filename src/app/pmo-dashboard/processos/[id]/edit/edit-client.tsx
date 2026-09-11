@@ -20,6 +20,10 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
   const [avisos, setAvisos] = useState<string[]>([])
+  /* Campos barrados pela validação: ficam marcados em vermelho e o primeiro
+     recebe o foco. Dizer "preencha X" sem levar até X faz a pessoa varrer o
+     formulário atrás de um campo que ela nem sabe que existe. */
+  const [camposComProblema, setCamposComProblema] = useState<string[]>([])
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const isMobile = useIsMobile()
 
@@ -100,9 +104,14 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
     })
     if (problemas.length > 0) {
       setError(problemas.map(p => p.mensagem).join(' '))
+      setCamposComProblema(problemas.map(p => p.campo))
       setLoading(false)
+      const alvo = document.querySelector<HTMLElement>(`[name="${problemas[0].campo}"]`)
+      alvo?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+      alvo?.focus?.({ preventScroll: true })
       return
     }
+    setCamposComProblema([])
     setAvisos(avisosProcesso({
       valor_estimado: cleanNum(form.valor_estimado),
       valor_homologado: cleanNum(form.valor_homologado),
@@ -234,29 +243,44 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
           gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
           gap: 16, marginBottom: 24,
         }}>
-          {fields.map(f => (
-            <div key={f.name}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</label>
-              {f.options ? (
-                <select
-                  value={form[f.name] || ''}
-                  onChange={e => setForm(fm => ({ ...fm, [f.name]: e.target.value }))}
-                  style={{ ...baseInput, cursor: 'pointer' }}
-                >
-                  <option value="">Selecione...</option>
-                  {f.options.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
-                </select>
-              ) : (
-                <input
-                  type={f.type || 'text'}
-                  value={form[f.name] || ''}
-                  onChange={e => setForm(fm => ({ ...fm, [f.name]: e.target.value }))}
-                  onInput={f.name === 'id_processo' ? handleIdInput : undefined}
-                  style={baseInput}
-                />
-              )}
-            </div>
-          ))}
+          {fields.map(f => {
+            const comProblema = camposComProblema.includes(f.name)
+            const estilo = comProblema
+              ? { ...baseInput, border: '1px solid #e05561', background: 'rgba(224,85,97,0.08)' }
+              : baseInput
+            return (
+              <div key={f.name}>
+                <label
+                  htmlFor={`campo-${f.name}`}
+                  style={{ display: 'block', fontSize: 12, fontWeight: 600, color: comProblema ? '#e8a3a8' : '#94a3b8', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                >{f.label}</label>
+                {f.options ? (
+                  <select
+                    id={`campo-${f.name}`}
+                    name={f.name}
+                    aria-invalid={comProblema || undefined}
+                    value={form[f.name] || ''}
+                    onChange={e => setForm(fm => ({ ...fm, [f.name]: e.target.value }))}
+                    style={{ ...estilo, cursor: 'pointer' }}
+                  >
+                    <option value="">Selecione...</option>
+                    {f.options.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    id={`campo-${f.name}`}
+                    name={f.name}
+                    aria-invalid={comProblema || undefined}
+                    type={f.type || 'text'}
+                    value={form[f.name] || ''}
+                    onChange={e => setForm(fm => ({ ...fm, [f.name]: e.target.value }))}
+                    onInput={f.name === 'id_processo' ? handleIdInput : undefined}
+                    style={estilo}
+                  />
+                )}
+              </div>
+            )
+          })}
         </div>
 
         <div style={{ marginBottom: 24 }}>

@@ -23,7 +23,10 @@ export interface ProcessoParaValidar {
 }
 
 export interface Problema {
+  /** Nome do campo no formulário — usado para levar o foco até ele. */
   campo: string
+  /** Rótulo como aparece na tela. A mensagem precisa citar o que a pessoa vê. */
+  rotulo: string
   mensagem: string
 }
 
@@ -42,27 +45,33 @@ export function validarProcesso(p: ProcessoParaValidar): Problema[] {
   const terminal = STATUS_TERMINAIS.includes(status as (typeof STATUS_TERMINAIS)[number])
 
   if (vazio(p.responsavel_id)) {
-    problemas.push({ campo: 'responsavel_id', mensagem: 'Informe o responsável pelo processo.' })
+    problemas.push({
+      campo: 'responsavel_id', rotulo: 'Responsável',
+      mensagem: 'Preencha "Responsável".',
+    })
   }
 
   if (!terminal && vazio(p.data_entrega)) {
     problemas.push({
-      campo: 'data_entrega',
-      mensagem: 'Informe a data de entrega. Sem ela o processo não entra em nenhuma faixa de prazo e não aparece nos alertas de atraso.',
+      campo: 'data_entrega', rotulo: 'Data Entrega',
+      mensagem: 'Preencha "Data Entrega" — sem ela o processo não entra em nenhuma faixa de prazo e não aparece nos alertas de atraso.',
     })
   }
 
   if (concluido) {
     if (!p.valor_homologado || p.valor_homologado <= 0) {
       problemas.push({
-        campo: 'valor_homologado',
-        mensagem: 'Processo concluído precisa do valor homologado — é ele que alimenta a taxa de homologação e a economia.',
+        campo: 'valor_homologado', rotulo: 'Valor Homologado (R$)',
+        mensagem: 'Preencha "Valor Homologado (R$)" — é ele que alimenta a taxa de homologação e a economia.',
       })
     }
     if (vazio(p.data_atividade)) {
       problemas.push({
-        campo: 'data_atividade',
-        mensagem: 'Informe a data da conclusão. Sem ela o processo não aparece na tendência mensal.',
+        /* Antes esta mensagem pedia "data da conclusão", nome que não existe
+           na tela: o campo se chama "Data Atividade". Mensagem que nomeia
+           campo inventado manda a pessoa procurar o que não está lá. */
+        campo: 'data_atividade', rotulo: 'Data Atividade',
+        mensagem: 'Preencha "Data Atividade" com a data da conclusão — sem ela o processo não aparece na tendência mensal.',
       })
     }
   }

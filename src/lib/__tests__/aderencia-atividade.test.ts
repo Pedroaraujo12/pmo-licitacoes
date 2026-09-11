@@ -120,6 +120,22 @@ describe('validarProcesso', () => {
     expect(campos).toContain('data_atividade')
   })
 
+  it('toda mensagem cita o rótulo exato que aparece na tela', () => {
+    /* A primeira versão pedia "data da conclusão" — nome que não existe no
+       formulário, onde o campo se chama "Data Atividade". Quem foi procurar
+       não achou. Os rótulos abaixo são os do formulário de edição. */
+    const rotulosDoFormulario = ['Responsável', 'Data Entrega', 'Valor Homologado (R$)', 'Data Atividade']
+    const problemas = validarProcesso({
+      responsavel_id: null, status_nome: 'Concluído',
+      data_entrega: null, valor_homologado: 0, data_atividade: null,
+    })
+    expect(problemas.length).toBe(3) // entrega não é cobrada de processo terminal
+    for (const p of problemas) {
+      expect(rotulosDoFormulario).toContain(p.rotulo)
+      expect(p.mensagem).toContain(`"${p.rotulo}"`)
+    }
+  })
+
   it('concluído com valor e data passa', () => {
     expect(validarProcesso({
       ...ok, status_nome: 'Concluído', valor_homologado: 90, data_atividade: '2026-08-10',
