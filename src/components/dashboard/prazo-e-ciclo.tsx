@@ -89,6 +89,18 @@ export default function PrazoECiclo({
         </span>
       </div>
 
+      {/* Antes dos dois painéis: é a leitura mais consultada da seção, e vem
+          em largura cheia porque são 26 atividades com rótulos de até 173
+          caracteres — espremer isso em meia tela deixaria tudo truncado. */}
+      <div style={{ marginBottom: 16 }}>
+        <AtividadesChart
+          atividades={atividades}
+          selecionada={atividadeSelecionada}
+          onSelecionar={onSelecionarAtividade}
+          carregando={carregando}
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PainelGrafico
           titulo="Processos por faixa de prazo"
@@ -142,16 +154,6 @@ export default function PrazoECiclo({
         </PainelGrafico>
       </div>
 
-      {/* Largura cheia: sao 26 atividades com rotulos de ate 173 caracteres —
-          espremer isso em meia tela deixaria tudo truncado. */}
-      <div style={{ marginTop: 16 }}>
-        <AtividadesChart
-          atividades={atividades}
-          selecionada={atividadeSelecionada}
-          onSelecionar={onSelecionarAtividade}
-          carregando={carregando}
-        />
-      </div>
     </section>
   )
 }
