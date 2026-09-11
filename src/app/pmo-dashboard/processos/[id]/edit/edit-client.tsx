@@ -1,15 +1,21 @@
 'use client'
 
-import { useEffect, useState, useRef, use } from 'react'
+import { useEffect, useState, useRef, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useVoltar } from '@/hooks/useVoltar'
 import { createClient } from '@/lib/supabase/client'
 import type { Coordenacao, Modalidade, Demandante, Responsavel, StatusProcesso } from '@/types/database'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { cleanNum, formatBRL, upsertSeiLink, fetchSeiLink } from '@/lib/utils'
+import { cleanNum, formatBRL, formatDateBR, upsertSeiLink, fetchSeiLink } from '@/lib/utils'
 import { PT_BR } from '@/lib/pt-br'
 import AtividadeAtualSelect from '@/components/ui/atividade-atual-select'
 import { validarProcesso, avisosProcesso } from '@/lib/validacao-processo'
+import { listFeriados } from '@/lib/simulador-cronograma'
+import {
+  encontrarEtapaPorAtividade, planejarReposicionamento, deslocamentoDaEntrega,
+  type PlanoDeReposicionamento,
+} from '@/lib/reposicionar-cronograma'
+import { aplicarReposicionamento, carregarEtapasDoProcesso } from '@/lib/aplicar-reposicionamento'
 
 export default function EditProcessoClient({ params, idOverride }: { params?: Promise<{ id: string }>; idOverride?: string }) {
   const paramsId = idOverride ?? (params ? use(params).id : '')
@@ -24,13 +30,24 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
      recebe o foco. Dizer "preencha X" sem levar até X faz a pessoa varrer o
      formulário atrás de um campo que ela nem sabe que existe. */
   const [camposComProblema, setCamposComProblema] = useState<string[]>([])
+
+  /* Reposicionamento do cronograma quando a atividade atual muda.
+     Não é automático: reescrever as datas do processo inteiro e a data de
+     entrega é caro de desfazer, então a tela mostra o plano e pergunta. */
+  const [atividadeOriginal, setAtividadeOriginal] = useState<string>('')
+  const [plano, setPlano] = useState<PlanoDeReposicionamento | null>(null)
+  const [ajustarCronograma, setAjustarCronograma] = useState(true)
+  const [calculandoPlano, setCalculandoPlano] = useState(false)
+  const [semCasamento, setSemCasamento] = useState(false)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const isMobile = useIsMobile()
 
-  function getSupabase() {
+  // Estável entre renders: sem isso, todo efeito que dependa dela roda de novo
+  // a cada digitação no formulário.
+  const getSupabase = useCallback(() => {
     if (!supabaseRef.current) supabaseRef.current = createClient()
     return supabaseRef.current
-  }
+  }, [])
 
   const [coordenacoes, setCoordenacoes] = useState<Coordenacao[]>([])
   const [modalidades, setModalidades] = useState<Modalidade[]>([])
@@ -67,6 +84,7 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
                 ? formatBRL(value)
                 : String(value)
           }
+          setAtividadeOriginal(String(proc.data.atividade_atual || ''))
           const sei = await fetchSeiLink(getSupabase(), id)
           if (sei) f.link_sei = sei
           setForm(f)
@@ -83,7 +101,50 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
       }
     }
     load()
-  }, [id])
+  }, [id, getSupabase])
+
+  /* Recalcula o plano sempre que a atividade declarada muda para algo
+     diferente do que estava gravado. Só calcula — nada é escrito aqui. */
+  useEffect(() => {
+    let cancelado = false
+    const declarada = (form.atividade_atual || '').trim()
+    const mudou = declarada !== '' && declarada !== atividadeOriginal.trim()
+
+    ;(async () => {
+      if (!mudou) {
+        setPlano(null)
+        setSemCasamento(false)
+        return
+      }
+      setCalculandoPlano(true)
+      try {
+        const supabase = getSupabase()
+        const [etapas, feriados] = await Promise.all([
+          carregarEtapasDoProcesso(supabase, id),
+          listFeriados(supabase),
+        ])
+        if (cancelado) return
+
+        const alvo = encontrarEtapaPorAtividade(etapas, declarada)
+        if (!alvo) {
+          setPlano(null)
+          setSemCasamento(etapas.length > 0)
+          return
+        }
+
+        const base = (form.data_atividade || '').trim() || new Date().toISOString().split('T')[0]
+        setPlano(planejarReposicionamento(etapas, alvo.ordem, base, feriados, form.data_entrega || null))
+        setSemCasamento(false)
+      } catch (err) {
+        console.warn('Não foi possível projetar o cronograma:', err)
+        if (!cancelado) { setPlano(null); setSemCasamento(false) }
+      } finally {
+        if (!cancelado) setCalculandoPlano(false)
+      }
+    })()
+
+    return () => { cancelado = true }
+  }, [form.atividade_atual, form.data_atividade, form.data_entrega, atividadeOriginal, id, getSupabase])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -145,6 +206,23 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
       setError(err.message)
       setLoading(false)
       return
+    }
+
+    /* Depois do processo gravado: o cronograma acompanha a etapa declarada.
+       Se falhar, o processo continua salvo e a mensagem diz o que ficou para
+       trás — perder a edicao inteira por causa do reencadeamento seria pior. */
+    if (plano && ajustarCronograma) {
+      const { data: { user } } = await getSupabase().auth.getUser()
+      const r = await aplicarReposicionamento(getSupabase(), id, plano, {
+        atividadeDeclarada: (form.atividade_atual || '').trim(),
+        dataBase: (form.data_atividade || '').trim() || new Date().toISOString().split('T')[0],
+        usuarioId: user?.id ?? null,
+      })
+      if (r.erro) {
+        setError(`Processo salvo, mas o cronograma não pôde ser ajustado: ${r.erro}`)
+        setLoading(false)
+        return
+      }
     }
 
     if (form.link_sei?.trim()) {
@@ -234,6 +312,63 @@ export default function EditProcessoClient({ params, idOverride }: { params?: Pr
       {avisos.length > 0 && (
         <div role="status" style={{ padding: '10px 14px', background: 'rgba(201,133,0,0.14)', color: '#e8c07a', borderRadius: 8, fontSize: 13, marginBottom: 16, border: '1px solid rgba(201,133,0,0.32)' }}>
           {avisos.join(' ')}
+        </div>
+      )}
+
+      {calculandoPlano && (
+        <div style={{ padding: '10px 14px', background: 'rgba(148,163,184,0.1)', color: '#94a3b8', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+          Projetando o cronograma para a nova atividade…
+        </div>
+      )}
+
+      {semCasamento && !calculandoPlano && (
+        <div role="status" style={{ padding: '10px 14px', background: 'rgba(201,133,0,0.14)', color: '#e8c07a', borderRadius: 8, fontSize: 13, marginBottom: 16, border: '1px solid rgba(201,133,0,0.32)' }}>
+          Não foi possível identificar esta atividade entre as etapas do cronograma deste processo,
+          então as datas não serão recalculadas. O processo será salvo normalmente.
+        </div>
+      )}
+
+      {plano && !calculandoPlano && (
+        <div style={{ padding: '14px 16px', background: 'rgba(30,41,59,0.7)', border: '1px solid rgba(79,156,245,0.4)', borderRadius: 10, marginBottom: 16 }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={ajustarCronograma}
+              onChange={e => setAjustarCronograma(e.target.checked)}
+              style={{ marginTop: 3, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }}
+            />
+            <span>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#eef2f9' }}>
+                Ajustar o cronograma para esta atividade
+              </span>
+              <span style={{ display: 'block', fontSize: 12, color: '#a8b4cc', marginTop: 4, lineHeight: 1.55 }}>
+                A etapa <strong>{plano.ordemAlvo}. {plano.descricaoAlvo}</strong> passa a ser a atual.
+                {plano.concluir.length > 0 && ` ${plano.concluir.length} etapa${plano.concluir.length === 1 ? '' : 's'} anterior${plano.concluir.length === 1 ? '' : 'es'} ${plano.concluir.length === 1 ? 'será marcada' : 'serão marcadas'} como concluída${plano.concluir.length === 1 ? '' : 's'}.`}
+                {plano.reprojetar.length > 0 && ` ${plano.reprojetar.length} etapa${plano.reprojetar.length === 1 ? '' : 's'} ${plano.reprojetar.length === 1 ? 'tem' : 'têm'} as datas recalculadas em dias úteis, a partir de ${formatDateBR(plano.reprojetar[0].data_inicio)}.`}
+              </span>
+              {plano.novaDataEntrega && (
+                <span style={{ display: 'block', fontSize: 12, color: '#a8b4cc', marginTop: 6 }}>
+                  Data de entrega:{' '}
+                  {plano.dataEntregaAnterior
+                    ? <><s style={{ color: '#7d8aa5' }}>{formatDateBR(plano.dataEntregaAnterior)}</s>{' → '}</>
+                    : null}
+                  <strong style={{ color: '#eef2f9' }}>{formatDateBR(plano.novaDataEntrega)}</strong>
+                  {(() => {
+                    const d = deslocamentoDaEntrega(plano)
+                    if (d === null || d === 0) return null
+                    return (
+                      <span style={{ color: d > 0 ? '#e05561' : '#2fbf71', fontWeight: 700 }}>
+                        {' '}({d > 0 ? '+' : ''}{d} dia{Math.abs(d) === 1 ? '' : 's'})
+                      </span>
+                    )
+                  })()}
+                </span>
+              )}
+              <span style={{ display: 'block', fontSize: 11, color: '#7d8aa5', marginTop: 6 }}>
+                Desmarque para salvar o processo sem mexer nas datas do cronograma.
+              </span>
+            </span>
+          </label>
         </div>
       )}
 
