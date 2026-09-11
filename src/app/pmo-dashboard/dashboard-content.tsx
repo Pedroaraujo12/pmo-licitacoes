@@ -512,9 +512,9 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
           leadTime={leadTime}
           faixaSelecionada={prazoFilter}
           onSelecionarFaixa={aplicarPrazo}
-          atividades={porAtividade}
-          atividadeSelecionada={atividadeFilter}
-          onSelecionarAtividade={aplicarAtividade}
+          concluidosPorMes={concluidosPorMes}
+          concluidosComData={concluidosComData}
+          concluidosTotal={concluidos}
           carregando={loadingRows}
         />
       </div>
@@ -534,9 +534,9 @@ export default function DashboardContent({ userRole }: { userRole?: string | nul
 
       <CargaETendencia
         porResponsavel={carga}
-        concluidosPorMes={concluidosPorMes}
-        concluidosComData={concluidosComData}
-        concluidosTotal={concluidos}
+        atividades={porAtividade}
+        atividadeSelecionada={atividadeFilter}
+        onSelecionarAtividade={aplicarAtividade}
         responsavelSelecionado={responsavelFilter}
         onSelecionarResponsavel={aplicarResponsavel}
         carregando={loadingRows}

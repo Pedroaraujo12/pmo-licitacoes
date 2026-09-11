@@ -125,9 +125,9 @@ describe('a tela aguenta as strings reais', () => {
         leadTime={LEAD_TIME_REAL}
         faixaSelecionada={null}
         onSelecionarFaixa={vi.fn()}
-        atividades={[]}
-        atividadeSelecionada={null}
-        onSelecionarAtividade={vi.fn()}
+        concluidosPorMes={[]}
+        concluidosComData={0}
+        concluidosTotal={0}
       />,
     )
     const maisLongo = LEAD_TIME_REAL.reduce((a, b) => (a.etapa.length >= b.etapa.length ? a : b))
@@ -154,9 +154,9 @@ describe('a tela aguenta as strings reais', () => {
         leadTime={LEAD_TIME_REAL}
         faixaSelecionada={null}
         onSelecionarFaixa={vi.fn()}
-        atividades={[]}
-        atividadeSelecionada={null}
-        onSelecionarAtividade={vi.fn()}
+        concluidosPorMes={[]}
+        concluidosComData={0}
+        concluidosTotal={0}
       />,
     )
     const rotulos = [...document.querySelectorAll('svg[aria-label*="Tempo médio"] text')]
@@ -172,9 +172,9 @@ describe('a tela aguenta as strings reais', () => {
         leadTime={LEAD_TIME_REAL}
         faixaSelecionada={null}
         onSelecionarFaixa={vi.fn()}
-        atividades={[]}
-        atividadeSelecionada={null}
-        onSelecionarAtividade={vi.fn()}
+        concluidosPorMes={[]}
+        concluidosComData={0}
+        concluidosTotal={0}
       />,
     )
     const marcas = [...document.querySelectorAll('svg[aria-label*="Tempo médio"] text')]
@@ -189,16 +189,9 @@ describe('a tela aguenta as strings reais', () => {
     render(
       <CargaETendencia
         porResponsavel={CARGA_REAL}
-        concluidosPorMes={[
-          { chave: '2026-04', rotulo: 'Abr', total: 3 },
-          { chave: '2026-05', rotulo: 'Mai', total: 4 },
-          { chave: '2026-06', rotulo: 'Jun', total: 3 },
-          { chave: '2026-07', rotulo: 'Jul', total: 0 },
-          { chave: '2026-08', rotulo: 'Ago', total: 1 },
-          { chave: '2026-09', rotulo: 'Set', total: 0 },
-        ]}
-        concluidosComData={15}
-        concluidosTotal={24}
+        atividades={[]}
+        atividadeSelecionada={null}
+        onSelecionarAtividade={vi.fn()}
         responsavelSelecionado={null}
         onSelecionarResponsavel={vi.fn()}
       />,
@@ -206,20 +199,6 @@ describe('a tela aguenta as strings reais', () => {
     const rotulos = [...document.querySelectorAll('svg[aria-label*="responsável"] text')]
       .map(t => t.textContent || '')
     expect(rotulos).toContain('Karla Oliveira')
-  })
-
-  it('a tendencia admite a cobertura parcial em vez de parecer mais rasa do que e', () => {
-    render(
-      <CargaETendencia
-        porResponsavel={CARGA_REAL}
-        concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 1 }]}
-        concluidosComData={15}
-        concluidosTotal={24}
-        responsavelSelecionado={null}
-        onSelecionarResponsavel={vi.fn()}
-      />,
-    )
-    expect(screen.getByText(/15 de 24 concluídos têm cronograma registrado/)).toBeTruthy()
   })
 
   it('os 18 processos sem estimativa nao viram R$ 0,00 na carteira', () => {
@@ -253,9 +232,9 @@ describe('a tela aguenta as strings reais', () => {
     render(
       <CargaETendencia
         porResponsavel={equipe.map((nome, i) => ({ nome, total: i < 3 ? 3 : i < 8 ? 2 : 1, atrasados: 0 }))}
-        concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 1 }]}
-        concluidosComData={16}
-        concluidosTotal={26}
+        atividades={[]}
+        atividadeSelecionada={null}
+        onSelecionarAtividade={vi.fn()}
         responsavelSelecionado={null}
         onSelecionarResponsavel={vi.fn()}
       />,

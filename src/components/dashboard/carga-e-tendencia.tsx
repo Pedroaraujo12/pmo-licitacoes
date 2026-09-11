@@ -1,8 +1,9 @@
 'use client'
 
 import { CORES } from '@/lib/dashboard-tokens'
-import type { CargaResponsavel, PontoMensal } from '@/lib/dashboard-metrics'
-import { BarrasHorizontais, Colunas, Legenda, PainelGrafico, type LinhaBarra } from './chart-primitives'
+import type { CargaResponsavel, ContagemAtividade } from '@/lib/dashboard-metrics'
+import AtividadesChart from './atividades-chart'
+import { BarrasHorizontais, Legenda, PainelGrafico, type LinhaBarra } from './chart-primitives'
 
 /* ==========================================================================
    Carga e tendência.
@@ -16,17 +17,16 @@ import { BarrasHorizontais, Colunas, Legenda, PainelGrafico, type LinhaBarra } f
 
 interface Props {
   porResponsavel: CargaResponsavel[]
-  concluidosPorMes: PontoMensal[]
-  /** Concluídos com data de conclusão conhecida, e o total de concluídos. */
-  concluidosComData: number
-  concluidosTotal: number
+  atividades: ContagemAtividade[]
+  atividadeSelecionada: string | null
+  onSelecionarAtividade: (atividade: string | null) => void
   responsavelSelecionado: string | null
   onSelecionarResponsavel: (nome: string | null) => void
   carregando?: boolean
 }
 
 export default function CargaETendencia({
-  porResponsavel, concluidosPorMes, concluidosComData, concluidosTotal,
+  porResponsavel, atividades, atividadeSelecionada, onSelecionarAtividade,
   responsavelSelecionado, onSelecionarResponsavel, carregando,
 }: Props) {
   const totalEmAndamento = porResponsavel.reduce((s, r) => s + r.total, 0)
@@ -38,7 +38,6 @@ export default function CargaETendencia({
   const mostrados = porResponsavel.slice(0, VISIVEIS)
   const ocultos = porResponsavel.length - mostrados.length
   const alturaCarga = Math.max(176, mostrados.length * 21 + 20)
-  const totalConcluidos = concluidosPorMes.reduce((s, p) => s + p.total, 0)
   const maxCarga = Math.max(...porResponsavel.map(r => r.total), 1)
   const marcasCarga: number[] = []
   const passo = maxCarga <= 6 ? 1 : Math.ceil(maxCarga / 6)
@@ -113,36 +112,12 @@ export default function CargaETendencia({
           )}
         </PainelGrafico>
 
-        <PainelGrafico
-          titulo="Processos concluídos por mês"
-          meta={`${totalConcluidos} no período`}
-        >
-          <Colunas
-            colunas={concluidosPorMes.map(p => ({
-              rotulo: p.rotulo,
-              total: p.total,
-              descricao: (
-                <>
-                  <b>{p.rotulo}</b> — {p.total} concluído{p.total === 1 ? '' : 's'}
-                </>
-              ),
-            }))}
-            altura={212}
-            ariaLabel={
-              concluidosPorMes.length
-                ? `Processos concluídos por mês: ${concluidosPorMes.map(p => `${p.rotulo}, ${p.total}`).join('; ')}.`
-                : 'Sem histórico de conclusões.'
-            }
-            vazio={carregando ? 'Carregando…' : 'Sem histórico de conclusões'}
-          />
-          <p style={{ margin: '8px 0 0', fontSize: 10.5, color: CORES.ink3 }}>
-            Pela data de fim da última etapa concluída do cronograma
-            {/* a cobertura só é afirmada depois que os processos chegaram:
-                durante o carregamento diria "0 de 24", que não é verdade */}
-            {!carregando && concluidosTotal > 0 &&
-              ` — ${concluidosComData} de ${concluidosTotal} concluídos têm cronograma registrado`}.
-          </p>
-        </PainelGrafico>
+        <AtividadesChart
+          atividades={atividades}
+          selecionada={atividadeSelecionada}
+          onSelecionar={onSelecionarAtividade}
+          carregando={carregando}
+        />
       </div>
     </section>
   )

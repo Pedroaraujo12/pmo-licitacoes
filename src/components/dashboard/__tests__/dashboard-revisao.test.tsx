@@ -13,6 +13,7 @@ import StatusCards, { type StatusValue } from '../status-cards'
 import KpiCards from '../kpi-cards'
 import PrazoECiclo from '../prazo-e-ciclo'
 import CargaETendencia from '../carga-e-tendencia'
+import TendenciaChart from '../tendencia-chart'
 import FilterChips from '../filter-chips'
 import { agruparPorFaixaDePrazo } from '@/lib/dashboard-metrics'
 
@@ -149,7 +150,7 @@ describe('PrazoECiclo', () => {
 
   it('descreve o gráfico de prazo em texto, para quem não enxerga a barra', () => {
     render(
-      <PrazoECiclo faixas={faixas} leadTime={[]} faixaSelecionada={null} onSelecionarFaixa={vi.fn()} atividades={[]} atividadeSelecionada={null} onSelecionarAtividade={vi.fn()} />,
+      <PrazoECiclo faixas={faixas} leadTime={[]} faixaSelecionada={null} onSelecionarFaixa={vi.fn()} concluidosPorMes={[]} concluidosComData={0} concluidosTotal={0} />,
     )
     const grafico = screen.getByLabelText(/Processos por faixa de prazo:/)
     expect(grafico.getAttribute('aria-label')).toContain('Atraso acima de 30 dias, 1')
@@ -157,7 +158,7 @@ describe('PrazoECiclo', () => {
 
   it('diz claramente quando ainda não há cronograma concluído para medir ciclo', () => {
     render(
-      <PrazoECiclo faixas={faixas} leadTime={[]} faixaSelecionada={null} onSelecionarFaixa={vi.fn()} atividades={[]} atividadeSelecionada={null} onSelecionarAtividade={vi.fn()} />,
+      <PrazoECiclo faixas={faixas} leadTime={[]} faixaSelecionada={null} onSelecionarFaixa={vi.fn()} concluidosPorMes={[]} concluidosComData={0} concluidosTotal={0} />,
     )
     expect(screen.getByText('Sem atividades de cronograma concluídas')).toBeTruthy()
   })
@@ -169,9 +170,9 @@ describe('PrazoECiclo', () => {
         leadTime={[{ etapa: 'Emissão de Parecer jurídico (UJUR)', dias: 9, amostra: 14 }]}
         faixaSelecionada={null}
         onSelecionarFaixa={vi.fn()}
-        atividades={[]}
-        atividadeSelecionada={null}
-        onSelecionarAtividade={vi.fn()}
+        concluidosPorMes={[]}
+        concluidosComData={0}
+        concluidosTotal={0}
       />,
     )
     const grafico = screen.getByLabelText(/Tempo médio por etapa/)
@@ -186,9 +187,9 @@ describe('CargaETendencia', () => {
     render(
       <CargaETendencia
         porResponsavel={[{ nome: 'Bruno', total: 4, atrasados: 1 }, { nome: 'Ilma', total: 3, atrasados: 0 }]}
-        concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 7 }]}
-        concluidosComData={15}
-        concluidosTotal={24}
+        atividades={[]}
+        atividadeSelecionada={null}
+        onSelecionarAtividade={vi.fn()}
         responsavelSelecionado={null}
         onSelecionarResponsavel={vi.fn()}
       />,
@@ -205,9 +206,9 @@ describe('CargaETendencia', () => {
     render(
       <CargaETendencia
         porResponsavel={equipe}
-        concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 1 }]}
-        concluidosComData={15}
-        concluidosTotal={24}
+        atividades={[]}
+        atividadeSelecionada={null}
+        onSelecionarAtividade={vi.fn()}
         responsavelSelecionado={null}
         onSelecionarResponsavel={vi.fn()}
       />,
@@ -220,9 +221,9 @@ describe('CargaETendencia', () => {
     render(
       <CargaETendencia
         porResponsavel={[{ nome: 'Isaias', total: 1, atrasados: 0 }]}
-        concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 1 }]}
-        concluidosComData={15}
-        concluidosTotal={24}
+        atividades={[]}
+        atividadeSelecionada={null}
+        onSelecionarAtividade={vi.fn()}
         responsavelSelecionado={null}
         onSelecionarResponsavel={vi.fn()}
       />,
@@ -231,19 +232,26 @@ describe('CargaETendencia', () => {
     expect(screen.getByText(/1 responsável/)).toBeTruthy()
   })
 
+})
+
+describe('TendenciaChart', () => {
   it('declara a fonte da data de conclusão e quantos processos ela cobre', () => {
     render(
-      <CargaETendencia
-        porResponsavel={[]}
+      <TendenciaChart
         concluidosPorMes={[{ chave: '2026-08', rotulo: 'Ago', total: 7 }]}
         concluidosComData={15}
         concluidosTotal={24}
-        responsavelSelecionado={null}
-        onSelecionarResponsavel={vi.fn()}
       />,
     )
     // a cobertura parcial fica na cara em vez de a série parecer mais rasa do que é
     expect(screen.getByText(/15 de 24 concluídos têm cronograma registrado/)).toBeTruthy()
+  })
+
+  it('não afirma cobertura enquanto os processos não chegaram', () => {
+    render(
+      <TendenciaChart concluidosPorMes={[]} concluidosComData={0} concluidosTotal={24} carregando />,
+    )
+    expect(screen.queryByText(/de 24 concluídos têm cronograma/)).toBeNull()
   })
 })
 

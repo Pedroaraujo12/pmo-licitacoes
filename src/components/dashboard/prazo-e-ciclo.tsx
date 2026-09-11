@@ -1,8 +1,8 @@
 'use client'
 
 import { CORES } from '@/lib/dashboard-tokens'
-import { combinaFiltroPrazo, type ContagemFaixa, type LeadTimeEtapa, type FiltroPrazo, type ContagemAtividade } from '@/lib/dashboard-metrics'
-import AtividadesChart from './atividades-chart'
+import { combinaFiltroPrazo, type ContagemFaixa, type LeadTimeEtapa, type FiltroPrazo, type PontoMensal } from '@/lib/dashboard-metrics'
+import TendenciaChart from './tendencia-chart'
 import { BarrasHorizontais, Legenda, PainelGrafico, type LinhaBarra } from './chart-primitives'
 
 /* ==========================================================================
@@ -19,15 +19,15 @@ interface Props {
   leadTime: LeadTimeEtapa[]
   faixaSelecionada: FiltroPrazo | null
   onSelecionarFaixa: (faixa: FiltroPrazo | null) => void
-  atividades: ContagemAtividade[]
-  atividadeSelecionada: string | null
-  onSelecionarAtividade: (atividade: string | null) => void
+  concluidosPorMes: PontoMensal[]
+  concluidosComData: number
+  concluidosTotal: number
   carregando?: boolean
 }
 
 export default function PrazoECiclo({
   faixas, leadTime, faixaSelecionada, onSelecionarFaixa,
-  atividades, atividadeSelecionada, onSelecionarAtividade, carregando,
+  concluidosPorMes, concluidosComData, concluidosTotal, carregando,
 }: Props) {
   const totalAtrasados = faixas.filter(f => f.atrasada).reduce((s, f) => s + f.total, 0)
   const totalVencendo = faixas.find(f => !f.atrasada)?.total || 0
@@ -89,14 +89,11 @@ export default function PrazoECiclo({
         </span>
       </div>
 
-      {/* Antes dos dois painéis: é a leitura mais consultada da seção, e vem
-          em largura cheia porque são 26 atividades com rótulos de até 173
-          caracteres — espremer isso em meia tela deixaria tudo truncado. */}
       <div style={{ marginBottom: 16 }}>
-        <AtividadesChart
-          atividades={atividades}
-          selecionada={atividadeSelecionada}
-          onSelecionar={onSelecionarAtividade}
+        <TendenciaChart
+          concluidosPorMes={concluidosPorMes}
+          concluidosComData={concluidosComData}
+          concluidosTotal={concluidosTotal}
           carregando={carregando}
         />
       </div>
